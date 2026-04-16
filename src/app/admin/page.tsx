@@ -4,19 +4,132 @@ import { createClient } from '@/lib/supabase/client';
 import type { Category, Table, Passation, LiveStatus } from '@/lib/types';
 import Link from 'next/link';
 
+const ADMIN_PASSWORD = 'beniclarilaetiobom123?!';
+
 const STATUS_COLORS: Record<string, string> = {
-  Scheduled: 'bg-gray-100 text-gray-700',
-  Prepare: 'bg-yellow-100 text-yellow-800',
-  Next: 'bg-blue-100 text-blue-800',
-  'In Progress': 'bg-green-100 text-green-800',
-  Finished: 'bg-emerald-100 text-emerald-800',
-  Absent: 'bg-red-100 text-red-800',
-  Delayed: 'bg-orange-100 text-orange-800',
+  Scheduled: 'bg-slate-100 text-slate-600',
+  Prepare: 'bg-amber-100 text-amber-700',
+  Next: 'bg-blue-100 text-blue-700',
+  'In Progress': 'bg-emerald-100 text-emerald-700',
+  Finished: 'bg-green-100 text-green-700',
+  Absent: 'bg-red-100 text-red-600',
+  Delayed: 'bg-orange-100 text-orange-600',
+};
+
+const STATUS_DOT: Record<string, string> = {
+  Scheduled: 'bg-slate-400',
+  Prepare: 'bg-amber-400',
+  Next: 'bg-blue-400',
+  'In Progress': 'bg-emerald-400',
+  Finished: 'bg-green-400',
+  Absent: 'bg-red-400',
+  Delayed: 'bg-orange-400',
 };
 
 const LIVE_STATUSES: LiveStatus[] = ['Scheduled', 'Prepare', 'Next', 'In Progress', 'Finished', 'Absent', 'Delayed'];
 
+// ── Password Gate ──────────────────────────────────────────────────────────────
+function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
+  const [value, setValue] = useState('');
+  const [error, setError] = useState(false);
+  const [show, setShow] = useState(false);
+
+  function attempt() {
+    if (value === ADMIN_PASSWORD) {
+      sessionStorage.setItem('admin_unlocked', 'true');
+      onUnlock();
+    } else {
+      setError(true);
+      setValue('');
+      setTimeout(() => setError(false), 2000);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center p-6">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <div className="inline-flex p-4 bg-slate-800 rounded-2xl mb-4 border border-slate-700">
+            <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-1">Admin Access</h1>
+          <p className="text-slate-400 text-sm">Enter the admin password to continue</p>
+        </div>
+
+        <div className={`bg-slate-800 border rounded-2xl p-6 transition-all ${error ? 'border-red-500 shake' : 'border-slate-700'}`}>
+          <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
+          <div className="relative mb-4">
+            <input
+              type={show ? 'text' : 'password'}
+              className={`w-full bg-slate-900 border rounded-xl px-4 py-3 text-white placeholder-slate-500 outline-none focus:ring-2 transition pr-10 ${
+                error ? 'border-red-500 focus:ring-red-500/30' : 'border-slate-600 focus:ring-blue-500/30 focus:border-blue-500'
+              }`}
+              placeholder="Enter password…"
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && attempt()}
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={() => setShow(s => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+            >
+              {show ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              )}
+            </button>
+          </div>
+          {error && (
+            <p className="text-red-400 text-sm mb-3 flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              Incorrect password. Try again.
+            </p>
+          )}
+          <button
+            onClick={attempt}
+            disabled={!value}
+            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-3 rounded-xl transition"
+          >
+            Unlock Admin Panel
+          </button>
+        </div>
+
+        <div className="text-center mt-6">
+          <Link href="/" className="text-slate-500 hover:text-slate-300 text-sm transition">← Back to home</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Admin Panel ───────────────────────────────────────────────────────────
 export default function AdminPage() {
+  const [unlocked, setUnlocked] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('admin_unlocked') === 'true') {
+      setUnlocked(true);
+    }
+  }, []);
+
+  if (!unlocked) return <PasswordGate onUnlock={() => setUnlocked(true)} />;
+  return <AdminDashboard />;
+}
+
+function AdminDashboard() {
   const supabase = useMemo(() => createClient(), []);
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
@@ -33,6 +146,7 @@ export default function AdminPage() {
   const [editPasId, setEditPasId] = useState<string | null>(null);
   const [showPasForm, setShowPasForm] = useState(false);
   const [filteredTables, setFilteredTables] = useState<Table[]>([]);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   const load = useCallback(async () => {
     const [{ data: cats }, { data: tabs }, { data: pas }] = await Promise.all([
@@ -42,7 +156,7 @@ export default function AdminPage() {
     ]);
     if (cats) setCategories(cats);
     if (tabs) setTables(tabs);
-    if (pas) setPassations(pas as any);
+    if (pas) setPassations(pas as unknown as Passation[]);
   }, [supabase]);
 
   useEffect(() => { load(); }, [load]);
@@ -55,7 +169,7 @@ export default function AdminPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, load)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [load]);
+  }, [load, supabase]);
 
   useEffect(() => {
     if (pasForm.category_id) {
@@ -70,7 +184,8 @@ export default function AdminPage() {
     } else {
       setFilteredTables([]);
     }
-  }, [pasForm.category_id, categories, tables, pasForm.table_id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pasForm.category_id, categories, tables]);
 
   async function syncTablesForCategory(catId: string, count: number) {
     for (let i = 1; i <= count; i++) {
@@ -80,6 +195,15 @@ export default function AdminPage() {
       );
     }
     await supabase.from('tables').update({ active: false }).eq('category_id', catId).gt('table_number', count);
+  }
+
+  async function syncAllTables() {
+    setSyncingAll(true);
+    for (const cat of categories) {
+      await syncTablesForCategory(cat.id, cat.table_count);
+    }
+    await load();
+    setSyncingAll(false);
   }
 
   async function saveCategory() {
@@ -100,6 +224,7 @@ export default function AdminPage() {
     setCatForm({ name: cat.name, age_range_label: cat.age_range_label || '', table_count: cat.table_count });
     setEditCatId(cat.id);
     setActiveTab('categories');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function deleteCategory(id: string) {
@@ -166,6 +291,7 @@ export default function AdminPage() {
     });
     setEditPasId(p.id);
     setShowPasForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function deletePassation(id: string) {
@@ -174,98 +300,194 @@ export default function AdminPage() {
     load();
   }
 
+  function logout() {
+    sessionStorage.removeItem('admin_unlocked');
+    window.location.reload();
+  }
+
   const getCatLabel = (id: string) => {
     const c = categories.find(c => c.id === id);
-    return c ? `${c.name}${c.age_range_label ? ` (${c.age_range_label})` : ''}` : id;
+    return c ? `${c.name}${c.age_range_label ? ` (${c.age_range_label})` : ''}` : '—';
   };
   const getTableLabel = (id: string) => {
     const t = tables.find(t => t.id === id);
-    return t ? (t.display_label || `Table ${t.table_number}`) : id;
+    return t ? (t.display_label || `Table ${t.table_number}`) : '—';
   };
 
+  const tablesExist = tables.length > 0;
+
+  const inputCls = 'w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition placeholder-slate-400';
+  const labelCls = 'block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5';
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-blue-700 text-white px-6 py-4 flex items-center justify-between shadow">
-        <div>
-          <h1 className="text-2xl font-bold">Admin Panel</h1>
-          <p className="text-blue-200 text-sm">MakeX 2026 — Lebanon</p>
+    <div className="min-h-screen bg-slate-50">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-slate-800 leading-tight">Admin Panel</h1>
+              <p className="text-xs text-slate-400">MakeX 2026 — Lebanon</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="text-sm text-slate-500 hover:text-slate-700 transition">← Home</Link>
+            <button onClick={logout}
+              className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition">
+              Lock
+            </button>
+          </div>
         </div>
-        <Link href="/" className="text-blue-200 hover:text-white text-sm">← Home</Link>
       </header>
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="flex gap-2 mb-6">
+
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Stats row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+          {[
+            { label: 'Categories', value: categories.length, color: 'text-blue-600', bg: 'bg-blue-50' },
+            { label: 'Tables', value: tables.filter(t => t.active).length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Passations', value: passations.length, color: 'text-violet-600', bg: 'bg-violet-50' },
+            { label: 'Finished', value: passations.filter(p => p.live_status === 'Finished').length, color: 'text-green-600', bg: 'bg-green-50' },
+          ].map(s => (
+            <div key={s.label} className={`${s.bg} rounded-2xl p-4 border border-white shadow-sm`}>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{s.label}</p>
+              <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Tables warning */}
+        {!tablesExist && categories.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <p className="text-sm text-amber-800 font-medium">No tables found. Click Sync to generate tables for all categories.</p>
+            </div>
+            <button onClick={syncAllTables} disabled={syncingAll}
+              className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition disabled:opacity-50">
+              {syncingAll ? 'Syncing…' : 'Sync Tables'}
+            </button>
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="flex gap-1.5 mb-6 bg-white border border-slate-200 rounded-xl p-1 w-fit shadow-sm">
           {(['passations', 'categories'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`px-5 py-2 rounded-lg font-semibold capitalize transition ${activeTab === tab ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100 border'}`}>
+              className={`px-5 py-2 rounded-lg font-semibold text-sm capitalize transition ${
+                activeTab === tab ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              }`}>
               {tab}
+              {tab === 'passations' && (
+                <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab ? 'bg-white/20' : 'bg-slate-100'}`}>
+                  {passations.length}
+                </span>
+              )}
+              {tab === 'categories' && (
+                <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab ? 'bg-white/20' : 'bg-slate-100'}`}>
+                  {categories.length}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
+        {/* ── CATEGORIES TAB ── */}
         {activeTab === 'categories' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow p-6">
-              <h2 className="text-xl font-bold mb-4">{editCatId ? 'Edit Category' : 'Add Category'}</h2>
+          <div className="space-y-5">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <h2 className="text-base font-bold text-slate-800 mb-5">
+                {editCatId ? 'Edit Category' : 'New Category'}
+              </h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Name *</label>
-                  <input className="w-full border rounded-lg px-3 py-2" value={catForm.name}
-                    onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. MakeX Starter" />
+                  <label className={labelCls}>Category Name *</label>
+                  <input className={inputCls} value={catForm.name}
+                    onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="e.g. MakeX Starter" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Age Range Label</label>
-                  <input className="w-full border rounded-lg px-3 py-2" value={catForm.age_range_label}
-                    onChange={e => setCatForm(f => ({ ...f, age_range_label: e.target.value }))} placeholder="e.g. 11–13 years old" />
+                  <label className={labelCls}>Age Range Label</label>
+                  <input className={inputCls} value={catForm.age_range_label}
+                    onChange={e => setCatForm(f => ({ ...f, age_range_label: e.target.value }))}
+                    placeholder="e.g. 11–13 years old" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Table Count *</label>
-                  <input type="number" min={1} max={20} className="w-full border rounded-lg px-3 py-2"
+                  <label className={labelCls}>Number of Tables *</label>
+                  <input type="number" min={1} max={20} className={inputCls}
                     value={catForm.table_count}
                     onChange={e => setCatForm(f => ({ ...f, table_count: parseInt(e.target.value) || 1 }))} />
                 </div>
               </div>
-              <div className="flex gap-3 mt-4">
-                <button onClick={saveCategory} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700">
-                  {editCatId ? 'Update' : 'Add Category'}
+              <div className="flex gap-3 mt-5">
+                <button onClick={saveCategory}
+                  className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition">
+                  {editCatId ? 'Update Category' : 'Add Category'}
                 </button>
                 {editCatId && (
                   <button onClick={() => { setCatForm({ name: '', age_range_label: '', table_count: 1 }); setEditCatId(null); }}
-                    className="bg-gray-200 px-6 py-2 rounded-lg font-semibold hover:bg-gray-300">Cancel</button>
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold text-sm transition">
+                    Cancel
+                  </button>
                 )}
               </div>
             </div>
-            <div className="bg-white rounded-2xl shadow overflow-hidden">
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-semibold text-slate-800">All Categories</h3>
+                <button onClick={syncAllTables} disabled={syncingAll}
+                  className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg transition disabled:opacity-50">
+                  {syncingAll ? 'Syncing…' : 'Sync All Tables'}
+                </button>
+              </div>
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    <th className="text-left px-4 py-3 font-semibold">Name</th>
-                    <th className="text-left px-4 py-3 font-semibold">Age Range</th>
-                    <th className="text-left px-4 py-3 font-semibold">Tables</th>
-                    <th className="text-left px-4 py-3 font-semibold">Status</th>
-                    <th className="text-right px-4 py-3 font-semibold">Actions</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Age Range</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tables</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                    <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-50">
                   {categories.map(cat => (
-                    <tr key={cat.id} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium">{cat.name}</td>
-                      <td className="px-4 py-3 text-gray-500">{cat.age_range_label || '—'}</td>
-                      <td className="px-4 py-3">{cat.table_count}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${cat.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                    <tr key={cat.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4 font-semibold text-slate-800">{cat.name}</td>
+                      <td className="px-6 py-4 text-slate-500">{cat.age_range_label || '—'}</td>
+                      <td className="px-6 py-4">
+                        <span className="bg-slate-100 text-slate-700 text-xs font-bold px-2 py-0.5 rounded-md">
+                          {cat.table_count} {cat.table_count === 1 ? 'table' : 'tables'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cat.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${cat.active ? 'bg-emerald-400' : 'bg-slate-400'}`} />
                           {cat.active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-6 py-4 text-right">
                         <div className="flex gap-2 justify-end">
-                          <button onClick={() => editCategory(cat)} className="text-blue-600 hover:underline text-sm">Edit</button>
-                          <button onClick={() => deleteCategory(cat.id)} className="text-red-500 hover:underline text-sm">Delete</button>
+                          <button onClick={() => editCategory(cat)}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-50 transition">Edit</button>
+                          <button onClick={() => deleteCategory(cat.id)}
+                            className="text-red-500 hover:text-red-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-red-50 transition">Delete</button>
                         </div>
                       </td>
                     </tr>
                   ))}
                   {categories.length === 0 && (
-                    <tr><td colSpan={5} className="text-center py-8 text-gray-400">No categories yet</td></tr>
+                    <tr><td colSpan={5} className="text-center py-12 text-slate-400">No categories yet. Add one above.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -273,167 +495,209 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* ── PASSATIONS TAB ── */}
         {activeTab === 'passations' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold">Passations ({passations.length})</h2>
-              <button onClick={() => setShowPasForm(!showPasForm)}
-                className="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700">
-                {showPasForm ? 'Hide Form' : '+ Add Passation'}
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-slate-800">Passations</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{passations.length} total</p>
+              </div>
+              <button onClick={() => { resetPasForm(); setShowPasForm(!showPasForm); }}
+                className="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition flex items-center gap-2">
+                {showPasForm ? (
+                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>Cancel</>
+                ) : (
+                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>Add Passation</>
+                )}
               </button>
             </div>
 
             {showPasForm && (
-              <div className="bg-white rounded-2xl shadow p-6">
-                <h3 className="text-lg font-bold mb-4">{editPasId ? 'Edit Passation' : 'New Passation'}</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Team Name *</label>
-                    <input className="w-full border rounded-lg px-3 py-2" value={pasForm.team_name}
-                      onChange={e => setPasForm(f => ({ ...f, team_name: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Student Names</label>
-                    <input className="w-full border rounded-lg px-3 py-2" value={pasForm.student_names}
-                      onChange={e => setPasForm(f => ({ ...f, student_names: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Coach Name</label>
-                    <input className="w-full border rounded-lg px-3 py-2" value={pasForm.coach_name}
-                      onChange={e => setPasForm(f => ({ ...f, coach_name: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Parent Name</label>
-                    <input className="w-full border rounded-lg px-3 py-2" value={pasForm.parent_name}
-                      onChange={e => setPasForm(f => ({ ...f, parent_name: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Parent Contact</label>
-                    <input className="w-full border rounded-lg px-3 py-2" value={pasForm.parent_contact}
-                      onChange={e => setPasForm(f => ({ ...f, parent_contact: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Category *</label>
-                    <select className="w-full border rounded-lg px-3 py-2" value={pasForm.category_id}
-                      onChange={e => setPasForm(f => ({ ...f, category_id: e.target.value, table_id: '' }))}>
-                      <option value="">Select category…</option>
-                      {categories.filter(c => c.active).map(c => (
-                        <option key={c.id} value={c.id}>{c.name}{c.age_range_label ? ` (${c.age_range_label})` : ''}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Table *</label>
-                    <select className="w-full border rounded-lg px-3 py-2" value={pasForm.table_id}
-                      onChange={e => setPasForm(f => ({ ...f, table_id: e.target.value }))}
-                      disabled={!pasForm.category_id}>
-                      <option value="">Select table…</option>
-                      {filteredTables.map(t => (
-                        <option key={t.id} value={t.id}>{t.display_label || `Table ${t.table_number}`}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Scheduled Time</label>
-                    <input type="datetime-local" className="w-full border rounded-lg px-3 py-2" value={pasForm.scheduled_time}
-                      onChange={e => setPasForm(f => ({ ...f, scheduled_time: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Queue Position</label>
-                    <input type="number" min={0} className="w-full border rounded-lg px-3 py-2" value={pasForm.queue_position}
-                      onChange={e => setPasForm(f => ({ ...f, queue_position: parseInt(e.target.value) || 0 }))} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Status</label>
-                    <select className="w-full border rounded-lg px-3 py-2" value={pasForm.live_status}
-                      onChange={e => setPasForm(f => ({ ...f, live_status: e.target.value as LiveStatus }))}>
-                      {LIVE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Judge Name</label>
-                    <input className="w-full border rounded-lg px-3 py-2" value={pasForm.judge_name}
-                      onChange={e => setPasForm(f => ({ ...f, judge_name: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Score</label>
-                    <input type="number" className="w-full border rounded-lg px-3 py-2" value={pasForm.score}
-                      onChange={e => setPasForm(f => ({ ...f, score: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Time (seconds)</label>
-                    <input type="number" className="w-full border rounded-lg px-3 py-2" value={pasForm.time_seconds}
-                      onChange={e => setPasForm(f => ({ ...f, time_seconds: e.target.value }))} />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium mb-1">Notes</label>
-                    <textarea className="w-full border rounded-lg px-3 py-2" rows={2} value={pasForm.notes}
-                      onChange={e => setPasForm(f => ({ ...f, notes: e.target.value }))} />
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <h3 className="font-bold text-slate-800 mb-5">{editPasId ? 'Edit Passation' : 'New Passation'}</h3>
+
+                <div className="mb-5">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Team Info</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className={labelCls}>Team Name *</label>
+                      <input className={inputCls} value={pasForm.team_name}
+                        onChange={e => setPasForm(f => ({ ...f, team_name: e.target.value }))} placeholder="Team name" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Student Names</label>
+                      <input className={inputCls} value={pasForm.student_names}
+                        onChange={e => setPasForm(f => ({ ...f, student_names: e.target.value }))} placeholder="Student 1, Student 2…" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Coach Name</label>
+                      <input className={inputCls} value={pasForm.coach_name}
+                        onChange={e => setPasForm(f => ({ ...f, coach_name: e.target.value }))} placeholder="Coach name" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Parent Name</label>
+                      <input className={inputCls} value={pasForm.parent_name}
+                        onChange={e => setPasForm(f => ({ ...f, parent_name: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Parent Contact</label>
+                      <input className={inputCls} value={pasForm.parent_contact}
+                        onChange={e => setPasForm(f => ({ ...f, parent_contact: e.target.value }))} placeholder="Phone or email" />
+                    </div>
                   </div>
                 </div>
-                <div className="flex gap-3 mt-4">
-                  <button onClick={savePassation} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700">
-                    {editPasId ? 'Update' : 'Add'}
+
+                <div className="border-t border-slate-100 pt-5 mb-5">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Assignment</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className={labelCls}>Category *</label>
+                      <select className={inputCls} value={pasForm.category_id}
+                        onChange={e => setPasForm(f => ({ ...f, category_id: e.target.value, table_id: '' }))}>
+                        <option value="">Select category…</option>
+                        {categories.filter(c => c.active).map(c => (
+                          <option key={c.id} value={c.id}>{c.name}{c.age_range_label ? ` (${c.age_range_label})` : ''}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Table *</label>
+                      <select className={inputCls} value={pasForm.table_id}
+                        onChange={e => setPasForm(f => ({ ...f, table_id: e.target.value }))}
+                        disabled={!pasForm.category_id}>
+                        <option value="">{pasForm.category_id ? 'Select table…' : 'Select category first'}</option>
+                        {filteredTables.map(t => (
+                          <option key={t.id} value={t.id}>{t.display_label || `Table ${t.table_number}`}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Scheduled Time</label>
+                      <input type="datetime-local" className={inputCls} value={pasForm.scheduled_time}
+                        onChange={e => setPasForm(f => ({ ...f, scheduled_time: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Queue Position</label>
+                      <input type="number" min={0} className={inputCls} value={pasForm.queue_position}
+                        onChange={e => setPasForm(f => ({ ...f, queue_position: parseInt(e.target.value) || 0 }))} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Status</label>
+                      <select className={inputCls} value={pasForm.live_status}
+                        onChange={e => setPasForm(f => ({ ...f, live_status: e.target.value as LiveStatus }))}>
+                        {LIVE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Judge Name</label>
+                      <input className={inputCls} value={pasForm.judge_name}
+                        onChange={e => setPasForm(f => ({ ...f, judge_name: e.target.value }))} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 pt-5 mb-5">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Results (optional)</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className={labelCls}>Score</label>
+                      <input type="number" className={inputCls} value={pasForm.score}
+                        onChange={e => setPasForm(f => ({ ...f, score: e.target.value }))} placeholder="0" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Time (seconds)</label>
+                      <input type="number" className={inputCls} value={pasForm.time_seconds}
+                        onChange={e => setPasForm(f => ({ ...f, time_seconds: e.target.value }))} placeholder="0" />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <label className={labelCls}>Notes</label>
+                      <textarea className={inputCls} rows={2} value={pasForm.notes}
+                        onChange={e => setPasForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes…" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button onClick={savePassation}
+                    className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition">
+                    {editPasId ? 'Update Passation' : 'Add Passation'}
                   </button>
-                  <button onClick={resetPasForm} className="bg-gray-200 px-6 py-2 rounded-lg font-semibold hover:bg-gray-300">Cancel</button>
+                  <button onClick={resetPasForm}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold text-sm transition">
+                    Cancel
+                  </button>
                 </div>
               </div>
             )}
 
-            <div className="bg-white rounded-2xl shadow overflow-x-auto">
-              <table className="w-full text-sm min-w-[900px]">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="text-left px-4 py-3 font-semibold">Team</th>
-                    <th className="text-left px-4 py-3 font-semibold">Category</th>
-                    <th className="text-left px-4 py-3 font-semibold">Table</th>
-                    <th className="text-left px-4 py-3 font-semibold">Coach</th>
-                    <th className="text-left px-4 py-3 font-semibold">Time</th>
-                    <th className="text-left px-4 py-3 font-semibold">Status</th>
-                    <th className="text-left px-4 py-3 font-semibold">Score</th>
-                    <th className="text-left px-4 py-3 font-semibold">Judge</th>
-                    <th className="text-left px-4 py-3 font-semibold">Sig</th>
-                    <th className="text-right px-4 py-3 font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {passations.map(p => (
-                    <tr key={p.id} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div className="font-medium">{p.team_name}</div>
-                        {p.student_names && <div className="text-xs text-gray-400">{p.student_names}</div>}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">{getCatLabel(p.category_id)}</td>
-                      <td className="px-4 py-3">{getTableLabel(p.table_id)}</td>
-                      <td className="px-4 py-3 text-gray-600">{p.coach_name || '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {p.scheduled_time ? new Date(p.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[p.live_status] || 'bg-gray-100'}`}>
-                          {p.live_status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">{p.score ?? '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">{p.judge_name || '—'}</td>
-                      <td className="px-4 py-3">
-                        {p.signature_image ? (
-                          <img src={p.signature_image} alt="sig" className="h-8 w-16 object-contain border rounded" />
-                        ) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex gap-2 justify-end">
-                          <button onClick={() => editPassation(p)} className="text-blue-600 hover:underline text-sm">Edit</button>
-                          <button onClick={() => deletePassation(p.id)} className="text-red-500 hover:underline text-sm">Del</button>
-                        </div>
-                      </td>
+            {/* Passations table */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[960px]">
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      {['Team', 'Category', 'Table', 'Coach', 'Scheduled', 'Status', 'Score', 'Judge', 'Sig', ''].map(h => (
+                        <th key={h} className={`px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider ${h === '' ? 'text-right' : 'text-left'}`}>
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                  {passations.length === 0 && (
-                    <tr><td colSpan={10} className="text-center py-8 text-gray-400">No passations yet</td></tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {passations.map(p => (
+                      <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <div className="font-semibold text-slate-800">{p.team_name}</div>
+                          {p.student_names && <div className="text-xs text-slate-400 mt-0.5">{p.student_names}</div>}
+                        </td>
+                        <td className="px-5 py-3.5 text-slate-500 text-xs max-w-[160px]">{getCatLabel(p.category_id)}</td>
+                        <td className="px-5 py-3.5">
+                          <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
+                            {getTableLabel(p.table_id)}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-slate-500 text-xs">{p.coach_name || '—'}</td>
+                        <td className="px-5 py-3.5 text-slate-500 text-xs">
+                          {p.scheduled_time ? new Date(p.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[p.live_status] || 'bg-slate-100 text-slate-600'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[p.live_status] || 'bg-slate-400'}`} />
+                            {p.live_status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-slate-700 font-mono text-xs">{p.score ?? '—'}</td>
+                        <td className="px-5 py-3.5 text-slate-500 text-xs">{p.judge_name || '—'}</td>
+                        <td className="px-5 py-3.5">
+                          {p.signature_image ? (
+                            <img src={p.signature_image} alt="sig" className="h-7 w-14 object-contain border border-slate-200 rounded-md bg-white" />
+                          ) : <span className="text-slate-300">—</span>}
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="flex gap-1.5 justify-end">
+                            <button onClick={() => editPassation(p)}
+                              className="text-blue-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-50 transition">Edit</button>
+                            <button onClick={() => deletePassation(p.id)}
+                              className="text-red-500 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-red-50 transition">Del</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {passations.length === 0 && (
+                      <tr>
+                        <td colSpan={10} className="text-center py-16">
+                          <svg className="w-10 h-10 text-slate-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                          <p className="text-slate-400 text-sm">No passations yet</p>
+                          <p className="text-slate-300 text-xs mt-1">Click Add Passation to get started</p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

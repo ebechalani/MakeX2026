@@ -58,4 +58,12 @@ INSERT INTO categories (name, age_range_label, table_count) VALUES
   ('Capelli Inspire', '10–12 years old', 5),
   ('Capelli Starter', '13–15 years old', 5),
   ('MakeX Inspire', '8–12 years old', 5),
-  ('MakeX Starter', '11–13 years old', 1);
+  ('MakeX Starter', '11–13 years old', 1)
+ON CONFLICT DO NOTHING;
+
+-- Seed tables for all categories (generates Table 1..N for each category)
+INSERT INTO tables (category_id, table_number, display_label, active)
+SELECT c.id, g.n, 'Table ' || g.n, true
+FROM categories c
+JOIN LATERAL generate_series(1, c.table_count) AS g(n) ON true
+ON CONFLICT (category_id, table_number) DO NOTHING;

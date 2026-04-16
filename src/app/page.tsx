@@ -5,51 +5,116 @@ const pages = [
     href: '/admin',
     label: 'Admin Panel',
     description: 'Manage categories, tables, and passations. View all judge results.',
-    color: 'bg-blue-600 hover:bg-blue-700',
-    icon: '⚙️',
+    gradient: 'from-slate-700 to-slate-900',
+    border: 'border-slate-600',
+    badge: 'Admin Only',
+    badgeColor: 'bg-red-500',
+    icon: (
+      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
   },
   {
     href: '/judge',
     label: 'Judge Interface',
-    description: 'Manage your table queue, enter scores, and finalize results.',
-    color: 'bg-green-600 hover:bg-green-700',
-    icon: '🏆',
+    description: 'Manage your assigned table — score, signature, and finalize results.',
+    gradient: 'from-emerald-700 to-emerald-900',
+    border: 'border-emerald-600',
+    badge: 'Judges',
+    badgeColor: 'bg-emerald-500',
+    icon: (
+      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+      </svg>
+    ),
   },
   {
     href: '/coach',
     label: 'Coach / Teacher View',
-    description: 'Track your teams live — see status, table, and timing.',
-    color: 'bg-purple-600 hover:bg-purple-700',
-    icon: '👨‍🏫',
+    description: 'Track your teams live — see status, table assignment, and timing.',
+    gradient: 'from-violet-700 to-violet-900',
+    border: 'border-violet-600',
+    badge: 'Coaches',
+    badgeColor: 'bg-violet-500',
+    icon: (
+      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
   },
   {
     href: '/live',
-    label: 'Public Display Screen',
-    description: 'Live screen for venue displays — NOW / NEXT / PREPARE.',
-    color: 'bg-orange-600 hover:bg-orange-700',
-    icon: '📺',
+    label: 'Public Display',
+    description: 'Live venue screen — NOW, NEXT, and PREPARE at every table.',
+    gradient: 'from-amber-600 to-orange-800',
+    border: 'border-amber-600',
+    badge: 'Public',
+    badgeColor: 'bg-amber-500',
+    icon: (
+      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    ),
   },
 ];
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex flex-col items-center justify-center p-6">
-      <div className="text-center mb-12">
-        <h1 className="text-5xl font-black text-white mb-3 tracking-tight">MakeX 2026</h1>
-        <p className="text-blue-200 text-xl">Lebanon National Competition — Live Management System</p>
+    <main className="min-h-screen bg-[#0a0f1e] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl" />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-3xl">
-        {pages.map((p) => (
-          <Link
-            key={p.href}
-            href={p.href}
-            className={`${p.color} text-white rounded-2xl p-8 flex flex-col gap-3 shadow-xl transition-transform hover:scale-105`}
-          >
-            <span className="text-4xl">{p.icon}</span>
-            <span className="text-2xl font-bold">{p.label}</span>
-            <span className="text-sm opacity-90">{p.description}</span>
-          </Link>
-        ))}
+
+      <div className="relative z-10 w-full max-w-4xl">
+        {/* Header */}
+        <div className="text-center mb-14">
+          <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-6">
+            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-white/60 text-sm font-medium tracking-wide">Live System Active</span>
+          </div>
+          <h1 className="text-6xl font-black text-white mb-4 tracking-tight leading-none">
+            MakeX<span className="text-blue-400"> 2026</span>
+          </h1>
+          <p className="text-white/50 text-lg font-medium">Lebanon National Competition · Queue Management System</p>
+        </div>
+
+        {/* Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {pages.map((p) => (
+            <Link
+              key={p.href}
+              href={p.href}
+              className={`group relative bg-gradient-to-br ${p.gradient} border ${p.border} rounded-2xl p-7 flex flex-col gap-4 shadow-2xl transition-all duration-200 hover:scale-[1.02] hover:shadow-blue-900/30`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="p-2.5 bg-white/10 rounded-xl text-white">{p.icon}</div>
+                <span className={`${p.badgeColor} text-white text-xs font-bold px-2.5 py-1 rounded-full tracking-wide uppercase`}>
+                  {p.badge}
+                </span>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white mb-1">{p.label}</h2>
+                <p className="text-white/60 text-sm leading-relaxed">{p.description}</p>
+              </div>
+              <div className="flex items-center gap-1 text-white/40 text-xs font-medium group-hover:text-white/60 transition-colors">
+                Open
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </Link>
+          ))}
+        </div>
+
+        <p className="text-center text-white/20 text-xs mt-10">MakeX 2026 · Lebanon · Competition Management System</p>
       </div>
     </main>
   );
