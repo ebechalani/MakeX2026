@@ -291,7 +291,7 @@ export default function JudgePage() {
                 </button>
               )}
 
-              {/* Score + Time */}
+              {/* Score + Mission Duration */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Score</label>
@@ -299,9 +299,13 @@ export default function JudgePage() {
                     value={score} onChange={e => setScore(e.target.value)} placeholder="0" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Time (seconds)</label>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Mission Duration
+                    <span className="ml-1 text-slate-400 font-normal normal-case">(seconds)</span>
+                  </label>
                   <input type="number" className={inputCls + ' text-xl font-bold'}
                     value={timeVal} onChange={e => setTimeVal(e.target.value)} placeholder="0" />
+                  <p className="text-xs text-slate-400 mt-1">How long the mission took to complete</p>
                 </div>
               </div>
 

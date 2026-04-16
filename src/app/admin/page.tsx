@@ -573,7 +573,8 @@ function AdminDashboard() {
                       </select>
                     </div>
                     <div>
-                      <label className={labelCls}>Scheduled Time</label>
+                      <label className={labelCls}>Appointment Time</label>
+                      <p className="text-xs text-slate-400 -mt-1 mb-1.5">When this team is scheduled to present</p>
                       <input type="datetime-local" className={inputCls} value={pasForm.scheduled_time}
                         onChange={e => setPasForm(f => ({ ...f, scheduled_time: e.target.value }))} />
                     </div>
@@ -606,7 +607,8 @@ function AdminDashboard() {
                         onChange={e => setPasForm(f => ({ ...f, score: e.target.value }))} placeholder="0" />
                     </div>
                     <div>
-                      <label className={labelCls}>Time (seconds)</label>
+                      <label className={labelCls}>Mission Duration (sec)</label>
+                      <p className="text-xs text-slate-400 -mt-1 mb-1.5">How long the mission took to complete</p>
                       <input type="number" className={inputCls} value={pasForm.time_seconds}
                         onChange={e => setPasForm(f => ({ ...f, time_seconds: e.target.value }))} placeholder="0" />
                     </div>
