@@ -518,17 +518,14 @@ function AdminDashboard() {
                 <h3 className="font-bold text-slate-800 mb-5">{editPasId ? 'Edit Passation' : 'New Passation'}</h3>
 
                 <div className="mb-5">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Team Info</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Student Info</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className={labelCls}>Team Name *</label>
+                    <div className="sm:col-span-2 md:col-span-1">
+                      <label className={labelCls}>Student Full Name *</label>
+                      <p className="text-xs text-slate-400 -mt-1 mb-1.5">This name will appear on all screens</p>
                       <input className={inputCls} value={pasForm.team_name}
-                        onChange={e => setPasForm(f => ({ ...f, team_name: e.target.value }))} placeholder="Team name" />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Student Names</label>
-                      <input className={inputCls} value={pasForm.student_names}
-                        onChange={e => setPasForm(f => ({ ...f, student_names: e.target.value }))} placeholder="Student 1, Student 2…" />
+                        onChange={e => setPasForm(f => ({ ...f, team_name: e.target.value, student_names: e.target.value }))}
+                        placeholder="e.g. Sara Khoury" />
                     </div>
                     <div>
                       <label className={labelCls}>Coach Name</label>
@@ -639,7 +636,7 @@ function AdminDashboard() {
                 <table className="w-full text-sm min-w-[960px]">
                   <thead className="bg-slate-50 border-b border-slate-100">
                     <tr>
-                      {['Team', 'Category', 'Table', 'Coach', 'Scheduled', 'Status', 'Score', 'Judge', 'Sig', ''].map(h => (
+                      {['Student', 'Category', 'Table', 'Coach', 'Appt. Time', 'Status', 'Score', 'Judge', 'Sig', ''].map(h => (
                         <th key={h} className={`px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider ${h === '' ? 'text-right' : 'text-left'}`}>
                           {h}
                         </th>

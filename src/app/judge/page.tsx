@@ -267,10 +267,7 @@ export default function JudgePage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-emerald-200 text-xs font-semibold uppercase tracking-wider mb-1">Now Competing</p>
-                  <h2 className="text-2xl font-black text-white leading-tight">{current.team_name}</h2>
-                  {current.student_names && (
-                    <p className="text-emerald-200 text-sm mt-1">{current.student_names}</p>
-                  )}
+                  <h2 className="text-2xl font-black text-white leading-tight">{current.student_names || current.team_name}</h2>
                 </div>
                 <span className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold ${STATUS_COLORS[current.live_status] || 'bg-white/20 text-white'}`}>
                   {current.live_status}
@@ -399,8 +396,7 @@ export default function JudgePage() {
                       {i + 1}
                     </span>
                     <div>
-                      <p className="font-semibold text-slate-800 text-sm">{p.team_name}</p>
-                      {p.student_names && <p className="text-xs text-slate-400 mt-0.5">{p.student_names}</p>}
+                      <p className="font-semibold text-slate-800 text-sm">{p.student_names || p.team_name}</p>
                     </div>
                   </div>
                   <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[p.live_status] || 'bg-slate-100 text-slate-600'}`}>

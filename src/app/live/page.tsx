@@ -12,9 +12,15 @@ interface TableDisplay {
   prepare: Passation | null;
 }
 
-function fmt(iso: string | null) {
-  if (!iso) return null;
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+// Show student name — fall back to team_name for old records
+function getName(p: Passation | null): string {
+  if (!p) return '';
+  return p.student_names || p.team_name || '—';
+}
+
+function getTime(p: Passation | null): string {
+  if (!p?.scheduled_time) return '';
+  return new Date(p.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 export default function LivePage() {
@@ -22,13 +28,11 @@ export default function LivePage() {
   const [displays, setDisplays] = useState<TableDisplay[]>([]);
   const [filterCatId, setFilterCatId] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [connected, setConnected] = useState(false);
-  const [now, setNow] = useState(new Date());
+  const [clock, setClock] = useState(new Date());
 
-  // Live clock
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
+    const t = setInterval(() => setClock(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
 
@@ -39,72 +43,79 @@ export default function LivePage() {
       supabase.from('passations').select('*')
         .not('live_status', 'eq', 'Finished')
         .not('live_status', 'eq', 'Absent')
-        .order('queue_position').order('scheduled_time'),
+        .order('queue_position')
+        .order('scheduled_time'),
     ]);
     if (!cats || !tabs || !pas) return;
     setCategories(cats as Category[]);
     const result: TableDisplay[] = (tabs as Table[]).map(table => {
       const cat = (cats as Category[]).find(c => c.id === table.category_id);
       if (!cat) return null;
-      const tablePas = (pas as Passation[]).filter(p => p.table_id === table.id);
-      const current = tablePas.find(p => p.live_status === 'In Progress') || tablePas[0] || null;
-      const rest = tablePas.filter(p => p.id !== current?.id);
-      return { table, category: cat, now: current, next: rest[0] || null, prepare: rest[1] || null };
+      const tp = (pas as Passation[]).filter(p => p.table_id === table.id);
+      const nowP = tp.find(p => p.live_status === 'In Progress') || tp[0] || null;
+      const rest = tp.filter(p => p.id !== nowP?.id);
+      return { table, category: cat, now: nowP, next: rest[0] || null, prepare: rest[1] || null };
     }).filter(Boolean) as TableDisplay[];
     setDisplays(result);
-    setLastUpdate(new Date());
   }, [supabase]);
 
   useEffect(() => {
     loadAll();
-    const channel = supabase
-      .channel('live-realtime')
+    const ch = supabase
+      .channel('live-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'passations' }, loadAll)
-      .subscribe(status => setConnected(status === 'SUBSCRIBED'));
-    return () => { supabase.removeChannel(channel); };
+      .subscribe(s => setConnected(s === 'SUBSCRIBED'));
+    return () => { supabase.removeChannel(ch); };
   }, [loadAll, supabase]);
 
-  const filtered = filterCatId ? displays.filter(d => d.category.id === filterCatId) : displays;
+  const filtered = filterCatId
+    ? displays.filter(d => d.category.id === filterCatId)
+    : displays;
 
-  // Group by category for better layout
-  const grouped = filtered.reduce<Record<string, TableDisplay[]>>((acc, d) => {
-    const key = d.category.id;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(d);
+  // Group by category
+  const groups = filtered.reduce<{ cat: Category; rows: TableDisplay[] }[]>((acc, d) => {
+    const g = acc.find(x => x.cat.id === d.category.id);
+    if (g) g.rows.push(d);
+    else acc.push({ cat: d.category, rows: [d] });
     return acc;
-  }, {});
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white overflow-x-hidden">
+    <div className="min-h-screen flex flex-col" style={{ background: '#0b0f1a', color: '#fff' }}>
 
-      {/* ── Top bar ── */}
-      <header className="bg-gray-900 border-b border-white/10 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+      {/* ── HEADER BAR ── */}
+      <header style={{ background: '#111827', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+        className="flex items-center justify-between px-6 py-3 sticky top-0 z-40">
+
+        <div className="flex items-center gap-5">
+          <div>
+            <p className="text-xl font-black tracking-tight text-white">
+              MakeX <span style={{ color: '#3b82f6' }}>2026</span>
+              <span className="text-white/40 font-normal text-sm ml-3">Live Board</span>
+            </p>
           </div>
-          <span className="text-white font-black text-lg tracking-tight">
-            MakeX 2026 <span className="text-blue-400">LIVE</span>
-          </span>
-          <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
-            {connected ? 'Live' : 'Connecting'}
+          {/* Connection pill */}
+          <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
+            style={{ background: connected ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: connected ? '#4ade80' : '#f87171' }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: connected ? '#4ade80' : '#f87171', boxShadow: connected ? '0 0 6px #4ade80' : 'none' }} />
+            {connected ? 'LIVE' : 'Connecting…'}
           </span>
         </div>
 
         <div className="flex items-center gap-5">
-          {/* Live clock */}
-          <div className="text-right hidden sm:block">
-            <p className="text-2xl font-black text-white tabular-nums">
-              {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          {/* Clock */}
+          <div className="text-right">
+            <p className="text-3xl font-black tabular-nums" style={{ color: '#e2e8f0', letterSpacing: '-0.02em' }}>
+              {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </p>
-            <p className="text-xs text-white/30">{now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            <p className="text-xs text-white/30 mt-0.5">
+              {clock.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}
+            </p>
           </div>
-
+          {/* Category filter */}
           <select
-            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"
+            className="text-sm rounded-xl px-3 py-2 focus:outline-none"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#e2e8f0' }}
             value={filterCatId}
             onChange={e => setFilterCatId(e.target.value)}>
             <option value="">All Categories</option>
@@ -114,137 +125,159 @@ export default function LivePage() {
               </option>
             ))}
           </select>
-          <Link href="/" className="text-white/30 hover:text-white/60 text-sm transition">← Home</Link>
+          <Link href="/" className="text-xs text-white/25 hover:text-white/50 transition">← Home</Link>
         </div>
       </header>
 
-      {/* ── Content ── */}
-      <div className="p-5 space-y-8">
-        {Object.entries(grouped).map(([catId, tableDisplays]) => {
-          const cat = tableDisplays[0].category;
-          return (
-            <section key={catId}>
-              {/* Category heading */}
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-px flex-1 bg-white/10" />
-                <h2 className="text-sm font-bold text-white/40 uppercase tracking-widest px-2">
-                  {cat.name}{cat.age_range_label ? ` · ${cat.age_range_label}` : ''}
-                </h2>
-                <div className="h-px flex-1 bg-white/10" />
+      {/* ── MAIN CONTENT ── */}
+      <div className="flex-1 p-5 pb-12 space-y-8 overflow-auto">
+
+        {groups.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-32">
+            <p className="text-4xl font-black text-white/10 mb-3">No Active Tables</p>
+            <p className="text-white/20 text-sm">Waiting for admin to assign passations</p>
+          </div>
+        )}
+
+        {groups.map(({ cat, rows }) => (
+          <section key={cat.id}>
+            {/* Category banner */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
+              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <span className="text-xs font-bold uppercase tracking-widest text-white/50">
+                  {cat.name}
+                </span>
+                {cat.age_range_label && (
+                  <span className="text-xs text-white/30">{cat.age_range_label}</span>
+                )}
               </div>
+              <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
+            </div>
 
-              {/* Table cards grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {tableDisplays.map(({ table, now: nowTeam, next: nextTeam, prepare: prepTeam }) => (
-                  <div key={table.id} className="rounded-2xl overflow-hidden border border-white/8 shadow-2xl flex flex-col">
+            {/* Table cards */}
+            <div className="grid gap-4"
+              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+              {rows.map(({ table, now, next, prepare }) => {
+                const hasAny = !!(now || next || prepare);
+                return (
+                  <div key={table.id}
+                    className="rounded-2xl overflow-hidden flex flex-col"
+                    style={{
+                      background: '#141b2d',
+                      border: hasAny ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.04)',
+                      boxShadow: hasAny ? '0 4px 24px rgba(0,0,0,0.5)' : 'none',
+                    }}>
 
-                    {/* Table label */}
-                    <div className="bg-gray-800 px-5 py-3 flex items-center justify-between">
-                      <span className="text-white font-black text-xl tracking-tight">
+                    {/* Table header */}
+                    <div className="flex items-center justify-between px-4 py-3"
+                      style={{ background: '#1e2a3d', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                      <span className="font-black text-lg text-white">
                         {table.display_label || `Table ${table.table_number}`}
                       </span>
-                      {nowTeam && (
-                        <span className="flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-bold px-2.5 py-1 rounded-full">
-                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                      {now && (
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5"
+                          style={{ background: 'rgba(34,197,94,0.2)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)' }}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-400"
+                            style={{ boxShadow: '0 0 6px #4ade80', animation: 'pulse 2s infinite' }} />
                           ACTIVE
                         </span>
                       )}
                     </div>
 
-                    {/* NOW — large, full green */}
-                    <div className={`px-5 py-5 flex-1 ${nowTeam ? 'bg-emerald-600' : 'bg-gray-900/60'}`}>
+                    {/* ── NOW ── */}
+                    <div className="px-4 pt-4 pb-4 flex-1"
+                      style={{ background: now ? 'rgba(22,163,74,0.25)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-black uppercase tracking-[0.2em] text-emerald-100/80">
+                        <span className="text-xs font-black uppercase tracking-widest"
+                          style={{ color: now ? '#4ade80' : 'rgba(255,255,255,0.2)' }}>
                           ▶ NOW
                         </span>
-                        {nowTeam?.scheduled_time && (
-                          <span className="text-xs font-mono bg-black/20 text-emerald-100/70 px-2 py-0.5 rounded-md">
-                            {fmt(nowTeam.scheduled_time)}
+                        {now && getTime(now) && (
+                          <span className="text-xs font-mono px-2 py-0.5 rounded-md"
+                            style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(74,222,128,0.8)' }}>
+                            {getTime(now)}
                           </span>
                         )}
                       </div>
-                      {nowTeam ? (
-                        <>
-                          <p className="text-white font-black text-2xl leading-tight">{nowTeam.team_name}</p>
-                          {nowTeam.student_names && (
-                            <p className="text-emerald-100/70 text-sm mt-1 truncate">{nowTeam.student_names}</p>
-                          )}
-                        </>
+                      {now ? (
+                        <p className="font-black text-white leading-tight"
+                          style={{ fontSize: 'clamp(1.1rem, 2.5vw, 1.5rem)' }}>
+                          {getName(now)}
+                        </p>
                       ) : (
-                        <p className="text-white/20 text-lg font-semibold mt-1">— Waiting —</p>
+                        <p className="font-semibold" style={{ color: 'rgba(255,255,255,0.1)', fontSize: '1rem' }}>
+                          — Waiting —
+                        </p>
                       )}
                     </div>
 
-                    {/* NEXT — blue */}
-                    <div className={`px-5 py-4 border-t border-white/5 ${nextTeam ? 'bg-blue-700' : 'bg-gray-900/40'}`}>
+                    {/* ── NEXT ── */}
+                    <div className="px-4 py-3"
+                      style={{ background: next ? 'rgba(37,99,235,0.25)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-black uppercase tracking-[0.2em] text-blue-100/70">
+                        <span className="text-xs font-black uppercase tracking-widest"
+                          style={{ color: next ? '#60a5fa' : 'rgba(255,255,255,0.15)' }}>
                           ⏭ NEXT
                         </span>
-                        {nextTeam?.scheduled_time && (
-                          <span className="text-xs font-mono bg-black/20 text-blue-100/60 px-2 py-0.5 rounded-md">
-                            {fmt(nextTeam.scheduled_time)}
+                        {next && getTime(next) && (
+                          <span className="text-xs font-mono px-2 py-0.5 rounded-md"
+                            style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(96,165,250,0.7)' }}>
+                            {getTime(next)}
                           </span>
                         )}
                       </div>
-                      {nextTeam ? (
-                        <>
-                          <p className="text-white font-bold text-lg leading-tight">{nextTeam.team_name}</p>
-                          {nextTeam.student_names && (
-                            <p className="text-blue-100/60 text-xs mt-0.5 truncate">{nextTeam.student_names}</p>
-                          )}
-                        </>
+                      {next ? (
+                        <p className="font-bold text-white text-base leading-tight">{getName(next)}</p>
                       ) : (
-                        <p className="text-white/15 text-sm">—</p>
+                        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.1)' }}>—</p>
                       )}
                     </div>
 
-                    {/* PREPARE — amber */}
-                    <div className={`px-5 py-3.5 border-t border-white/5 ${prepTeam ? 'bg-amber-600' : 'bg-gray-900/30'}`}>
+                    {/* ── PREPARE ── */}
+                    <div className="px-4 py-3"
+                      style={{ background: prepare ? 'rgba(180,83,9,0.2)' : 'transparent' }}>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-black uppercase tracking-[0.2em] text-amber-100/70">
+                        <span className="text-xs font-black uppercase tracking-widest"
+                          style={{ color: prepare ? '#fbbf24' : 'rgba(255,255,255,0.12)' }}>
                           ⚑ PREPARE
                         </span>
-                        {prepTeam?.scheduled_time && (
-                          <span className="text-xs font-mono bg-black/20 text-amber-100/60 px-2 py-0.5 rounded-md">
-                            {fmt(prepTeam.scheduled_time)}
+                        {prepare && getTime(prepare) && (
+                          <span className="text-xs font-mono px-2 py-0.5 rounded-md"
+                            style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(251,191,36,0.7)' }}>
+                            {getTime(prepare)}
                           </span>
                         )}
                       </div>
-                      {prepTeam ? (
-                        <>
-                          <p className="text-white font-semibold text-base leading-tight">{prepTeam.team_name}</p>
-                          {prepTeam.student_names && (
-                            <p className="text-amber-100/55 text-xs mt-0.5 truncate">{prepTeam.student_names}</p>
-                          )}
-                        </>
+                      {prepare ? (
+                        <p className="font-semibold text-sm leading-tight" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                          {getName(prepare)}
+                        </p>
                       ) : (
-                        <p className="text-white/15 text-sm">—</p>
+                        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.1)' }}>—</p>
                       )}
                     </div>
 
                   </div>
-                ))}
-              </div>
-            </section>
-          );
-        })}
-
-        {filtered.length === 0 && (
-          <div className="text-center py-32">
-            <p className="text-white/20 text-3xl font-black">No active tables</p>
-            <p className="text-white/10 text-base mt-2">Waiting for the admin to configure passations</p>
-          </div>
-        )}
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
 
-      {/* Bottom status bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur border-t border-white/5 px-6 py-2 flex items-center justify-between">
-        <p className="text-white/30 text-xs">MakeX 2026 · Lebanon National Competition</p>
-        <p className="text-white/20 text-xs tabular-nums">
-          Last updated: {lastUpdate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+      {/* ── STATUS FOOTER ── */}
+      <div className="fixed bottom-0 left-0 right-0 py-2 px-6 flex items-center justify-between"
+        style={{ background: 'rgba(11,15,26,0.95)', borderTop: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)' }}>
+        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>
+          MakeX 2026 · Lebanon National Competition
+        </p>
+        <p className="text-xs tabular-nums" style={{ color: 'rgba(255,255,255,0.15)' }}>
+          {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </p>
       </div>
+
     </div>
   );
 }
