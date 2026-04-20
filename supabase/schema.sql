@@ -67,3 +67,19 @@ SELECT c.id, g.n, 'Table ' || g.n, true
 FROM categories c
 JOIN LATERAL generate_series(1, c.table_count) AS g(n) ON true
 ON CONFLICT (category_id, table_number) DO NOTHING;
+
+-- Organizer Tasks
+CREATE TABLE IF NOT EXISTS organizer_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  category TEXT NOT NULL DEFAULT 'General',
+  priority TEXT NOT NULL DEFAULT 'medium', -- low, medium, high, urgent
+  status TEXT NOT NULL DEFAULT 'todo',     -- todo, in_progress, done, blocked
+  due_date DATE,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE organizer_tasks REPLICA IDENTITY FULL;

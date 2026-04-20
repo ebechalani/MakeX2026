@@ -1,3 +1,19 @@
+export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'blocked';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface OrganizerTask {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string;
+  priority: TaskPriority;
+  status: TaskStatus;
+  due_date: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type LiveStatus =
   | 'Scheduled'
   | 'Prepare'

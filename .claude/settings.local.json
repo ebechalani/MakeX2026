@@ -42,7 +42,11 @@
       "Bash(cmd.exe //c \"rmdir /s /q C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\makex-temp\")",
       "Bash(npm install:*)",
       "Bash(npm run:*)",
-      "Bash(ls /c/Users/eddy.bachaalany/Documents/GitHub/MakeX2026/*.md)"
+      "Bash(ls /c/Users/eddy.bachaalany/Documents/GitHub/MakeX2026/*.md)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
