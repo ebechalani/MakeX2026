@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client';
 import type { Category, Table, Passation, LiveStatus } from '@/lib/types';
 import Link from 'next/link';
 
-const ADMIN_PASSWORD = 'beniclarilaetiobom123?!';
+const ADMIN_PASSWORD = 'MakeX@2026';
 
 const STATUS_COLORS: Record<string, string> = {
   Scheduled: 'bg-slate-100 text-slate-600',

@@ -20,7 +20,7 @@ const CATEGORIES = [
   'General',
 ];
 
-const ADMIN_PASSWORD = 'beniclarilaetiobom123?!';
+const ADMIN_PASSWORD = 'MakeX@2026';
 
 const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string }> = {
   todo:        { label: 'To Do',       color: 'bg-slate-600/80 text-slate-200' },
