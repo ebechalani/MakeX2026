@@ -87,6 +87,7 @@ export default function OrganizerPage() {
   const [editingTask, setEditingTask] = useState<OrganizerTask | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -160,6 +161,7 @@ export default function OrganizerPage() {
   function openAddModal() {
     setEditingTask(null);
     setForm(defaultForm);
+    setSaveError(null);
     setModalOpen(true);
   }
 
@@ -180,6 +182,7 @@ export default function OrganizerPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setSaveError(null);
     const payload = {
       title: form.title.trim(),
       description: form.description.trim() || null,
@@ -190,12 +193,17 @@ export default function OrganizerPage() {
       notes: form.notes.trim() || null,
       updated_at: new Date().toISOString(),
     };
+    let error;
     if (editingTask) {
-      await supabase.from('organizer_tasks').update(payload).eq('id', editingTask.id);
+      ({ error } = await supabase.from('organizer_tasks').update(payload).eq('id', editingTask.id));
     } else {
-      await supabase.from('organizer_tasks').insert(payload);
+      ({ error } = await supabase.from('organizer_tasks').insert(payload));
     }
     setSaving(false);
+    if (error) {
+      setSaveError(error.message);
+      return;
+    }
     setModalOpen(false);
     await loadTasks();
   }
@@ -514,6 +522,12 @@ export default function OrganizerPage() {
                     placeholder="Contacts, links, details…"
                   />
                 </div>
+
+                {saveError && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">
+                    <strong>Error:</strong> {saveError}
+                  </div>
+                )}
 
                 <div className="flex gap-3 pt-1">
                   <button
