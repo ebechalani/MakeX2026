@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS passations (
   coach_name TEXT,
   parent_name TEXT,
   parent_contact TEXT,
+  club_name TEXT,
   category_id UUID NOT NULL REFERENCES categories(id),
   table_id UUID NOT NULL REFERENCES tables(id),
   scheduled_time TIMESTAMPTZ,

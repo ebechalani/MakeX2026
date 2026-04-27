@@ -138,7 +138,7 @@ function AdminDashboard() {
   const [catForm, setCatForm] = useState({ name: '', age_range_label: '', table_count: 1 });
   const [editCatId, setEditCatId] = useState<string | null>(null);
   const [pasForm, setPasForm] = useState({
-    team_name: '', student_names: '', coach_name: '', parent_name: '',
+    team_name: '', student_names: '', coach_name: '', parent_name: '', club_name: '',
     parent_contact: '', category_id: '', table_id: '', scheduled_time: '',
     queue_position: 0, live_status: 'Scheduled' as LiveStatus,
     judge_name: '', score: '', time_seconds: '', notes: '',
@@ -240,6 +240,7 @@ function AdminDashboard() {
       student_names: pasForm.student_names || null,
       coach_name: pasForm.coach_name || null,
       parent_name: pasForm.parent_name || null,
+      club_name: pasForm.club_name || null,
       parent_contact: pasForm.parent_contact || null,
       category_id: pasForm.category_id,
       table_id: pasForm.table_id,
@@ -263,7 +264,7 @@ function AdminDashboard() {
 
   function resetPasForm() {
     setPasForm({
-      team_name: '', student_names: '', coach_name: '', parent_name: '',
+      team_name: '', student_names: '', coach_name: '', parent_name: '', club_name: '',
       parent_contact: '', category_id: '', table_id: '', scheduled_time: '',
       queue_position: 0, live_status: 'Scheduled', judge_name: '',
       score: '', time_seconds: '', notes: '',
@@ -278,6 +279,7 @@ function AdminDashboard() {
       student_names: p.student_names || '',
       coach_name: p.coach_name || '',
       parent_name: p.parent_name || '',
+      club_name: p.club_name || '',
       parent_contact: p.parent_contact || '',
       category_id: p.category_id,
       table_id: p.table_id,
@@ -528,6 +530,11 @@ function AdminDashboard() {
                         placeholder="e.g. Sara Khoury" />
                     </div>
                     <div>
+                      <label className={labelCls}>Club / School</label>
+                      <input className={inputCls} value={pasForm.club_name}
+                        onChange={e => setPasForm(f => ({ ...f, club_name: e.target.value }))} placeholder="Club or school name" />
+                    </div>
+                    <div>
                       <label className={labelCls}>Coach Name</label>
                       <input className={inputCls} value={pasForm.coach_name}
                         onChange={e => setPasForm(f => ({ ...f, coach_name: e.target.value }))} placeholder="Coach name" />
@@ -648,7 +655,8 @@ function AdminDashboard() {
                       <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-5 py-3.5">
                           <div className="font-semibold text-slate-800">{p.team_name}</div>
-                          {p.student_names && <div className="text-xs text-slate-400 mt-0.5">{p.student_names}</div>}
+                          {p.club_name && <div className="text-xs text-slate-500 mt-0.5">{p.club_name}</div>}
+                          {p.student_names && p.student_names !== p.team_name && <div className="text-xs text-slate-400 mt-0.5">{p.student_names}</div>}
                         </td>
                         <td className="px-5 py-3.5 text-slate-500 text-xs max-w-[160px]">{getCatLabel(p.category_id)}</td>
                         <td className="px-5 py-3.5">

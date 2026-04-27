@@ -62,6 +62,7 @@ for (const [k, recs] of grouped) {
       coach_name: r.coach_name || null,
       parent_name: r.school || null,
       parent_contact: r.parent_contact || null,
+      club_name: r.school || null,
       category_id: cat.id,
       table_id: tables[tIdx].id,
       queue_position: ++perTable[tIdx],

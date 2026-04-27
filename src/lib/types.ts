@@ -49,6 +49,7 @@ export interface Passation {
   coach_name: string | null;
   parent_name: string | null;
   parent_contact: string | null;
+  club_name: string | null;
   category_id: string;
   table_id: string;
   scheduled_time: string | null;
