@@ -46,7 +46,12 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(python -c ' *)",
+      "Bash(npm ls *)",
+      "Bash(node scripts/read_xlsx.mjs)",
+      "Bash(node scripts/parse_registrations.mjs)",
+      "Bash(node scripts/import_to_supabase.mjs)"
     ]
   }
 }
