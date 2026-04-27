@@ -9,8 +9,8 @@ const SKIP = new Set(['Teams_registration', 'Summary - By Age Category']);
 const CATEGORY_MAP = {
   'Sports Wonderland - 4-5 manual':           { name: 'Sportswonderland',  age_range_label: '4–5 years old' },
   'Sports Wonderland 6-7 automatic':          { name: 'Sportswonderland',  age_range_label: '6–7 years old' },
-  'Capelli Smart Logistics 8 - 9 automatic':  { name: 'Capelli Inspire',    age_range_label: '8–9 years old' },
-  'Capelli Smart Logistics 10-12 automatic':  { name: 'Capelli Inspire',    age_range_label: '10–12 years old' },
+  'Capelli Smart Logistics 8 - 9 automatic':  { name: 'Capelli Inspire',    age_range_label: '8–12 years old' },
+  'Capelli Smart Logistics 10-12 automatic':  { name: 'Capelli Inspire',    age_range_label: '8–12 years old' },
   'Capelli Starter 13-15 automatic':          { name: 'Capelli Starter',    age_range_label: '13–15 years old' },
   'Capelli Football 8-12 manual':             { name: 'Capelli Soccer',     age_range_label: '' },
   'MakeX Inspire Code Courier 8-12 manual':   { name: 'MakeX Inspire',      age_range_label: '8–12 years old' },
