@@ -54,7 +54,10 @@
       "Bash(node scripts/import_to_supabase.mjs)",
       "WebFetch(domain:view.genially.com)",
       "mcp__Claude_in_Chrome__tabs_context_mcp",
-      "WebFetch(domain:api.genially.com)"
+      "WebFetch(domain:api.genially.com)",
+      "Bash(gh repo *)",
+      "Bash(where git *)",
+      "Bash(git --version)"
     ]
   }
 }
