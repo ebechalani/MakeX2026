@@ -67,3 +67,31 @@ export interface Passation {
   category?: Category;
   table?: Table;
 }
+
+export interface Academy {
+  id: string;
+  name: string;
+  username: string;
+  password: string;
+  coach_name: string | null;
+  whatsapp_number: string | null;
+  created_at: string;
+}
+
+export type ChangeAction = 'add' | 'update' | 'delete';
+export type ChangeStatus = 'pending' | 'approved' | 'rejected';
+
+export interface PendingChange {
+  id: string;
+  academy_id: string;
+  action: ChangeAction;
+  passation_id: string | null;
+  payload: Record<string, unknown> | null;
+  status: ChangeStatus;
+  reviewer_notes: string | null;
+  reviewed_by: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  academy?: Academy;
+  passation?: Passation;
+}

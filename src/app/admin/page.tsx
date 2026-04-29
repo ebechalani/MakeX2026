@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { Category, Table, Passation, LiveStatus } from '@/lib/types';
+import type { Category, Table, Passation, LiveStatus, PendingChange, Academy } from '@/lib/types';
 import Link from 'next/link';
 
 const ADMIN_PASSWORD = 'MakeX@2026';
@@ -134,7 +134,9 @@ function AdminDashboard() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [passations, setPassations] = useState<Passation[]>([]);
-  const [activeTab, setActiveTab] = useState<'passations' | 'categories'>('passations');
+  const [activeTab, setActiveTab] = useState<'passations' | 'categories' | 'approvals'>('passations');
+  const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
+  const [academies, setAcademies] = useState<Academy[]>([]);
   const [catForm, setCatForm] = useState({ name: '', age_range_label: '', table_count: 1 });
   const [editCatId, setEditCatId] = useState<string | null>(null);
   const [pasForm, setPasForm] = useState({
@@ -149,14 +151,18 @@ function AdminDashboard() {
   const [syncingAll, setSyncingAll] = useState(false);
 
   const load = useCallback(async () => {
-    const [{ data: cats }, { data: tabs }, { data: pas }] = await Promise.all([
+    const [{ data: cats }, { data: tabs }, { data: pas }, { data: pcs }, { data: acs }] = await Promise.all([
       supabase.from('categories').select('*').order('name'),
       supabase.from('tables').select('*').order('table_number'),
       supabase.from('passations').select('*, category:categories(*), table:tables(*)').order('scheduled_time').order('queue_position'),
+      supabase.from('pending_changes').select('*, academy:academies(*), passation:passations(*)').order('created_at', { ascending: false }),
+      supabase.from('academies').select('*').order('name'),
     ]);
     if (cats) setCategories(cats);
     if (tabs) setTables(tabs);
     if (pas) setPassations(pas as unknown as Passation[]);
+    if (pcs) setPendingChanges(pcs as unknown as PendingChange[]);
+    if (acs) setAcademies(acs);
   }, [supabase]);
 
   useEffect(() => { load(); }, [load]);
@@ -167,6 +173,7 @@ function AdminDashboard() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'passations' }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_changes' }, load)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [load, supabase]);
@@ -302,6 +309,73 @@ function AdminDashboard() {
     load();
   }
 
+  async function approveChange(pc: PendingChange) {
+    const payload = (pc.payload || {}) as Record<string, unknown>;
+    let resultPasName = '';
+    if (pc.action === 'add') {
+      const insertRow = {
+        team_name: payload.team_name as string,
+        student_names: payload.student_names as string,
+        coach_name: payload.coach_name as string | null,
+        parent_contact: payload.parent_contact as string | null,
+        club_name: payload.club_name as string,
+        category_id: payload.category_id as string,
+        table_id: payload.table_id as string,
+        notes: payload.notes as string | null,
+        live_status: 'Scheduled',
+        queue_position: 0,
+      };
+      const { error } = await supabase.from('passations').insert(insertRow);
+      if (error) { alert('Insert failed: ' + error.message); return; }
+      resultPasName = String(payload.team_name);
+    } else if (pc.action === 'update' && pc.passation_id) {
+      const updateRow: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      for (const k of ['team_name', 'student_names', 'coach_name', 'parent_contact', 'category_id', 'table_id', 'notes']) {
+        if (payload[k] !== undefined) updateRow[k] = payload[k];
+      }
+      const { error } = await supabase.from('passations').update(updateRow).eq('id', pc.passation_id);
+      if (error) { alert('Update failed: ' + error.message); return; }
+      resultPasName = String(payload.team_name || pc.passation?.team_name || '');
+    } else if (pc.action === 'delete' && pc.passation_id) {
+      const { error } = await supabase.from('passations').delete().eq('id', pc.passation_id);
+      if (error) { alert('Delete failed: ' + error.message); return; }
+      resultPasName = String(pc.passation?.team_name || payload.team_name || '');
+    }
+    await supabase.from('pending_changes').update({
+      status: 'approved', reviewed_by: 'admin', reviewed_at: new Date().toISOString(),
+    }).eq('id', pc.id);
+
+    // Open WhatsApp prefilled message to coach
+    const ac = pc.academy;
+    if (ac?.whatsapp_number) {
+      const num = ac.whatsapp_number.replace(/[^0-9]/g, '');
+      const phone = num.startsWith('961') ? num : `961${num.replace(/^0+/, '')}`;
+      const msg = encodeURIComponent(
+        `Hello ${ac.coach_name || ac.name}, your ${pc.action} request${resultPasName ? ` for "${resultPasName}"` : ''} has been APPROVED for the MakeX 2026 competition.`
+      );
+      window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+    }
+    load();
+  }
+
+  async function rejectChange(pc: PendingChange) {
+    const reason = prompt('Reason for rejection (optional):') || '';
+    await supabase.from('pending_changes').update({
+      status: 'rejected', reviewer_notes: reason, reviewed_by: 'admin', reviewed_at: new Date().toISOString(),
+    }).eq('id', pc.id);
+    const ac = pc.academy;
+    if (ac?.whatsapp_number) {
+      const num = ac.whatsapp_number.replace(/[^0-9]/g, '');
+      const phone = num.startsWith('961') ? num : `961${num.replace(/^0+/, '')}`;
+      const team = (pc.payload as Record<string, string>)?.team_name || pc.passation?.team_name || '';
+      const msg = encodeURIComponent(
+        `Hello ${ac.coach_name || ac.name}, your ${pc.action} request${team ? ` for "${team}"` : ''} for MakeX 2026 was rejected.${reason ? ` Reason: ${reason}` : ''}`
+      );
+      window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+    }
+    load();
+  }
+
   function logout() {
     sessionStorage.removeItem('admin_unlocked');
     window.location.reload();
@@ -383,7 +457,7 @@ function AdminDashboard() {
 
         {/* Tabs */}
         <div className="flex gap-1.5 mb-6 bg-white border border-slate-200 rounded-xl p-1 w-fit shadow-sm">
-          {(['passations', 'categories'] as const).map(tab => (
+          {(['passations', 'categories', 'approvals'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-5 py-2 rounded-lg font-semibold text-sm capitalize transition ${
                 activeTab === tab ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
@@ -397,6 +471,11 @@ function AdminDashboard() {
               {tab === 'categories' && (
                 <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab ? 'bg-white/20' : 'bg-slate-100'}`}>
                   {categories.length}
+                </span>
+              )}
+              {tab === 'approvals' && (
+                <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${pendingChanges.filter(p => p.status === 'pending').length > 0 ? 'bg-amber-500 text-white' : (activeTab === tab ? 'bg-white/20' : 'bg-slate-100')}`}>
+                  {pendingChanges.filter(p => p.status === 'pending').length}
                 </span>
               )}
             </button>
@@ -708,7 +787,158 @@ function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* ── APPROVALS TAB ── */}
+        {activeTab === 'approvals' && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-base font-bold text-slate-800">Pending Approvals</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Academy-submitted changes awaiting your review</p>
+            </div>
+
+            {pendingChanges.filter(p => p.status === 'pending').length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400 text-sm">
+                No pending requests.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pendingChanges.filter(p => p.status === 'pending').map(pc => {
+                  const pl = (pc.payload || {}) as Record<string, string>;
+                  const cur = pc.passation;
+                  const catLabel = (id?: string) => {
+                    const c = categories.find(c => c.id === id);
+                    return c ? `${c.name}${c.age_range_label ? ` (${c.age_range_label})` : ''}` : '—';
+                  };
+                  const tabLabel = (id?: string) => {
+                    const t = tables.find(t => t.id === id);
+                    return t ? (t.display_label || `Table ${t.table_number}`) : '—';
+                  };
+                  return (
+                    <div key={pc.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                      <div className="flex items-start justify-between gap-4 mb-3">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-xs font-bold px-2 py-1 rounded-md uppercase ${
+                              pc.action === 'add' ? 'bg-emerald-100 text-emerald-700' :
+                              pc.action === 'update' ? 'bg-blue-100 text-blue-700' :
+                              'bg-red-100 text-red-600'
+                            }`}>{pc.action}</span>
+                            <span className="text-sm font-bold text-slate-800">
+                              {pl.team_name || cur?.team_name || '—'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            {pc.academy?.name || '—'} · submitted {new Date(pc.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => approveChange(pc)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-lg">
+                            Approve & Notify
+                          </button>
+                          <button onClick={() => rejectChange(pc)}
+                            className="bg-red-100 hover:bg-red-200 text-red-700 text-xs font-semibold px-4 py-2 rounded-lg">
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        {pc.action === 'update' && cur && (
+                          <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                            <p className="font-semibold text-slate-500 uppercase mb-2">Current</p>
+                            <Row k="Name" v={cur.team_name} />
+                            <Row k="Coach" v={cur.coach_name} />
+                            <Row k="Contact" v={cur.parent_contact} />
+                            <Row k="Category" v={catLabel(cur.category_id)} />
+                            <Row k="Table" v={tabLabel(cur.table_id)} />
+                          </div>
+                        )}
+                        {(pc.action === 'add' || pc.action === 'update') && (
+                          <div className={`${pc.action === 'add' ? 'bg-emerald-50 border-emerald-100' : 'bg-blue-50 border-blue-100'} rounded-xl p-3 border`}>
+                            <p className="font-semibold text-slate-500 uppercase mb-2">{pc.action === 'add' ? 'New' : 'Proposed'}</p>
+                            <Row k="Name" v={pl.team_name} />
+                            <Row k="Coach" v={pl.coach_name} />
+                            <Row k="Contact" v={pl.parent_contact} />
+                            <Row k="Category" v={catLabel(pl.category_id)} />
+                            <Row k="Table" v={tabLabel(pl.table_id)} />
+                            {pl.notes && <Row k="Notes" v={pl.notes} />}
+                          </div>
+                        )}
+                        {pc.action === 'delete' && cur && (
+                          <div className="bg-red-50 rounded-xl p-3 border border-red-100">
+                            <p className="font-semibold text-red-700 uppercase mb-2">Delete request</p>
+                            <Row k="Name" v={cur.team_name} />
+                            <Row k="Category" v={catLabel(cur.category_id)} />
+                            <Row k="Table" v={tabLabel(cur.table_id)} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {pendingChanges.filter(p => p.status !== 'pending').length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase">
+                  Recent Decisions ({pendingChanges.filter(p => p.status !== 'pending').length})
+                </div>
+                <table className="w-full text-sm">
+                  <tbody className="divide-y divide-slate-50">
+                    {pendingChanges.filter(p => p.status !== 'pending').slice(0, 20).map(pc => {
+                      const pl = (pc.payload || {}) as Record<string, string>;
+                      return (
+                        <tr key={pc.id}>
+                          <td className="px-5 py-3 text-xs uppercase font-semibold text-slate-500">{pc.action}</td>
+                          <td className="px-5 py-3 text-xs">{pl.team_name || pc.passation?.team_name || '—'}</td>
+                          <td className="px-5 py-3 text-xs text-slate-500">{pc.academy?.name || '—'}</td>
+                          <td className="px-5 py-3"><span className={`text-xs font-semibold px-2 py-1 rounded-full ${pc.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>{pc.status}</span></td>
+                          <td className="px-5 py-3 text-xs text-slate-500">{pc.reviewer_notes || ''}</td>
+                          <td className="px-5 py-3 text-xs text-slate-400">{pc.reviewed_at ? new Date(pc.reviewed_at).toLocaleString() : ''}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {academies.length > 0 && (
+              <details className="bg-white rounded-2xl border border-slate-200 p-5">
+                <summary className="cursor-pointer font-semibold text-slate-700 text-sm">Academy Credentials ({academies.length})</summary>
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="text-slate-500 uppercase">
+                      <tr><th className="text-left py-2 px-2">Name</th><th className="text-left py-2 px-2">Username</th><th className="text-left py-2 px-2">Password</th><th className="text-left py-2 px-2">Coach</th><th className="text-left py-2 px-2">WhatsApp</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {academies.map(a => (
+                        <tr key={a.id}>
+                          <td className="py-2 px-2 font-semibold">{a.name}</td>
+                          <td className="py-2 px-2 font-mono">{a.username}</td>
+                          <td className="py-2 px-2 font-mono">{a.password}</td>
+                          <td className="py-2 px-2">{a.coach_name || '—'}</td>
+                          <td className="py-2 px-2 font-mono">{a.whatsapp_number || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            )}
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string | null | undefined }) {
+  return (
+    <div className="flex gap-2 py-0.5">
+      <span className="text-slate-400 w-20 shrink-0">{k}:</span>
+      <span className="text-slate-700 font-medium">{v || '—'}</span>
     </div>
   );
 }

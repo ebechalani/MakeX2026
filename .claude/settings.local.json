@@ -57,7 +57,14 @@
       "WebFetch(domain:api.genially.com)",
       "Bash(gh repo *)",
       "Bash(where git *)",
-      "Bash(git --version)"
+      "Bash(git --version)",
+      "Bash(python3 -c ' *)",
+      "Bash(where python*)",
+      "Bash(ls \"/c/Python\"*)",
+      "WebFetch(domain:www.usj.edu.lb)",
+      "WebFetch(domain:www.ndu.edu.lb)",
+      "WebFetch(domain:www.usek.edu.lb)",
+      "Bash(node -e ' *)"
     ]
   }
 }
