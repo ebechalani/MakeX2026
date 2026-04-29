@@ -51,7 +51,10 @@
       "Bash(npm ls *)",
       "Bash(node scripts/read_xlsx.mjs)",
       "Bash(node scripts/parse_registrations.mjs)",
-      "Bash(node scripts/import_to_supabase.mjs)"
+      "Bash(node scripts/import_to_supabase.mjs)",
+      "WebFetch(domain:view.genially.com)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "WebFetch(domain:api.genially.com)"
     ]
   }
 }
