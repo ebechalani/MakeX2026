@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Choice = { label: string; value: number };
 type Item = { id: string; title: string; description?: string; choices: Choice[] };
@@ -10,6 +10,7 @@ type Sheet = {
   tag: string;
   ages: string;
   duration: string;
+  durationSec: number;
   color: string;
   sections: Section[];
   voidIds?: string[];
@@ -24,6 +25,7 @@ const SHEETS: Sheet[] = [
     tag: 'SportsWonderland 4–5 / 6–7',
     ages: '4–5 (Manual) · 6–7 (Autonomous)',
     duration: '120 seconds',
+    durationSec: 120,
     color: 'from-pink-600 to-rose-700',
     sections: [
       {
@@ -66,6 +68,7 @@ const SHEETS: Sheet[] = [
     tag: 'Capelli Inspire 8–12',
     ages: '8–12 · Fully autonomous',
     duration: '150 seconds',
+    durationSec: 150,
     color: 'from-blue-600 to-cyan-700',
     sections: [
       {
@@ -116,7 +119,8 @@ const SHEETS: Sheet[] = [
     name: 'Locker Room — Capelli Starter',
     tag: 'Capelli Starter 13–15',
     ages: '13–15 · Fully autonomous',
-    duration: 'Match',
+    duration: '150 seconds',
+    durationSec: 150,
     color: 'from-emerald-600 to-teal-700',
     sections: [
       {
@@ -164,24 +168,60 @@ export default function PracticeScoresheet() {
   const sheet = useMemo(() => SHEETS.find(s => s.key === active)!, [active]);
   const [vals, setVals] = useState<Record<string, number>>({});
   const [studentName, setStudentName] = useState('');
+  const [remaining, setRemaining] = useState(sheet.durationSec);
+  const [running, setRunning] = useState(false);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isVoid = sheet.voidIds?.some(id => vals[id] === -9999) ?? false;
   const total = isVoid ? 0 : sheet.formula(vals);
 
+  useEffect(() => {
+    if (!running) return;
+    tickRef.current = setInterval(() => {
+      setRemaining(r => {
+        if (r <= 1) {
+          setRunning(false);
+          try { new Audio('data:audio/wav;base64,UklGRl9vAQBXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQ==').play().catch(() => {}); } catch {}
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
+    return () => { if (tickRef.current) clearInterval(tickRef.current); };
+  }, [running]);
+
+  function startPause() {
+    if (remaining === 0) setRemaining(sheet.durationSec);
+    setRunning(r => !r);
+  }
+  function resetTimer() {
+    setRunning(false);
+    setRemaining(sheet.durationSec);
+  }
+
   function reset() {
     setVals({});
     setStudentName('');
+    resetTimer();
   }
 
   function switchSheet(k: string) {
     setActive(k);
     setVals({});
+    setRunning(false);
+    const next = SHEETS.find(s => s.key === k)!;
+    setRemaining(next.durationSec);
   }
+
+  const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
+  const ss = String(remaining % 60).padStart(2, '0');
+  const timerWarn = remaining > 0 && remaining <= 10;
+  const timerDone = remaining === 0;
 
   return (
     <div className="space-y-6">
       <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-4 text-sm text-cyan-900">
-        <strong>Trial mode:</strong> Use this to practice with your students. Nothing is saved to the database.
+        <strong>Trial mode:</strong> Use this to practice with your students.
       </div>
 
       {/* Category selector */}
@@ -216,12 +256,35 @@ export default function PracticeScoresheet() {
             className="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-sm placeholder-white/50 mt-1 focus:outline-none focus:bg-white/20"
           />
         </div>
+
+        {/* Timer */}
+        <div className="text-center">
+          <div className="text-xs uppercase tracking-wider opacity-75">Match Timer</div>
+          <div className={`text-5xl font-black tabular-nums ${timerDone ? 'text-red-300' : timerWarn ? 'text-amber-200 animate-pulse' : ''}`}>
+            {mm}:{ss}
+          </div>
+          <div className="flex gap-1.5 justify-center mt-1.5">
+            <button
+              onClick={startPause}
+              className="bg-white/15 hover:bg-white/25 border border-white/20 rounded-lg px-3 py-1 text-xs font-semibold"
+            >
+              {running ? '⏸ Pause' : timerDone ? '↻ Restart' : remaining < sheet.durationSec ? '▶ Resume' : '▶ Start'}
+            </button>
+            <button
+              onClick={resetTimer}
+              className="bg-white/15 hover:bg-white/25 border border-white/20 rounded-lg px-3 py-1 text-xs font-semibold"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+
         <div className="text-right">
           <div className="text-xs uppercase tracking-wider opacity-75">{isVoid ? 'Run Voided' : 'Live Score'}</div>
           <div className={`text-5xl font-black ${isVoid ? 'text-red-200' : ''}`}>{isVoid ? 'VOID' : total}</div>
         </div>
         <button onClick={reset} className="bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-4 py-2 text-sm font-semibold">
-          Reset
+          Reset All
         </button>
       </div>
 
@@ -274,7 +337,7 @@ export default function PracticeScoresheet() {
       ))}
 
       <div className="text-center text-xs text-slate-400 py-4">
-        Practice scoresheet · MakeX Lebanon 2026 · No data is stored
+        Practice scoresheet · MakeX Lebanon 2026
       </div>
     </div>
   );
