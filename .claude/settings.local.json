@@ -64,7 +64,8 @@
       "WebFetch(domain:www.usj.edu.lb)",
       "WebFetch(domain:www.ndu.edu.lb)",
       "WebFetch(domain:www.usek.edu.lb)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(node scripts/convert_credentials_to_xlsx.mjs)"
     ]
   }
 }
