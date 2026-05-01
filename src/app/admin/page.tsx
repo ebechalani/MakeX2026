@@ -319,6 +319,7 @@ function AdminDashboard() {
         team_name: payload.team_name as string,
         student_names: payload.student_names as string,
         coach_name: payload.coach_name as string | null,
+        parent_name: payload.parent_name as string | null,
         parent_contact: payload.parent_contact as string | null,
         club_name: payload.club_name as string,
         category_id: payload.category_id as string,
@@ -333,7 +334,7 @@ function AdminDashboard() {
       resultPasName = String(payload.team_name);
     } else if (pc.action === 'update' && pc.passation_id) {
       const updateRow: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      for (const k of ['team_name', 'student_names', 'coach_name', 'parent_contact', 'category_id', 'table_id', 'notes', 'date_of_birth']) {
+      for (const k of ['team_name', 'student_names', 'coach_name', 'parent_name', 'parent_contact', 'category_id', 'table_id', 'notes', 'date_of_birth']) {
         if (payload[k] !== undefined) updateRow[k] = payload[k];
       }
       const { error } = await supabase.from('passations').update(updateRow).eq('id', pc.passation_id);

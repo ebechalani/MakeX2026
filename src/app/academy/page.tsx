@@ -86,7 +86,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const [editingPas, setEditingPas] = useState<Passation | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({
-    team_name: '', student_names: '', coach_name: '', parent_contact: '',
+    team_name: '', student_names: '', coach_name: '', parent_name: '', parent_contact: '',
     category_id: '', table_id: '', notes: '', date_of_birth: '',
   });
 
@@ -120,25 +120,42 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
 
   function openAdd() {
     setEditingPas(null);
-    setForm({ team_name: '', student_names: '', coach_name: '', parent_contact: '', category_id: '', table_id: '', notes: '', date_of_birth: '' });
+    setForm({ team_name: '', student_names: '', coach_name: '', parent_name: '', parent_contact: '', category_id: '', table_id: '', notes: '', date_of_birth: '' });
     setShowForm(true);
   }
   function openEdit(p: Passation) {
     setEditingPas(p);
+    // If this record has a pending change with payload, prefill from that so they can keep refining
+    const pend = pending.find(pc => pc.status === 'pending' && pc.passation_id === p.id && pc.payload);
+    const src = (pend?.payload as Record<string, string> | undefined) || {};
     setForm({
-      team_name: p.team_name,
-      student_names: p.student_names || '',
-      coach_name: p.coach_name || '',
-      parent_contact: p.parent_contact || '',
-      category_id: p.category_id,
-      table_id: p.table_id,
-      notes: '',
-      date_of_birth: p.date_of_birth || '',
+      team_name: src.team_name || p.team_name,
+      student_names: src.student_names || p.student_names || '',
+      coach_name: src.coach_name || p.coach_name || '',
+      parent_name: src.parent_name || p.parent_name || '',
+      parent_contact: src.parent_contact || p.parent_contact || '',
+      category_id: src.category_id || p.category_id,
+      table_id: src.table_id || p.table_id,
+      notes: src.notes || '',
+      date_of_birth: src.date_of_birth || p.date_of_birth || '',
     });
     setShowForm(true);
   }
 
   async function submitChange(action: 'add' | 'update' | 'delete', passation_id: string | null, payload: Record<string, unknown> | null) {
+    // If there's already a pending request for this passation, replace it (academy can refine before admin reviews)
+    if (passation_id) {
+      const existing = pending.find(pc => pc.status === 'pending' && pc.passation_id === passation_id);
+      if (existing) {
+        const { error: upErr } = await supabase.from('pending_changes')
+          .update({ action, payload, created_at: new Date().toISOString() })
+          .eq('id', existing.id);
+        if (upErr) { alert('Failed: ' + upErr.message); return; }
+        setShowForm(false); setEditingPas(null);
+        load();
+        return;
+      }
+    }
     const { error } = await supabase.from('pending_changes').insert({
       academy_id: session.id, action, passation_id, payload, status: 'pending',
     });
@@ -153,6 +170,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
       team_name: form.team_name,
       student_names: form.student_names || form.team_name,
       coach_name: form.coach_name || null,
+      parent_name: form.parent_name || null,
       parent_contact: form.parent_contact || null,
       category_id: form.category_id,
       table_id: form.table_id,
@@ -283,9 +301,19 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
             <h3 className="font-bold mb-4">{editingPas ? 'Request Edit' : 'Request New Student'}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Student Name *">
+              <Field label="Display Name *">
                 <input className={inputCls} value={form.team_name}
-                  onChange={e => setForm(f => ({ ...f, team_name: e.target.value, student_names: e.target.value }))} />
+                  onChange={e => setForm(f => ({ ...f, team_name: e.target.value }))}
+                  placeholder="Name shown on screens" />
+              </Field>
+              <Field label="Student Full Name(s)">
+                <input className={inputCls} value={form.student_names}
+                  onChange={e => setForm(f => ({ ...f, student_names: e.target.value }))}
+                  placeholder="Full legal name(s)" />
+              </Field>
+              <Field label="Parent Name">
+                <input className={inputCls} value={form.parent_name}
+                  onChange={e => setForm(f => ({ ...f, parent_name: e.target.value }))} />
               </Field>
               <Field label="Date of Birth *">
                 <input type="date" className={inputCls} value={form.date_of_birth}
@@ -384,10 +412,16 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                       </td>
                       <td className="px-3 py-3 text-right" onClick={e => e.stopPropagation()}>
                         <div className="flex gap-1.5 justify-end">
-                          <button onClick={() => openEdit(p)} disabled={!!pend}
-                            className="text-blue-600 text-xs font-semibold px-2.5 py-1 rounded-lg hover:bg-blue-50 disabled:opacity-30">Edit</button>
-                          <button onClick={() => requestDelete(p)} disabled={!!pend}
-                            className="text-red-500 text-xs font-semibold px-2.5 py-1 rounded-lg hover:bg-red-50 disabled:opacity-30">Delete</button>
+                          <button onClick={() => openEdit(p)}
+                            className="text-blue-600 text-xs font-semibold px-2.5 py-1 rounded-lg hover:bg-blue-50">
+                            {pend ? '✎ Refine' : 'Edit'}
+                          </button>
+                          <button onClick={() => requestDelete(p)}
+                            className="text-red-500 text-xs font-semibold px-2.5 py-1 rounded-lg hover:bg-red-50">Delete</button>
+                          {pend && (
+                            <button onClick={() => cancelPending(pend.id)}
+                              className="text-slate-500 text-xs font-semibold px-2.5 py-1 rounded-lg hover:bg-slate-100">Cancel req</button>
+                          )}
                         </div>
                       </td>
                     </tr>
