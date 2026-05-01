@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, Fragment } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Category, Table, Passation, LiveStatus, PendingChange, Academy } from '@/lib/types';
 import Link from 'next/link';
@@ -149,6 +149,90 @@ function AdminDashboard() {
   const [showPasForm, setShowPasForm] = useState(false);
   const [filteredTables, setFilteredTables] = useState<Table[]>([]);
   const [syncingAll, setSyncingAll] = useState(false);
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+
+  const toggleCat = (id: string) => {
+    setExpandedCats(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const passByCat = useMemo(() => {
+    const m = new Map<string, Passation[]>();
+    for (const p of passations) {
+      if (!m.has(p.category_id)) m.set(p.category_id, []);
+      m.get(p.category_id)!.push(p);
+    }
+    return m;
+  }, [passations]);
+
+  function ageFromDob(dob: string | null): string {
+    if (!dob) return '';
+    const d = new Date(dob); if (isNaN(d.getTime())) return '';
+    const n = new Date();
+    let a = n.getFullYear() - d.getFullYear();
+    const m = n.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && n.getDate() < d.getDate())) a--;
+    return String(a);
+  }
+
+  function downloadCsv(filename: string, rows: (string | number | null)[][]) {
+    const csv = rows.map(r => r.map(v => {
+      const s = v == null ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(',')).join('\n');
+    // BOM helps Excel detect UTF-8
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const REPORT_HEADERS = ['Category', 'Age Range', 'Student / Team', 'Student Names', 'Date of Birth', 'Age', 'Academy / Club', 'Coach', 'Parent', 'Contact', 'Table', 'Queue #', 'Scheduled', 'Status', 'Score', 'Time (s)', 'Judge', 'Notes'];
+
+  function passToRow(p: Passation) {
+    const cat = categories.find(c => c.id === p.category_id);
+    const tbl = tables.find(t => t.id === p.table_id);
+    return [
+      cat?.name || '',
+      cat?.age_range_label || '',
+      p.team_name,
+      p.student_names || '',
+      p.date_of_birth || '',
+      ageFromDob(p.date_of_birth),
+      p.club_name || '',
+      p.coach_name || '',
+      p.parent_name || '',
+      p.parent_contact || '',
+      tbl ? (tbl.display_label || `Table ${tbl.table_number}`) : '',
+      p.queue_position,
+      p.scheduled_time ? new Date(p.scheduled_time).toLocaleString() : '',
+      p.live_status,
+      p.score ?? '',
+      p.time_seconds ?? '',
+      p.judge_name || '',
+      p.notes || '',
+    ];
+  }
+
+  function downloadCategoryReport(cat: Category) {
+    const list = (passByCat.get(cat.id) || []).slice().sort((a, b) => a.queue_position - b.queue_position);
+    const rows = [REPORT_HEADERS, ...list.map(passToRow)];
+    const safe = cat.name.replace(/[^a-z0-9]+/gi, '_');
+    downloadCsv(`MakeX_${safe}_${cat.age_range_label || ''}.csv`.replace(/_+/g, '_'), rows);
+  }
+
+  function downloadAllReport() {
+    const rows: (string | number | null)[][] = [REPORT_HEADERS];
+    for (const cat of categories) {
+      const list = (passByCat.get(cat.id) || []).slice().sort((a, b) => a.queue_position - b.queue_position);
+      for (const p of list) rows.push(passToRow(p));
+    }
+    downloadCsv('MakeX_All_Categories_Report.csv', rows);
+  }
 
   const load = useCallback(async () => {
     const [{ data: cats }, { data: tabs }, { data: pas }, { data: pcs }, { data: acs }] = await Promise.all([
@@ -528,51 +612,121 @@ function AdminDashboard() {
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-semibold text-slate-800">All Categories</h3>
-                <button onClick={syncAllTables} disabled={syncingAll}
-                  className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg transition disabled:opacity-50">
-                  {syncingAll ? 'Syncing…' : 'Sync All Tables'}
-                </button>
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+                <h3 className="font-semibold text-slate-800">All Categories <span className="text-xs text-slate-400 font-normal">· {passations.length} total participants</span></h3>
+                <div className="flex gap-2">
+                  <button onClick={downloadAllReport}
+                    className="text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1.5">
+                    ⬇ Download All Categories Report
+                  </button>
+                  <button onClick={syncAllTables} disabled={syncingAll}
+                    className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg transition disabled:opacity-50">
+                    {syncingAll ? 'Syncing…' : 'Sync All Tables'}
+                  </button>
+                </div>
               </div>
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Age Range</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tables</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                    <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                    <th className="w-8"></th>
+                    <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                    <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Age Range</th>
+                    <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Participants</th>
+                    <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tables</th>
+                    <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {categories.map(cat => (
-                    <tr key={cat.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-6 py-4 font-semibold text-slate-800">{cat.name}</td>
-                      <td className="px-6 py-4 text-slate-500">{cat.age_range_label || '—'}</td>
-                      <td className="px-6 py-4">
-                        <span className="bg-slate-100 text-slate-700 text-xs font-bold px-2 py-0.5 rounded-md">
-                          {cat.table_count} {cat.table_count === 1 ? 'table' : 'tables'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cat.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${cat.active ? 'bg-emerald-400' : 'bg-slate-400'}`} />
-                          {cat.active ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex gap-2 justify-end">
-                          <button onClick={() => editCategory(cat)}
-                            className="text-blue-600 hover:text-blue-800 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-50 transition">Edit</button>
-                          <button onClick={() => deleteCategory(cat.id)}
-                            className="text-red-500 hover:text-red-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-red-50 transition">Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {categories.map(cat => {
+                    const list = (passByCat.get(cat.id) || []).slice().sort((a, b) => a.queue_position - b.queue_position);
+                    const isOpen = expandedCats.has(cat.id);
+                    return (
+                      <Fragment key={cat.id}>
+                        <tr className="hover:bg-slate-50/50 transition-colors cursor-pointer" onClick={() => toggleCat(cat.id)}>
+                          <td className="px-2 text-slate-400 text-center">{isOpen ? '▾' : '▸'}</td>
+                          <td className="px-3 py-4 font-semibold text-slate-800">{cat.name}</td>
+                          <td className="px-3 py-4 text-slate-500 text-xs">{cat.age_range_label || '—'}</td>
+                          <td className="px-3 py-4">
+                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${list.length > 0 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-400'}`}>
+                              {list.length} {list.length === 1 ? 'participant' : 'participants'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-4">
+                            <span className="bg-slate-100 text-slate-700 text-xs font-bold px-2 py-0.5 rounded-md">
+                              {cat.table_count} {cat.table_count === 1 ? 'table' : 'tables'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-4">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cat.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${cat.active ? 'bg-emerald-400' : 'bg-slate-400'}`} />
+                              {cat.active ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-4 text-right" onClick={e => e.stopPropagation()}>
+                            <div className="flex gap-1.5 justify-end">
+                              <button onClick={() => downloadCategoryReport(cat)}
+                                className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition">⬇ Report</button>
+                              <button onClick={() => editCategory(cat)}
+                                className="text-blue-600 hover:text-blue-800 text-xs font-semibold px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition">Edit</button>
+                              <button onClick={() => deleteCategory(cat.id)}
+                                className="text-red-500 hover:text-red-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition">Delete</button>
+                            </div>
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr className="bg-slate-50/60">
+                            <td></td>
+                            <td colSpan={6} className="px-5 py-4">
+                              {list.length === 0 ? (
+                                <p className="text-xs text-slate-400 italic">No participants assigned to this category.</p>
+                              ) : (
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-xs">
+                                    <thead className="text-slate-500">
+                                      <tr className="border-b border-slate-200">
+                                        <th className="text-left py-1.5 px-2">#</th>
+                                        <th className="text-left py-1.5 px-2">Student</th>
+                                        <th className="text-left py-1.5 px-2">Academy</th>
+                                        <th className="text-left py-1.5 px-2">DOB / Age</th>
+                                        <th className="text-left py-1.5 px-2">Coach</th>
+                                        <th className="text-left py-1.5 px-2">Table</th>
+                                        <th className="text-left py-1.5 px-2">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {list.map((p, i) => {
+                                        const tbl = tables.find(t => t.id === p.table_id);
+                                        return (
+                                          <tr key={p.id} className="border-b border-slate-100">
+                                            <td className="py-1.5 px-2 text-slate-400">{i + 1}</td>
+                                            <td className="py-1.5 px-2 font-semibold text-slate-700">{p.team_name}</td>
+                                            <td className="py-1.5 px-2 text-slate-600">{p.club_name || '—'}</td>
+                                            <td className="py-1.5 px-2 text-slate-600">
+                                              {p.date_of_birth ? `${new Date(p.date_of_birth).toLocaleDateString()} (${ageFromDob(p.date_of_birth)} yrs)` : '—'}
+                                            </td>
+                                            <td className="py-1.5 px-2 text-slate-500">{p.coach_name || '—'}</td>
+                                            <td className="py-1.5 px-2 text-slate-500">{tbl ? (tbl.display_label || `Table ${tbl.table_number}`) : '—'}</td>
+                                            <td className="py-1.5 px-2">
+                                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_COLORS[p.live_status] || 'bg-slate-100 text-slate-600'}`}>
+                                                {p.live_status}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                   {categories.length === 0 && (
-                    <tr><td colSpan={5} className="text-center py-12 text-slate-400">No categories yet. Add one above.</td></tr>
+                    <tr><td colSpan={7} className="text-center py-12 text-slate-400">No categories yet. Add one above.</td></tr>
                   )}
                 </tbody>
               </table>
