@@ -13,8 +13,8 @@ function randPwd() {
 }
 
 const newAcademies = [
-  { name: 'Futurebot Academy', username: 'futurebot-academy', password: randPwd(), coach_name: null, whatsapp_number: null },
-  { name: 'College Maristes Notre Dame de Lourdes', username: 'college-maristes-ndl', password: randPwd(), coach_name: null, whatsapp_number: null },
+  { name: 'RoboHolic', username: 'roboholic', password: randPwd(), coach_name: null, whatsapp_number: null },
+  { name: 'Carmelites', username: 'carmelites', password: randPwd(), coach_name: null, whatsapp_number: null },
 ];
 
 for (const a of newAcademies) {
