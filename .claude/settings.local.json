@@ -65,7 +65,9 @@
       "WebFetch(domain:www.ndu.edu.lb)",
       "WebFetch(domain:www.usek.edu.lb)",
       "Bash(node -e ' *)",
-      "Bash(node scripts/convert_credentials_to_xlsx.mjs)"
+      "Bash(node scripts/convert_credentials_to_xlsx.mjs)",
+      "Bash(node scripts/inspect_xlsx.mjs)",
+      "Bash(node --env-file=.env.local scripts/backfill_dob.mjs)"
     ]
   }
 }
