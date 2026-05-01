@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, Fragment } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Academy, Category, Table, Passation, PendingChange } from '@/lib/types';
 import Link from 'next/link';
@@ -84,6 +84,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const [tab, setTab] = useState<'students' | 'practice'>('students');
   const [showForm, setShowForm] = useState(false);
   const [editingPas, setEditingPas] = useState<Passation | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({
     team_name: '', student_names: '', coach_name: '', parent_contact: '',
     category_id: '', table_id: '', notes: '',
@@ -178,6 +179,26 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const tableLabel = (id: string) => {
     const t = tables.find(t => t.id === id);
     return t ? (t.display_label || `Table ${t.table_number}`) : '—';
+  };
+  const toggleExpand = (id: string) => {
+    setExpanded(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+  const fmtDate = (s: string | null) => s ? new Date(s).toLocaleString() : '—';
+  const liveBadge = (s: string) => {
+    const map: Record<string, string> = {
+      Scheduled: 'bg-slate-100 text-slate-600',
+      Prepare: 'bg-amber-100 text-amber-700',
+      Next: 'bg-orange-100 text-orange-700',
+      'In Progress': 'bg-blue-100 text-blue-700',
+      Finished: 'bg-emerald-100 text-emerald-700',
+      Absent: 'bg-red-100 text-red-700',
+      Delayed: 'bg-purple-100 text-purple-700',
+    };
+    return map[s] || 'bg-slate-100 text-slate-600';
   };
   const statusBadge = (s: string) => {
     const map: Record<string, string> = {
@@ -291,45 +312,93 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Student</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Category</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Table</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Coach</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Actions</th>
+                <th className="w-8"></th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Student</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Category</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Table</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Queue</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Live Status</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Score</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Request</th>
+                <th className="text-right px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {passations.map(p => {
                 const pend = pendingByPasId.get(p.id);
+                const isOpen = expanded.has(p.id);
                 return (
-                  <tr key={p.id} className="hover:bg-slate-50/60">
-                    <td className="px-5 py-3 font-semibold text-slate-800">{p.team_name}</td>
-                    <td className="px-5 py-3 text-xs text-slate-500">{catLabel(p.category_id)}</td>
-                    <td className="px-5 py-3 text-xs text-slate-600">{tableLabel(p.table_id)}</td>
-                    <td className="px-5 py-3 text-xs text-slate-500">{p.coach_name || '—'}</td>
-                    <td className="px-5 py-3">
-                      {pend ? (
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${statusBadge('pending')}`}>
-                          ⏳ {pend.action} pending
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <div className="flex gap-1.5 justify-end">
-                        <button onClick={() => openEdit(p)} disabled={!!pend}
-                          className="text-blue-600 text-xs font-semibold px-2.5 py-1 rounded-lg hover:bg-blue-50 disabled:opacity-30">Edit</button>
-                        <button onClick={() => requestDelete(p)} disabled={!!pend}
-                          className="text-red-500 text-xs font-semibold px-2.5 py-1 rounded-lg hover:bg-red-50 disabled:opacity-30">Delete</button>
-                      </div>
-                    </td>
-                  </tr>
+                  <Fragment key={p.id}>
+                    <tr className="hover:bg-slate-50/60 cursor-pointer" onClick={() => toggleExpand(p.id)}>
+                      <td className="px-2 text-slate-400 text-center">{isOpen ? '▾' : '▸'}</td>
+                      <td className="px-3 py-3 font-semibold text-slate-800">{p.team_name}</td>
+                      <td className="px-3 py-3 text-xs text-slate-500">{catLabel(p.category_id)}</td>
+                      <td className="px-3 py-3 text-xs text-slate-600">{tableLabel(p.table_id)}</td>
+                      <td className="px-3 py-3 text-xs text-slate-500">#{p.queue_position}</td>
+                      <td className="px-3 py-3">
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${liveBadge(p.live_status)}`}>{p.live_status}</span>
+                      </td>
+                      <td className="px-3 py-3 text-xs text-slate-700 font-semibold">
+                        {p.score != null ? p.score : '—'}
+                        {p.time_seconds != null && <span className="text-slate-400 font-normal ml-1">({p.time_seconds}s)</span>}
+                      </td>
+                      <td className="px-3 py-3">
+                        {pend ? (
+                          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${statusBadge('pending')}`}>
+                            ⏳ {pend.action}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right" onClick={e => e.stopPropagation()}>
+                        <div className="flex gap-1.5 justify-end">
+                          <button onClick={() => openEdit(p)} disabled={!!pend}
+                            className="text-blue-600 text-xs font-semibold px-2.5 py-1 rounded-lg hover:bg-blue-50 disabled:opacity-30">Edit</button>
+                          <button onClick={() => requestDelete(p)} disabled={!!pend}
+                            className="text-red-500 text-xs font-semibold px-2.5 py-1 rounded-lg hover:bg-red-50 disabled:opacity-30">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr className="bg-slate-50/70" key={p.id + '-x'}>
+                        <td></td>
+                        <td colSpan={8} className="px-5 py-4">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 text-xs">
+                            <Detail label="Team / Student Name" v={p.team_name} />
+                            <Detail label="Student Names" v={p.student_names} />
+                            <Detail label="Coach Name" v={p.coach_name} />
+                            <Detail label="Parent Name" v={p.parent_name} />
+                            <Detail label="Parent Contact" v={p.parent_contact} />
+                            <Detail label="Club Name" v={p.club_name} />
+                            <Detail label="Category" v={catLabel(p.category_id)} />
+                            <Detail label="Table" v={tableLabel(p.table_id)} />
+                            <Detail label="Queue Position" v={`#${p.queue_position}`} />
+                            <Detail label="Scheduled Time" v={fmtDate(p.scheduled_time)} />
+                            <Detail label="Live Status" v={p.live_status} />
+                            <Detail label="Final Result" v={p.final_result_status} />
+                            <Detail label="Score" v={p.score != null ? String(p.score) : null} />
+                            <Detail label="Time (s)" v={p.time_seconds != null ? String(p.time_seconds) : null} />
+                            <Detail label="Judge" v={p.judge_name} />
+                            <Detail label="Finalized At" v={fmtDate(p.finalized_at)} />
+                            <Detail label="Created" v={fmtDate(p.created_at)} />
+                            <Detail label="Updated" v={fmtDate(p.updated_at)} />
+                            <Detail label="Notes" v={p.notes} wide />
+                            {p.signature_image && (
+                              <div className="col-span-full">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Signature</p>
+                                <img src={p.signature_image} alt="Signature" className="bg-white border border-slate-200 rounded-lg max-h-24" />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
               {passations.length === 0 && (
-                <tr><td colSpan={6} className="text-center py-12 text-slate-400">No students yet. Submit a new student request above.</td></tr>
+                <tr><td colSpan={9} className="text-center py-12 text-slate-400">No students yet. Submit a new student request above.</td></tr>
               )}
             </tbody>
           </table>
@@ -396,6 +465,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function Detail({ label, v, wide }: { label: string; v: string | null | undefined; wide?: boolean }) {
+  return (
+    <div className={wide ? 'col-span-full' : ''}>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
+      <p className="text-slate-700">{v || <span className="text-slate-300">—</span>}</p>
     </div>
   );
 }
