@@ -87,7 +87,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({
     team_name: '', student_names: '', coach_name: '', parent_contact: '',
-    category_id: '', table_id: '', notes: '',
+    category_id: '', table_id: '', notes: '', date_of_birth: '',
   });
 
   const load = useCallback(async () => {
@@ -120,7 +120,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
 
   function openAdd() {
     setEditingPas(null);
-    setForm({ team_name: '', student_names: '', coach_name: '', parent_contact: '', category_id: '', table_id: '', notes: '' });
+    setForm({ team_name: '', student_names: '', coach_name: '', parent_contact: '', category_id: '', table_id: '', notes: '', date_of_birth: '' });
     setShowForm(true);
   }
   function openEdit(p: Passation) {
@@ -133,6 +133,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
       category_id: p.category_id,
       table_id: p.table_id,
       notes: '',
+      date_of_birth: p.date_of_birth || '',
     });
     setShowForm(true);
   }
@@ -156,6 +157,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
       category_id: form.category_id,
       table_id: form.table_id,
       notes: form.notes || null,
+      date_of_birth: form.date_of_birth || null,
       club_name: session.name,
     };
     await submitChange(editingPas ? 'update' : 'add', editingPas?.id || null, payload);
@@ -188,6 +190,17 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
     });
   };
   const fmtDate = (s: string | null) => s ? new Date(s).toLocaleString() : '—';
+  const fmtDOB = (s: string | null) => s ? new Date(s).toLocaleDateString() : '—';
+  const calcAge = (s: string | null): number | null => {
+    if (!s) return null;
+    const dob = new Date(s);
+    if (isNaN(dob.getTime())) return null;
+    const now = new Date();
+    let a = now.getFullYear() - dob.getFullYear();
+    const m = now.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) a--;
+    return a;
+  };
   const liveBadge = (s: string) => {
     const map: Record<string, string> = {
       Scheduled: 'bg-slate-100 text-slate-600',
@@ -274,6 +287,13 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                 <input className={inputCls} value={form.team_name}
                   onChange={e => setForm(f => ({ ...f, team_name: e.target.value, student_names: e.target.value }))} />
               </Field>
+              <Field label="Date of Birth *">
+                <input type="date" className={inputCls} value={form.date_of_birth}
+                  onChange={e => setForm(f => ({ ...f, date_of_birth: e.target.value }))} />
+                {form.date_of_birth && (
+                  <p className="text-xs text-slate-500 mt-1">Age: {calcAge(form.date_of_birth)} years</p>
+                )}
+              </Field>
               <Field label="Coach Name">
                 <input className={inputCls} value={form.coach_name}
                   onChange={e => setForm(f => ({ ...f, coach_name: e.target.value }))} />
@@ -314,6 +334,8 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
               <tr>
                 <th className="w-8"></th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Student</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Academy</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">DOB / Age</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Category</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Table</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Queue</th>
@@ -332,6 +354,15 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                     <tr className="hover:bg-slate-50/60 cursor-pointer" onClick={() => toggleExpand(p.id)}>
                       <td className="px-2 text-slate-400 text-center">{isOpen ? '▾' : '▸'}</td>
                       <td className="px-3 py-3 font-semibold text-slate-800">{p.team_name}</td>
+                      <td className="px-3 py-3 text-xs text-slate-600">{p.club_name || '—'}</td>
+                      <td className="px-3 py-3 text-xs text-slate-600">
+                        {p.date_of_birth ? (
+                          <>
+                            <div>{fmtDOB(p.date_of_birth)}</div>
+                            <div className="text-slate-400">{calcAge(p.date_of_birth)} yrs</div>
+                          </>
+                        ) : <span className="text-slate-300">—</span>}
+                      </td>
                       <td className="px-3 py-3 text-xs text-slate-500">{catLabel(p.category_id)}</td>
                       <td className="px-3 py-3 text-xs text-slate-600">{tableLabel(p.table_id)}</td>
                       <td className="px-3 py-3 text-xs text-slate-500">#{p.queue_position}</td>
@@ -363,7 +394,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                     {isOpen && (
                       <tr className="bg-slate-50/70" key={p.id + '-x'}>
                         <td></td>
-                        <td colSpan={8} className="px-5 py-4">
+                        <td colSpan={10} className="px-5 py-4">
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 text-xs">
                             <Detail label="Team / Student Name" v={p.team_name} />
                             <Detail label="Student Names" v={p.student_names} />
@@ -371,6 +402,8 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                             <Detail label="Parent Name" v={p.parent_name} />
                             <Detail label="Parent Contact" v={p.parent_contact} />
                             <Detail label="Club Name" v={p.club_name} />
+                            <Detail label="Date of Birth" v={fmtDOB(p.date_of_birth)} />
+                            <Detail label="Age" v={calcAge(p.date_of_birth) != null ? `${calcAge(p.date_of_birth)} years` : null} />
                             <Detail label="Category" v={catLabel(p.category_id)} />
                             <Detail label="Table" v={tableLabel(p.table_id)} />
                             <Detail label="Queue Position" v={`#${p.queue_position}`} />
@@ -398,7 +431,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                 );
               })}
               {passations.length === 0 && (
-                <tr><td colSpan={9} className="text-center py-12 text-slate-400">No students yet. Submit a new student request above.</td></tr>
+                <tr><td colSpan={11} className="text-center py-12 text-slate-400">No students yet. Submit a new student request above.</td></tr>
               )}
             </tbody>
           </table>

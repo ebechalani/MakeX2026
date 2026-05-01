@@ -143,7 +143,7 @@ function AdminDashboard() {
     team_name: '', student_names: '', coach_name: '', parent_name: '', club_name: '',
     parent_contact: '', category_id: '', table_id: '', scheduled_time: '',
     queue_position: 0, live_status: 'Scheduled' as LiveStatus,
-    judge_name: '', score: '', time_seconds: '', notes: '',
+    judge_name: '', score: '', time_seconds: '', notes: '', date_of_birth: '',
   });
   const [editPasId, setEditPasId] = useState<string | null>(null);
   const [showPasForm, setShowPasForm] = useState(false);
@@ -258,6 +258,7 @@ function AdminDashboard() {
       score: pasForm.score ? Number(pasForm.score) : null,
       time_seconds: pasForm.time_seconds ? Number(pasForm.time_seconds) : null,
       notes: pasForm.notes || null,
+      date_of_birth: pasForm.date_of_birth || null,
       updated_at: new Date().toISOString(),
     };
     if (editPasId) {
@@ -274,7 +275,7 @@ function AdminDashboard() {
       team_name: '', student_names: '', coach_name: '', parent_name: '', club_name: '',
       parent_contact: '', category_id: '', table_id: '', scheduled_time: '',
       queue_position: 0, live_status: 'Scheduled', judge_name: '',
-      score: '', time_seconds: '', notes: '',
+      score: '', time_seconds: '', notes: '', date_of_birth: '',
     });
     setEditPasId(null);
     setShowPasForm(false);
@@ -297,6 +298,7 @@ function AdminDashboard() {
       score: p.score?.toString() || '',
       time_seconds: p.time_seconds?.toString() || '',
       notes: p.notes || '',
+      date_of_birth: p.date_of_birth || '',
     });
     setEditPasId(p.id);
     setShowPasForm(true);
@@ -322,6 +324,7 @@ function AdminDashboard() {
         category_id: payload.category_id as string,
         table_id: payload.table_id as string,
         notes: payload.notes as string | null,
+        date_of_birth: (payload.date_of_birth as string | null) || null,
         live_status: 'Scheduled',
         queue_position: 0,
       };
@@ -330,7 +333,7 @@ function AdminDashboard() {
       resultPasName = String(payload.team_name);
     } else if (pc.action === 'update' && pc.passation_id) {
       const updateRow: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      for (const k of ['team_name', 'student_names', 'coach_name', 'parent_contact', 'category_id', 'table_id', 'notes']) {
+      for (const k of ['team_name', 'student_names', 'coach_name', 'parent_contact', 'category_id', 'table_id', 'notes', 'date_of_birth']) {
         if (payload[k] !== undefined) updateRow[k] = payload[k];
       }
       const { error } = await supabase.from('passations').update(updateRow).eq('id', pc.passation_id);
@@ -614,6 +617,19 @@ function AdminDashboard() {
                         onChange={e => setPasForm(f => ({ ...f, club_name: e.target.value }))} placeholder="Club or school name" />
                     </div>
                     <div>
+                      <label className={labelCls}>Date of Birth</label>
+                      <input type="date" className={inputCls} value={pasForm.date_of_birth}
+                        onChange={e => setPasForm(f => ({ ...f, date_of_birth: e.target.value }))} />
+                      {pasForm.date_of_birth && (() => {
+                        const dob = new Date(pasForm.date_of_birth);
+                        const now = new Date();
+                        let a = now.getFullYear() - dob.getFullYear();
+                        const m = now.getMonth() - dob.getMonth();
+                        if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) a--;
+                        return <p className="text-xs text-slate-500 mt-1">Age: {a} years</p>;
+                      })()}
+                    </div>
+                    <div>
                       <label className={labelCls}>Coach Name</label>
                       <input className={inputCls} value={pasForm.coach_name}
                         onChange={e => setPasForm(f => ({ ...f, coach_name: e.target.value }))} placeholder="Coach name" />
@@ -722,7 +738,7 @@ function AdminDashboard() {
                 <table className="w-full text-sm min-w-[960px]">
                   <thead className="bg-slate-50 border-b border-slate-100">
                     <tr>
-                      {['Student', 'Category', 'Table', 'Coach', 'Appt. Time', 'Status', 'Score', 'Judge', 'Sig', ''].map(h => (
+                      {['Student', 'Academy', 'DOB / Age', 'Category', 'Table', 'Coach', 'Appt. Time', 'Status', 'Score', 'Judge', 'Sig', ''].map(h => (
                         <th key={h} className={`px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider ${h === '' ? 'text-right' : 'text-left'}`}>
                           {h}
                         </th>
@@ -734,8 +750,23 @@ function AdminDashboard() {
                       <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-5 py-3.5">
                           <div className="font-semibold text-slate-800">{p.team_name}</div>
-                          {p.club_name && <div className="text-xs text-slate-500 mt-0.5">{p.club_name}</div>}
                           {p.student_names && p.student_names !== p.team_name && <div className="text-xs text-slate-400 mt-0.5">{p.student_names}</div>}
+                        </td>
+                        <td className="px-5 py-3.5 text-slate-600 text-xs max-w-[160px]">{p.club_name || '—'}</td>
+                        <td className="px-5 py-3.5 text-xs">
+                          {p.date_of_birth ? (() => {
+                            const dob = new Date(p.date_of_birth);
+                            const now = new Date();
+                            let a = now.getFullYear() - dob.getFullYear();
+                            const m = now.getMonth() - dob.getMonth();
+                            if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) a--;
+                            return (
+                              <>
+                                <div className="text-slate-700">{dob.toLocaleDateString()}</div>
+                                <div className="text-slate-400">{a} yrs</div>
+                              </>
+                            );
+                          })() : <span className="text-slate-300">—</span>}
                         </td>
                         <td className="px-5 py-3.5 text-slate-500 text-xs max-w-[160px]">{getCatLabel(p.category_id)}</td>
                         <td className="px-5 py-3.5">
@@ -772,7 +803,7 @@ function AdminDashboard() {
                     ))}
                     {passations.length === 0 && (
                       <tr>
-                        <td colSpan={10} className="text-center py-16">
+                        <td colSpan={12} className="text-center py-16">
                           <svg className="w-10 h-10 text-slate-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                           </svg>
