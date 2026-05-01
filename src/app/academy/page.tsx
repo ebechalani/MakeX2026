@@ -55,7 +55,7 @@ function Login({ onLogin }: { onLogin: (s: Session) => void }) {
           <label className="block text-sm font-medium text-slate-300 mb-1.5">Username</label>
           <input value={u} onChange={e => setU(e.target.value)}
             className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-blue-500/30 mb-4"
-            placeholder="academy-username" autoFocus />
+            placeholder="school / academy username" autoFocus />
           <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
           <input value={p} onChange={e => setP(e.target.value)} type="password"
             className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-blue-500/30 mb-4"
