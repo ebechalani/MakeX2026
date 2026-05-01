@@ -226,6 +226,44 @@ export default function OrganizerPage() {
   const categoryColorFor = (cat: string) =>
     CATEGORY_COLORS[cat] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/30';
 
+  function downloadTasksReport(list: OrganizerTask[], scope: 'all' | 'filtered') {
+    const headers = ['Title', 'Category', 'Priority', 'Status', 'Due Date', 'Description', 'Notes', 'Created', 'Updated'];
+    const fmtDate = (s: string | null) => s ? new Date(s).toLocaleString() : '';
+    const fmtDue = (s: string | null) => s ? new Date(s).toLocaleDateString() : '';
+    const sorted = list.slice().sort((a, b) => {
+      // by category, then priority urgency, then due date
+      const cat = a.category.localeCompare(b.category);
+      if (cat !== 0) return cat;
+      const prioOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+      const pr = (prioOrder[a.priority] ?? 9) - (prioOrder[b.priority] ?? 9);
+      if (pr !== 0) return pr;
+      return (a.due_date || '').localeCompare(b.due_date || '');
+    });
+    const rows = [headers, ...sorted.map(t => [
+      t.title,
+      t.category,
+      t.priority,
+      t.status.replace('_', ' '),
+      fmtDue(t.due_date),
+      t.description || '',
+      t.notes || '',
+      fmtDate(t.created_at),
+      fmtDate(t.updated_at),
+    ])];
+    const csv = rows.map(r => r.map(v => {
+      const s = v == null ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `MakeX_Organizer_Tasks_${scope}_${stamp}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // ── Password gate ──────────────────────────────────────────────────────────
   if (!authenticated) {
     return (
@@ -376,6 +414,20 @@ export default function OrganizerPage() {
               Clear
             </button>
           )}
+          <button
+            onClick={() => downloadTasksReport(filteredTasks, 'filtered')}
+            className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-sm font-semibold px-3 py-2 rounded-xl transition"
+            title="Download currently filtered tasks"
+          >
+            ⬇ Filtered ({filteredTasks.length})
+          </button>
+          <button
+            onClick={() => downloadTasksReport(tasks, 'all')}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-3 py-2 rounded-xl transition"
+            title="Download all tasks"
+          >
+            ⬇ All Tasks Report
+          </button>
         </div>
 
         {/* Task list */}
