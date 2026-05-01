@@ -64,7 +64,7 @@ const pages = [
   },
   {
     href: '/academy',
-    label: 'Academy Portal',
+    label: 'School / Academy Portal',
     description: 'Verify your team registrations and request add/edit/delete changes.',
     gradient: 'from-cyan-700 to-cyan-900',
     border: 'border-cyan-600',
