@@ -2,7 +2,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Choice = { label: string; value: number };
-type Item = { id: string; title: string; description?: string; choices: Choice[] };
+type Item =
+  | { id: string; kind?: 'choices'; title: string; description?: string; choices: Choice[] }
+  | { id: string; kind: 'counter'; title: string; description?: string; min?: number; max?: number; step?: number; perUnit: number };
 type Section = { title: string; subtitle?: string; items: Item[] };
 type Sheet = {
   key: string;
@@ -15,56 +17,54 @@ type Sheet = {
   sections: Section[];
   voidIds?: string[];
   formula: (vals: Record<string, number>) => number;
+  customLayout?: 'soccer';
 };
 
 const SHEETS: Sheet[] = [
-  // ── SportsWonderland ──────────────────────────────────────────────
+  // ── SportsWonderland — All-Star Pickup ─────────────────────────────────
   {
     key: 'sportswonderland',
     name: 'SportsWonderland — All-Star Pickup',
-    tag: 'SportsWonderland 4–5 / 6–7',
+    tag: 'Capelli SportsWonderland 4–7',
     ages: '4–5 (Manual) · 6–7 (Autonomous)',
     duration: '120 seconds',
     durationSec: 120,
     color: 'from-pink-600 to-rose-700',
     sections: [
       {
-        title: 'Token Collection',
-        subtitle: 'Mark which tokens were collected. Only collected tokens score points.',
+        title: '1. Token Collection',
+        subtitle: 'All 5 tokens are present every match. Mark which were collected — only collected tokens score.',
         items: [
-          { id: 'helmet', title: 'Helmet (5 pts)', choices: [{ label: 'Collected', value: 5 }, { label: 'Not collected', value: 0 }] },
-          { id: 'whistle', title: 'Whistle (4 pts)', choices: [{ label: 'Collected', value: 4 }, { label: 'Not collected', value: 0 }] },
-          { id: 'basketball', title: 'Basketball (3 pts)', choices: [{ label: 'Collected', value: 3 }, { label: 'Not collected', value: 0 }] },
-          { id: 'volleyball', title: 'Volleyball (2 pts)', choices: [{ label: 'Collected', value: 2 }, { label: 'Not collected', value: 0 }] },
-          { id: 'tennis', title: 'Tennis Ball (1 pt)', choices: [{ label: 'Collected', value: 1 }, { label: 'Not collected', value: 0 }] },
+          { id: 'helmet', title: '🪖 Helmet (5 pts)', choices: [{ label: 'Collected (+5)', value: 5 }, { label: 'Not collected', value: 0 }] },
+          { id: 'whistle', title: '🥏 Whistle (4 pts)', choices: [{ label: 'Collected (+4)', value: 4 }, { label: 'Not collected', value: 0 }] },
+          { id: 'basketball', title: '🏀 Basketball (3 pts)', choices: [{ label: 'Collected (+3)', value: 3 }, { label: 'Not collected', value: 0 }] },
+          { id: 'volleyball', title: '🏐 Volleyball (2 pts)', choices: [{ label: 'Collected (+2)', value: 2 }, { label: 'Not collected', value: 0 }] },
+          { id: 'tennis', title: '🎾 Tennis Ball (1 pt)', choices: [{ label: 'Collected (+1)', value: 1 }, { label: 'Not collected', value: 0 }] },
         ],
       },
       {
-        title: 'Huddle Pad Bonus',
-        subtitle: 'Robot fully inside dashed Start/Huddle Pad at STOP.',
+        title: '2. Huddle Pad Bonus',
+        subtitle: 'Robot fully inside the dashed Huddle Pad at STOP.',
         items: [
-          { id: 'huddle', title: 'Huddle Pad', choices: [{ label: 'Awarded (+5)', value: 5 }, { label: 'Not awarded', value: 0 }] },
+          { id: 'huddle', title: 'Huddle Pad bonus', choices: [{ label: 'Awarded (+5)', value: 5 }, { label: 'Not awarded', value: 0 }] },
         ],
       },
       {
-        title: 'Penalties (–1 each)',
-        subtitle: 'Each occurrence deducts 1 point.',
+        title: '3. Run Validity',
+        subtitle: 'If anyone except the referee touches the robot or items during the match, the team loses the round.',
         items: [
-          { id: 'p_robot', title: 'Illegal touch of robot', choices: [{ label: 'No', value: 0 }, { label: '1', value: -1 }, { label: '2', value: -2 }, { label: '3+', value: -3 }] },
-          { id: 'p_token', title: 'Illegal touch of token', choices: [{ label: 'No', value: 0 }, { label: '1', value: -1 }, { label: '2', value: -2 }, { label: '3+', value: -3 }] },
-          { id: 'p_reset', title: 'Field reset / repositioning', choices: [{ label: 'No', value: 0 }, { label: '1', value: -1 }, { label: '2', value: -2 }] },
-          { id: 'p_damage', title: 'Damage to field or tokens', choices: [{ label: 'No', value: 0 }, { label: '1', value: -1 }, { label: '2', value: -2 }] },
-          { id: 'p_other', title: 'Other', choices: [{ label: 'No', value: 0 }, { label: '1', value: -1 }, { label: '2', value: -2 }] },
+          { id: 'sw_void', title: 'Illegal touch (robot or items) after GO', choices: [{ label: 'No', value: 0 }, { label: 'Yes → ROUND LOST', value: -9999 }] },
         ],
       },
     ],
+    voidIds: ['sw_void'],
     formula: v => Object.values(v).reduce((a, b) => a + b, 0),
   },
 
-  // ── SmartLogistics ────────────────────────────────────────────────
+  // ── SmartLogistics — Capelli Inspire ───────────────────────────────────
   {
     key: 'smartlogistics',
-    name: 'Smart Logistics — Capelli Inspire',
+    name: 'Smart Logistics',
     tag: 'Capelli Inspire 8–12',
     ages: '8–12 · Fully autonomous',
     duration: '150 seconds',
@@ -72,51 +72,52 @@ const SHEETS: Sheet[] = [
     color: 'from-blue-600 to-cyan-700',
     sections: [
       {
-        title: 'Mission Cube Deliveries',
-        subtitle: 'Correct = fully inside matching colored bay (RED → Home, GREEN → Training).',
+        title: '1. Mission Cube Deliveries',
+        subtitle: 'Correct = cube fully inside its matching colored bay. RED → Home, GREEN → Training.',
         items: [
-          { id: 'cube1', title: 'Cube 1', choices: [{ label: 'Correct (+20)', value: 20 }, { label: 'Wrong bay (−10)', value: -10 }, { label: 'Not delivered', value: 0 }] },
-          { id: 'cube2', title: 'Cube 2', choices: [{ label: 'Correct (+20)', value: 20 }, { label: 'Wrong bay (−10)', value: -10 }, { label: 'Not delivered', value: 0 }] },
-          { id: 'cube3', title: 'Cube 3', choices: [{ label: 'Correct (+20)', value: 20 }, { label: 'Wrong bay (−10)', value: -10 }, { label: 'Not delivered', value: 0 }] },
+          { id: 'cube1', title: 'Cube 1', choices: [{ label: 'Correct bay (+20)', value: 20 }, { label: 'Wrong bay (−10)', value: -10 }, { label: 'Not delivered', value: 0 }] },
+          { id: 'cube2', title: 'Cube 2', choices: [{ label: 'Correct bay (+20)', value: 20 }, { label: 'Wrong bay (−10)', value: -10 }, { label: 'Not delivered', value: 0 }] },
+          { id: 'cube3', title: 'Cube 3', choices: [{ label: 'Correct bay (+20)', value: 20 }, { label: 'Wrong bay (−10)', value: -10 }, { label: 'Not delivered', value: 0 }] },
         ],
       },
       {
-        title: 'Blue Cube Status',
+        title: '2. BLUE Cube Status',
+        subtitle: 'BLUE cube must stay in its locker.',
         items: [
           {
-            id: 'blue', title: 'BLUE cube',
+            id: 'blue', title: 'BLUE cube position',
             choices: [
               { label: 'Untouched (+10)', value: 10 },
-              { label: 'Moved but inside locker (0)', value: 0 },
-              { label: 'Outside locker (−20)', value: -20 },
+              { label: 'Moved, still inside locker (0)', value: 0 },
+              { label: 'Fully outside locker (−20)', value: -20 },
             ],
           },
         ],
       },
       {
-        title: 'Park / Finish Bonus',
-        subtitle: 'Robot partially or completely inside Finish zone at STOP.',
+        title: '3. Park / Finish Bonus',
+        subtitle: 'Robot partially or completely inside the Finish zone at STOP.',
         items: [
-          { id: 'park', title: 'Park / Finish', choices: [{ label: 'Awarded (+10)', value: 10 }, { label: 'Not awarded', value: 0 }] },
+          { id: 'park', title: 'Finish zone bonus', choices: [{ label: 'Awarded (+10)', value: 10 }, { label: 'Not awarded', value: 0 }] },
         ],
       },
       {
-        title: 'Field Protection & Autonomy',
-        subtitle: 'Confirmed violation voids the run.',
+        title: '4. Run Validity',
+        subtitle: 'A confirmed breach voids the run (score = 0).',
         items: [
-          { id: 'void_dmg', title: 'Damage to map/lockers/bays', choices: [{ label: 'No', value: 0 }, { label: 'Yes → VOID', value: -9999 }] },
-          { id: 'void_help', title: 'Illegal assistance after GO', choices: [{ label: 'No', value: 0 }, { label: 'Yes → VOID', value: -9999 }] },
+          { id: 'sl_void_touch', title: 'Anyone except referee touched robot/cubes/field after GO', choices: [{ label: 'No', value: 0 }, { label: 'Yes → VOID', value: -9999 }] },
+          { id: 'sl_void_remote', title: 'Student used remote / joystick / manual control', choices: [{ label: 'No', value: 0 }, { label: 'Yes → VOID', value: -9999 }] },
         ],
       },
     ],
-    voidIds: ['void_dmg', 'void_help'],
+    voidIds: ['sl_void_touch', 'sl_void_remote'],
     formula: v => Object.values(v).reduce((a, b) => a + b, 0),
   },
 
-  // ── LockerRoom ────────────────────────────────────────────────────
+  // ── LockerRoom — Capelli Starter ───────────────────────────────────────
   {
     key: 'lockerroom',
-    name: 'Locker Room — Capelli Starter',
+    name: 'Locker Room Mission',
     tag: 'Capelli Starter 13–15',
     ages: '13–15 · Fully autonomous',
     duration: '150 seconds',
@@ -124,41 +125,97 @@ const SHEETS: Sheet[] = [
     color: 'from-emerald-600 to-teal-700',
     sections: [
       {
-        title: 'Mission Phases',
-        subtitle: 'Phase 4 (Gate bonus) only counts if Phase 3 was a correct delivery.',
+        title: '1. Mission Phases',
+        subtitle: 'Phase 4 (Stadium Gate) only counts if Phase 3 is a correct delivery.',
         items: [
-          { id: 'p1', title: '1. Left Locker Room with Team Box', choices: [{ label: '+5', value: 5 }, { label: '0', value: 0 }] },
-          { id: 'p2a', title: '2a. Reached Scan Station with Team Box', choices: [{ label: '+10', value: 10 }, { label: '0', value: 0 }] },
-          { id: 'p2b', title: '2b. Coach approval — Team Box lifted', choices: [{ label: '+15', value: 15 }, { label: '0', value: 0 }] },
-          { id: 'p2c', title: '2c. 4-second pause maintained', choices: [{ label: 'Yes (no penalty)', value: 0 }, { label: 'No (+10s penalty)', value: 0 }] },
-          { id: 'p3', title: '3. Team-color cube delivery', choices: [{ label: 'Correct (+20)', value: 20 }, { label: 'Wrong bay (−10)', value: -10 }, { label: 'Not delivered', value: 0 }] },
-          { id: 'p4', title: '4. Stadium gate opened (only if P3 correct)', choices: [{ label: 'Awarded (+5)', value: 5 }, { label: 'Not awarded', value: 0 }] },
+          { id: 'p1', title: '1 · Left Locker Room with Team Box', choices: [{ label: 'Yes (+5)', value: 5 }, { label: 'No (0)', value: 0 }] },
+          { id: 'p2a', title: '2a · Reached Scan Station with Team Box', choices: [{ label: 'Yes (+10)', value: 10 }, { label: 'No (0)', value: 0 }] },
+          { id: 'p2b', title: '2b · Coach Approval — Team Box lifted by referee', choices: [{ label: 'Yes (+15)', value: 15 }, { label: 'No (0)', value: 0 }] },
+          { id: 'p3', title: '3 · Team-color cube delivered to matching big circle', choices: [{ label: 'Correct (+20)', value: 20 }, { label: 'Wrong circle (−10)', value: -10 }, { label: 'Not delivered (0)', value: 0 }] },
+          { id: 'p4', title: '4 · Stadium Gate opened (auto-zero unless Phase 3 correct)', choices: [{ label: 'Awarded (+5)', value: 5 }, { label: 'Not awarded', value: 0 }] },
         ],
       },
       {
-        title: 'Maze Sorting',
-        subtitle: 'Each token must end fully inside its matching colored target.',
+        title: '2. Maze Sorting (3 tokens)',
+        subtitle: 'Each colored token must end fully inside its matching color target inside the maze.',
         items: [
-          { id: 'mz_red', title: 'RED token', choices: [{ label: 'Correct (+10)', value: 10 }, { label: 'Wrong (−10)', value: -10 }, { label: 'Not delivered', value: 0 }] },
-          { id: 'mz_grn', title: 'GREEN token', choices: [{ label: 'Correct (+10)', value: 10 }, { label: 'Wrong (−10)', value: -10 }, { label: 'Not delivered', value: 0 }] },
-          { id: 'mz_blu', title: 'BLUE token', choices: [{ label: 'Correct (+10)', value: 10 }, { label: 'Wrong (−10)', value: -10 }, { label: 'Not delivered', value: 0 }] },
+          { id: 'mz_red', title: '🟥 RED token', choices: [{ label: 'Correct (+10)', value: 10 }, { label: 'Wrong target (−10)', value: -10 }, { label: 'Not delivered (0)', value: 0 }] },
+          { id: 'mz_grn', title: '🟩 GREEN token', choices: [{ label: 'Correct (+10)', value: 10 }, { label: 'Wrong target (−10)', value: -10 }, { label: 'Not delivered (0)', value: 0 }] },
+          { id: 'mz_blu', title: '🟦 BLUE token', choices: [{ label: 'Correct (+10)', value: 10 }, { label: 'Wrong target (−10)', value: -10 }, { label: 'Not delivered (0)', value: 0 }] },
         ],
       },
       {
-        title: 'Field Protection & Autonomy',
+        title: '3. Penalties & Run Validity',
+        subtitle: 'Note: the 4-second pause is no longer scored — it is only a recommendation so the referee can lift the Team Box.',
         items: [
-          { id: 'v_dmg', title: 'Robot damaged field/locker/maze/barriers', choices: [{ label: 'No', value: 0 }, { label: 'Yes → VOID', value: -9999 }] },
-          { id: 'v_help', title: 'Illegal human assistance after GO', choices: [{ label: 'No', value: 0 }, { label: 'Yes → VOID', value: -9999 }] },
-          { id: 'v_gate', title: 'Robot touched the gate', choices: [{ label: 'No', value: 0 }, { label: 'Yes (−10)', value: -10 }] },
+          { id: 'lr_gate', title: 'Robot touched the Stadium Gate', choices: [{ label: 'No', value: 0 }, { label: 'Yes (−10)', value: -10 }] },
+          { id: 'lr_void_touch', title: 'Anyone except referee touched robot/field after GO', choices: [{ label: 'No', value: 0 }, { label: 'Yes → VOID', value: -9999 }] },
+          { id: 'lr_void_remote', title: 'Student used remote / joystick', choices: [{ label: 'No', value: 0 }, { label: 'Yes → VOID', value: -9999 }] },
         ],
       },
     ],
-    voidIds: ['v_dmg', 'v_help'],
+    voidIds: ['lr_void_touch', 'lr_void_remote'],
     formula: v => {
-      // Gate bonus only if P3 correct
+      // Phase 4 only counts if Phase 3 was correct (+20)
       const copy = { ...v };
       if ((copy.p3 ?? 0) !== 20) copy.p4 = 0;
       return Object.values(copy).reduce((a, b) => a + b, 0);
+    },
+  },
+
+  // ── Soccer — Capelli Cup ───────────────────────────────────────────────
+  {
+    key: 'soccer',
+    name: 'Capelli Sport Cup — Soccer',
+    tag: 'Capelli Soccer 1v1',
+    ages: '2 halves × 2 min · Speed cap 40 RPM',
+    duration: '2 min / half',
+    durationSec: 120,
+    color: 'from-orange-600 to-amber-700',
+    customLayout: 'soccer',
+    sections: [
+      {
+        title: 'Goals (Half 1)',
+        items: [
+          { id: 'h1_us', kind: 'counter', title: 'Our team — Half 1', perUnit: 1, min: 0, max: 20 },
+          { id: 'h1_them', kind: 'counter', title: 'Opponent — Half 1', perUnit: -1, min: 0, max: 20 },
+        ],
+      },
+      {
+        title: 'Goals (Half 2)',
+        items: [
+          { id: 'h2_us', kind: 'counter', title: 'Our team — Half 2', perUnit: 1, min: 0, max: 20 },
+          { id: 'h2_them', kind: 'counter', title: 'Opponent — Half 2', perUnit: -1, min: 0, max: 20 },
+        ],
+      },
+      {
+        title: 'Fouls & Cards (informational, do not affect score)',
+        subtitle: '2 minor fouls in same half = 1 yellow. 2 yellows in same match = red (disqualification).',
+        items: [
+          { id: 'minor_us', kind: 'counter', title: 'Our minor fouls', perUnit: 0, min: 0, max: 20 },
+          { id: 'yellow_us', kind: 'counter', title: 'Our yellow cards', perUnit: 0, min: 0, max: 5 },
+          { id: 'red_us', kind: 'counter', title: 'Our red cards', perUnit: 0, min: 0, max: 2 },
+        ],
+      },
+      {
+        title: 'Pre-Match Inspection',
+        subtitle: 'All items must pass before kickoff.',
+        items: [
+          { id: 'ins_size', title: 'Footprint ≤ 22 × 22 cm', choices: [{ label: 'Pass', value: 0 }, { label: 'Fail → not eligible', value: -9999 }] },
+          { id: 'ins_weight', title: 'Weight ≤ 1.5 kg', choices: [{ label: 'Pass', value: 0 }, { label: 'Fail → not eligible', value: -9999 }] },
+          { id: 'ins_speed', title: 'Speed test ≥ 7 sec across field (40 RPM cap)', choices: [{ label: 'Pass', value: 0 }, { label: 'Fail → not eligible', value: -9999 }] },
+          { id: 'ins_attach', title: 'No forbidden attachments (no traps, magnets, sharps, blades)', choices: [{ label: 'Pass', value: 0 }, { label: 'Fail → not eligible', value: -9999 }] },
+        ],
+      },
+    ],
+    voidIds: ['ins_size', 'ins_weight', 'ins_speed', 'ins_attach', 'red_us'],
+    formula: v => {
+      const usH1 = v.h1_us ?? 0;
+      const themH1 = v.h1_them ?? 0;
+      const usH2 = v.h2_us ?? 0;
+      const themH2 = v.h2_them ?? 0;
+      // value displayed = goal differential (positive if our team leading)
+      return (usH1 + usH2) - (themH1 + themH2);
     },
   },
 ];
@@ -167,13 +224,22 @@ export default function PracticeScoresheet() {
   const [active, setActive] = useState(SHEETS[0].key);
   const sheet = useMemo(() => SHEETS.find(s => s.key === active)!, [active]);
   const [vals, setVals] = useState<Record<string, number>>({});
+  const [counts, setCounts] = useState<Record<string, number>>({}); // raw counts for counter items
   const [studentName, setStudentName] = useState('');
   const [remaining, setRemaining] = useState(sheet.durationSec);
   const [running, setRunning] = useState(false);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const isVoid = sheet.voidIds?.some(id => vals[id] === -9999) ?? false;
-  const total = isVoid ? 0 : sheet.formula(vals);
+  // Soft-void: red card disqualifies in soccer (we treat 1+ red as VOID)
+  const isVoid = sheet.voidIds?.some(id => {
+    const v = vals[id];
+    if (v === -9999) return true;
+    // For soccer: red_us is a counter; treat ≥1 as VOID
+    if (id === 'red_us' && (counts[id] ?? 0) >= 1) return true;
+    return false;
+  }) ?? false;
+
+  const total = isVoid ? 0 : sheet.formula({ ...vals, ...counts });
 
   useEffect(() => {
     if (!running) return;
@@ -201,6 +267,7 @@ export default function PracticeScoresheet() {
 
   function reset() {
     setVals({});
+    setCounts({});
     setStudentName('');
     resetTimer();
   }
@@ -208,9 +275,14 @@ export default function PracticeScoresheet() {
   function switchSheet(k: string) {
     setActive(k);
     setVals({});
+    setCounts({});
     setRunning(false);
     const next = SHEETS.find(s => s.key === k)!;
     setRemaining(next.durationSec);
+  }
+
+  function bumpCounter(id: string, delta: number, min: number, max: number) {
+    setCounts(c => ({ ...c, [id]: Math.max(min, Math.min(max, (c[id] ?? 0) + delta)) }));
   }
 
   const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
@@ -225,7 +297,7 @@ export default function PracticeScoresheet() {
       </div>
 
       {/* Category selector */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {SHEETS.map(s => (
           <button
             key={s.key}
@@ -240,7 +312,8 @@ export default function PracticeScoresheet() {
               {s.tag}
             </div>
             <div className="font-bold text-slate-800 text-sm leading-tight">{s.name}</div>
-            <div className="text-xs text-slate-500 mt-1">{s.ages} · {s.duration}</div>
+            <div className="text-xs text-slate-500 mt-1">{s.ages}</div>
+            <div className="text-[10px] text-slate-400 mt-0.5">{s.duration}</div>
           </button>
         ))}
       </div>
@@ -259,7 +332,7 @@ export default function PracticeScoresheet() {
 
         {/* Timer */}
         <div className="text-center">
-          <div className="text-xs uppercase tracking-wider opacity-75">Match Timer</div>
+          <div className="text-xs uppercase tracking-wider opacity-75">{sheet.customLayout === 'soccer' ? 'Half Timer' : 'Match Timer'}</div>
           <div className={`text-5xl font-black tabular-nums ${timerDone ? 'text-red-300' : timerWarn ? 'text-amber-200 animate-pulse' : ''}`}>
             {mm}:{ss}
           </div>
@@ -280,8 +353,17 @@ export default function PracticeScoresheet() {
         </div>
 
         <div className="text-right">
-          <div className="text-xs uppercase tracking-wider opacity-75">{isVoid ? 'Run Voided' : 'Live Score'}</div>
-          <div className={`text-5xl font-black ${isVoid ? 'text-red-200' : ''}`}>{isVoid ? 'VOID' : total}</div>
+          <div className="text-xs uppercase tracking-wider opacity-75">
+            {isVoid ? 'Run Voided' : sheet.customLayout === 'soccer' ? 'Goal Differential' : 'Live Score'}
+          </div>
+          <div className={`text-5xl font-black ${isVoid ? 'text-red-200' : ''}`}>
+            {isVoid ? 'VOID' : (sheet.customLayout === 'soccer' && total > 0 ? '+' : '') + total}
+          </div>
+          {sheet.customLayout === 'soccer' && !isVoid && (
+            <div className="text-xs opacity-75 mt-0.5">
+              Us {(counts.h1_us ?? 0) + (counts.h2_us ?? 0)} – {(counts.h1_them ?? 0) + (counts.h2_them ?? 0)} Them
+            </div>
+          )}
         </div>
         <button onClick={reset} className="bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-4 py-2 text-sm font-semibold">
           Reset All
@@ -297,6 +379,32 @@ export default function PracticeScoresheet() {
           </div>
           <div className="divide-y divide-slate-50">
             {sec.items.map(item => {
+              if (item.kind === 'counter') {
+                const c = counts[item.id] ?? 0;
+                const min = item.min ?? 0;
+                const max = item.max ?? 99;
+                return (
+                  <div key={item.id} className="px-5 py-3 flex items-center gap-3">
+                    <div className="flex-1">
+                      <div className="font-semibold text-sm text-slate-800">{item.title}</div>
+                      {item.description && <div className="text-xs text-slate-500 mt-0.5">{item.description}</div>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => bumpCounter(item.id, -1, min, max)}
+                        disabled={c <= min}
+                        className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-30 text-lg font-bold text-slate-700"
+                      >−</button>
+                      <div className="min-w-[3rem] text-center text-2xl font-black tabular-nums text-slate-800">{c}</div>
+                      <button
+                        onClick={() => bumpCounter(item.id, 1, min, max)}
+                        disabled={c >= max}
+                        className="w-9 h-9 rounded-lg bg-blue-100 hover:bg-blue-200 disabled:opacity-30 text-lg font-bold text-blue-700"
+                      >+</button>
+                    </div>
+                  </div>
+                );
+              }
               const cur = vals[item.id];
               return (
                 <div key={item.id} className="px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
