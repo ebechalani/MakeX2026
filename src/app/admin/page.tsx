@@ -983,8 +983,17 @@ function AdminDashboard() {
 
         {/* ── ACADEMIES TAB ── */}
         {activeTab === 'academies' && (() => {
-          // Group passations by club_name (case + whitespace insensitive match)
-          const norm = (s: string | null | undefined) => (s || '').trim().toLowerCase();
+          // Group passations by club_name — accent/case/whitespace insensitive
+          const norm = (s: string | null | undefined) => {
+            if (!s) return '';
+            let x = s;
+            // Fix mojibake (é stored as Ã©)
+            if (/Ã.|Â./.test(x)) {
+              try { x = Buffer.from(x, 'latin1').toString('utf8'); } catch {}
+            }
+            return x.normalize('NFD').replace(/[̀-ͯ]/g, '')
+              .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+          };
           const byClub = new Map<string, { name: string; list: Passation[] }>();
           // Seed with academies (so academies with zero students still appear)
           for (const a of academies) {
