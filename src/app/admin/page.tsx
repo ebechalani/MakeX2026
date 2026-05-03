@@ -134,7 +134,9 @@ function AdminDashboard() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [passations, setPassations] = useState<Passation[]>([]);
-  const [activeTab, setActiveTab] = useState<'passations' | 'categories' | 'approvals'>('passations');
+  const [activeTab, setActiveTab] = useState<'passations' | 'categories' | 'academies' | 'approvals'>('passations');
+  const [expandedAcademy, setExpandedAcademy] = useState<Set<string>>(new Set());
+  const [academySearch, setAcademySearch] = useState('');
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
   const [academies, setAcademies] = useState<Academy[]>([]);
   const [catForm, setCatForm] = useState({ name: '', age_range_label: '', table_count: 1 });
@@ -545,7 +547,7 @@ function AdminDashboard() {
 
         {/* Tabs */}
         <div className="flex gap-1.5 mb-6 bg-white border border-slate-200 rounded-xl p-1 w-fit shadow-sm">
-          {(['passations', 'categories', 'approvals'] as const).map(tab => (
+          {(['passations', 'categories', 'academies', 'approvals'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-5 py-2 rounded-lg font-semibold text-sm capitalize transition ${
                 activeTab === tab ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
@@ -559,6 +561,11 @@ function AdminDashboard() {
               {tab === 'categories' && (
                 <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab ? 'bg-white/20' : 'bg-slate-100'}`}>
                   {categories.length}
+                </span>
+              )}
+              {tab === 'academies' && (
+                <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab ? 'bg-white/20' : 'bg-slate-100'}`}>
+                  {academies.length}
                 </span>
               )}
               {tab === 'approvals' && (
@@ -973,6 +980,220 @@ function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* ── ACADEMIES TAB ── */}
+        {activeTab === 'academies' && (() => {
+          // Group passations by club_name (case + whitespace insensitive match)
+          const norm = (s: string | null | undefined) => (s || '').trim().toLowerCase();
+          const byClub = new Map<string, { name: string; list: Passation[] }>();
+          // Seed with academies (so academies with zero students still appear)
+          for (const a of academies) {
+            byClub.set(norm(a.name), { name: a.name, list: [] });
+          }
+          // Then bucket all passations by club_name
+          for (const p of passations) {
+            const k = norm(p.club_name);
+            if (!k) continue;
+            if (!byClub.has(k)) byClub.set(k, { name: p.club_name!, list: [] });
+            byClub.get(k)!.list.push(p);
+          }
+          const groups = Array.from(byClub.values()).sort((a, b) => a.name.localeCompare(b.name));
+          const filtered = academySearch.trim()
+            ? groups.filter(g => g.name.toLowerCase().includes(academySearch.toLowerCase())
+                || g.list.some(p =>
+                  (p.team_name || '').toLowerCase().includes(academySearch.toLowerCase())
+                  || (p.student_names || '').toLowerCase().includes(academySearch.toLowerCase())))
+            : groups;
+
+          // Per-academy category breakdown
+          const breakdownFor = (list: Passation[]) => {
+            const m = new Map<string, number>();
+            for (const p of list) {
+              const cat = categories.find(c => c.id === p.category_id);
+              const label = cat ? `${cat.name}${cat.age_range_label ? ` (${cat.age_range_label})` : ''}` : '—';
+              m.set(label, (m.get(label) ?? 0) + 1);
+            }
+            return Array.from(m.entries()).sort();
+          };
+
+          const totalStudents = passations.length;
+          const linkedCount = groups.filter(g => g.list.length > 0).length;
+
+          // Per-academy CSV
+          function downloadAcademyCsv(g: { name: string; list: Passation[] }) {
+            const sorted = g.list.slice().sort((a, b) => {
+              const ca = categories.find(c => c.id === a.category_id)?.name || '';
+              const cb = categories.find(c => c.id === b.category_id)?.name || '';
+              return ca.localeCompare(cb) || a.queue_position - b.queue_position;
+            });
+            const rows = [REPORT_HEADERS, ...sorted.map(passToRow)];
+            const safe = g.name.replace(/[^a-z0-9]+/gi, '_');
+            downloadCsv(`MakeX_Academy_${safe}.csv`, rows);
+          }
+
+          return (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-800">Academies / Schools</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">{groups.length} academies · {linkedCount} with students · {totalStudents} total students</p>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    value={academySearch}
+                    onChange={e => setAcademySearch(e.target.value)}
+                    placeholder="Search academy or student…"
+                    className="bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  />
+                  <button
+                    onClick={() => setExpandedAcademy(new Set(groups.map(g => norm(g.name))))}
+                    className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 px-3 py-2 rounded-xl"
+                  >Expand all</button>
+                  <button
+                    onClick={() => setExpandedAcademy(new Set())}
+                    className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 px-3 py-2 rounded-xl"
+                  >Collapse all</button>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th className="w-8"></th>
+                      <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Academy / School</th>
+                      <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Students</th>
+                      <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Categories</th>
+                      <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Coach</th>
+                      <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">WhatsApp</th>
+                      <th className="text-right px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {filtered.map(g => {
+                      const k = norm(g.name);
+                      const isOpen = expandedAcademy.has(k);
+                      const acc = academies.find(a => norm(a.name) === k);
+                      const breakdown = breakdownFor(g.list);
+                      return (
+                        <Fragment key={k}>
+                          <tr className="hover:bg-slate-50/60 cursor-pointer" onClick={() => {
+                            setExpandedAcademy(prev => {
+                              const n = new Set(prev);
+                              if (n.has(k)) n.delete(k); else n.add(k);
+                              return n;
+                            });
+                          }}>
+                            <td className="px-2 text-slate-400 text-center">{isOpen ? '▾' : '▸'}</td>
+                            <td className="px-3 py-3 font-semibold text-slate-800">
+                              {g.name}
+                              {!acc && <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">no login</span>}
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${g.list.length > 0 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-400'}`}>
+                                {g.list.length}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex flex-wrap gap-1">
+                                {breakdown.length === 0 ? <span className="text-xs text-slate-300">—</span> :
+                                  breakdown.map(([label, count]) => (
+                                    <span key={label} className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">
+                                      {label} <span className="font-bold">×{count}</span>
+                                    </span>
+                                  ))
+                                }
+                              </div>
+                            </td>
+                            <td className="px-3 py-3 text-xs text-slate-500">{acc?.coach_name || '—'}</td>
+                            <td className="px-3 py-3 text-xs text-slate-500">{acc?.whatsapp_number || '—'}</td>
+                            <td className="px-3 py-3 text-right" onClick={e => e.stopPropagation()}>
+                              <button
+                                disabled={g.list.length === 0}
+                                onClick={() => downloadAcademyCsv(g)}
+                                className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-30 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
+                              >⬇ CSV</button>
+                            </td>
+                          </tr>
+                          {isOpen && (
+                            <tr className="bg-slate-50/60">
+                              <td></td>
+                              <td colSpan={6} className="px-5 py-4">
+                                {g.list.length === 0 ? (
+                                  <p className="text-xs text-slate-400 italic">No students assigned to this academy.</p>
+                                ) : (
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-xs">
+                                      <thead className="text-slate-500">
+                                        <tr className="border-b border-slate-200">
+                                          <th className="text-left py-1.5 px-2">#</th>
+                                          <th className="text-left py-1.5 px-2">Student</th>
+                                          <th className="text-left py-1.5 px-2">Category</th>
+                                          <th className="text-left py-1.5 px-2">Table</th>
+                                          <th className="text-left py-1.5 px-2">DOB / Age</th>
+                                          <th className="text-left py-1.5 px-2">Queue</th>
+                                          <th className="text-left py-1.5 px-2">Status</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {g.list.slice().sort((a, b) => {
+                                          const ca = categories.find(c => c.id === a.category_id)?.name || '';
+                                          const cb = categories.find(c => c.id === b.category_id)?.name || '';
+                                          return ca.localeCompare(cb) || a.queue_position - b.queue_position;
+                                        }).map((p, i) => {
+                                          const cat = categories.find(c => c.id === p.category_id);
+                                          const tbl = tables.find(t => t.id === p.table_id);
+                                          let age = '';
+                                          if (p.date_of_birth) {
+                                            const d = new Date(p.date_of_birth);
+                                            const n = new Date();
+                                            let a = n.getFullYear() - d.getFullYear();
+                                            const m = n.getMonth() - d.getMonth();
+                                            if (m < 0 || (m === 0 && n.getDate() < d.getDate())) a--;
+                                            age = `${a}`;
+                                          }
+                                          return (
+                                            <tr key={p.id} className="border-b border-slate-100">
+                                              <td className="py-1.5 px-2 text-slate-400">{i + 1}</td>
+                                              <td className="py-1.5 px-2 font-semibold text-slate-700">
+                                                {p.team_name}
+                                                {p.student_names && p.student_names !== p.team_name && (
+                                                  <span className="text-slate-400 font-normal ml-1">· {p.student_names}</span>
+                                                )}
+                                              </td>
+                                              <td className="py-1.5 px-2 text-slate-600">{cat ? `${cat.name}${cat.age_range_label ? ` (${cat.age_range_label})` : ''}` : '—'}</td>
+                                              <td className="py-1.5 px-2 text-slate-500">{tbl ? (tbl.display_label || `Table ${tbl.table_number}`) : '—'}</td>
+                                              <td className="py-1.5 px-2 text-slate-500">
+                                                {p.date_of_birth ? `${new Date(p.date_of_birth).toLocaleDateString()} (${age} yrs)` : '—'}
+                                              </td>
+                                              <td className="py-1.5 px-2 text-slate-500">#{p.queue_position}</td>
+                                              <td className="py-1.5 px-2">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_COLORS[p.live_status] || 'bg-slate-100 text-slate-600'}`}>
+                                                  {p.live_status}
+                                                </span>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                    {filtered.length === 0 && (
+                      <tr><td colSpan={7} className="text-center py-12 text-slate-400">No academies match your search.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── APPROVALS TAB ── */}
         {activeTab === 'approvals' && (
