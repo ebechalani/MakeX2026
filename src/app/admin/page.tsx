@@ -134,7 +134,7 @@ function AdminDashboard() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [passations, setPassations] = useState<Passation[]>([]);
-  const [activeTab, setActiveTab] = useState<'passations' | 'categories' | 'academies' | 'approvals'>('passations');
+  const [activeTab, setActiveTab] = useState<'passations' | 'categories' | 'academies' | 'schedule' | 'approvals'>('passations');
   const [expandedAcademy, setExpandedAcademy] = useState<Set<string>>(new Set());
   const [academySearch, setAcademySearch] = useState('');
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
@@ -547,7 +547,7 @@ function AdminDashboard() {
 
         {/* Tabs */}
         <div className="flex gap-1.5 mb-6 bg-white border border-slate-200 rounded-xl p-1 w-fit shadow-sm">
-          {(['passations', 'categories', 'academies', 'approvals'] as const).map(tab => (
+          {(['passations', 'categories', 'academies', 'schedule', 'approvals'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-5 py-2 rounded-lg font-semibold text-sm capitalize transition ${
                 activeTab === tab ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
@@ -1200,6 +1200,141 @@ function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          );
+        })()}
+
+        {/* ── SCHEDULE TAB ── */}
+        {activeTab === 'schedule' && (() => {
+          // Group passations by table, sort each by queue_position / scheduled_time
+          const fmtTime = (s: string | null) => s ? new Date(s).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '—';
+          const tablesByCat2: Map<string, Table[]> = new Map();
+          for (const t of tables) {
+            if (!t.active) continue;
+            if (!tablesByCat2.has(t.category_id)) tablesByCat2.set(t.category_id, []);
+            tablesByCat2.get(t.category_id)!.push(t);
+          }
+          for (const arr of tablesByCat2.values()) arr.sort((a, b) => a.table_number - b.table_number);
+
+          // Pre-build map: table_id → sorted slots
+          const slotsByTable = new Map<string, Passation[]>();
+          for (const p of passations) {
+            if (!p.table_id) continue;
+            if (!slotsByTable.has(p.table_id)) slotsByTable.set(p.table_id, []);
+            slotsByTable.get(p.table_id)!.push(p);
+          }
+          for (const arr of slotsByTable.values()) {
+            arr.sort((a, b) => {
+              const at = a.scheduled_time || '';
+              const bt = b.scheduled_time || '';
+              if (at && bt && at !== bt) return at.localeCompare(bt);
+              return a.queue_position - b.queue_position;
+            });
+          }
+
+          const orderedCats = categories.slice().sort((a, b) => a.name.localeCompare(b.name));
+
+          // Per-table CSV
+          function downloadTableCsv(cat: Category, t: Table, list: Passation[]) {
+            const rows: (string | number | null)[][] = [
+              ['#', 'Time', 'Student', 'Academy', 'DOB / Age', 'Coach', 'Status']
+            ];
+            list.forEach((p, i) => {
+              let age = '';
+              if (p.date_of_birth) {
+                const d = new Date(p.date_of_birth); const n = new Date();
+                let a = n.getFullYear() - d.getFullYear();
+                const m = n.getMonth() - d.getMonth();
+                if (m < 0 || (m === 0 && n.getDate() < d.getDate())) a--;
+                age = String(a);
+              }
+              rows.push([i + 1, fmtTime(p.scheduled_time), p.team_name, p.club_name || '', p.date_of_birth ? `${p.date_of_birth} (${age} yrs)` : '', p.coach_name || '', p.live_status]);
+            });
+            const lbl = (t.display_label || `Table ${t.table_number}`).replace(/[^a-z0-9]+/gi, '_');
+            const safeCat = cat.name.replace(/[^a-z0-9]+/gi, '_');
+            downloadCsv(`MakeX_Schedule_${safeCat}_${lbl}.csv`, rows);
+          }
+
+          return (
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-800">Live Schedule</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">Per-table timeline. Click ⬇ on any table to download its run sheet.</p>
+                </div>
+                <button onClick={downloadAllReport}
+                  className="text-sm bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-xl">
+                  ⬇ Download All Schedule (CSV)
+                </button>
+              </div>
+
+              {orderedCats.map(cat => {
+                const catTables = tablesByCat2.get(cat.id) || [];
+                const totalStudents = (passByCat.get(cat.id) || []).length;
+                if (catTables.length === 0 && totalStudents === 0) return null;
+                // First slot time across this category
+                const allSlots = catTables.flatMap(t => slotsByTable.get(t.id) || []);
+                const firstTime = allSlots.map(p => p.scheduled_time).filter(Boolean).sort()[0];
+                const lastTime = allSlots.map(p => p.scheduled_time).filter(Boolean).sort().slice(-1)[0];
+                return (
+                  <div key={cat.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="font-bold text-slate-800">{cat.name} <span className="text-slate-400 font-normal">{cat.age_range_label}</span></h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {catTables.length} {catTables.length === 1 ? 'table' : 'tables'} · {totalStudents} {totalStudents === 1 ? 'student' : 'students'}
+                          {firstTime && ` · runs ${fmtTime(firstTime)}–${fmtTime(lastTime!)}`}
+                        </p>
+                      </div>
+                      <button onClick={() => downloadCategoryReport(cat)}
+                        className="text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg font-semibold">
+                        ⬇ Category CSV
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <div className="flex gap-3 p-4 min-w-fit">
+                        {catTables.map(t => {
+                          const list = slotsByTable.get(t.id) || [];
+                          return (
+                            <div key={t.id} className="min-w-[280px] flex-1 bg-slate-50/50 border border-slate-200 rounded-xl overflow-hidden">
+                              <div className="px-3 py-2 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-bold text-slate-800">{t.display_label || `Table ${t.table_number}`}</p>
+                                  <p className="text-[10px] text-slate-500">{list.length} slot{list.length === 1 ? '' : 's'}</p>
+                                </div>
+                                <button onClick={() => downloadTableCsv(cat, t, list)}
+                                  disabled={list.length === 0}
+                                  className="text-emerald-700 bg-white hover:bg-emerald-50 disabled:opacity-30 text-xs font-semibold px-2 py-1 rounded-md border border-emerald-200">⬇</button>
+                              </div>
+                              {list.length === 0 ? (
+                                <div className="px-3 py-6 text-center text-xs text-slate-300 italic">empty</div>
+                              ) : (
+                                <ol className="divide-y divide-slate-100">
+                                  {list.map((p, i) => {
+                                    return (
+                                      <li key={p.id} className="px-3 py-2 flex items-start gap-2 hover:bg-white">
+                                        <span className="text-[10px] font-bold text-slate-400 w-5 mt-0.5">{i + 1}</span>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="font-mono text-[10px] text-blue-700 font-bold">{fmtTime(p.scheduled_time)}</p>
+                                          <p className="text-xs font-semibold text-slate-800 truncate">{p.team_name}</p>
+                                          <p className="text-[10px] text-slate-500 truncate">{p.club_name || '—'}</p>
+                                        </div>
+                                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${STATUS_COLORS[p.live_status] || 'bg-slate-100 text-slate-500'}`}>
+                                          {p.live_status === 'In Progress' ? 'live' : p.live_status === 'Scheduled' ? '' : p.live_status.slice(0, 4)}
+                                        </span>
+                                      </li>
+                                    );
+                                  })}
+                                </ol>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           );
         })()}
