@@ -1130,6 +1130,7 @@ function AdminDashboard() {
                                   const rulesKeyFor = (catName: string): string | null => {
                                     if (/sports\s*wonderland/i.test(catName)) return 'sportswonderland';
                                     if (/capelli\s*inspire/i.test(catName)) return 'smartlogistics';
+                                    if (/makex\s*inspire/i.test(catName)) return 'codecourier';
                                     return null;
                                   };
                                   return cats.map(c => {

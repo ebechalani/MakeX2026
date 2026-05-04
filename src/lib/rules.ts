@@ -4,8 +4,9 @@ export type RulesDoc = {
   title: string;
   subtitle: string;
   appliesTo: RegExp;       // matches category.name
-  htmlUrl: string;         // converted-from-docx HTML, served from /public
-  docxUrl: string;         // original Word document, served from /public
+  htmlUrl?: string;        // converted-from-docx HTML, served from /public (optional)
+  docxUrl?: string;        // original Word document, served from /public (optional)
+  pdfUrl?: string;         // original PDF, served from /public (optional)
   sections: { heading: string; body: string[] }[];
   scoring: { label: string; points: string }[];
   voidConditions: string[];
@@ -147,6 +148,17 @@ export const RULES: RulesDoc[] = [
       'Anyone except the referee touches the robot, cubes, or field after GO → RUN VOIDED',
       'Student uses a remote, joystick, or any manual control → RUN VOIDED',
     ],
+  },
+  {
+    key: 'codecourier',
+    version: 'v1',
+    title: 'MakeX Inspire — Code Courier',
+    subtitle: 'Official 2026 MakeX Inspire Code Courier Rules · Ages 8–12',
+    appliesTo: /makex\s*inspire/i,
+    pdfUrl: '/rules/codecourier_rules.pdf',
+    sections: [],
+    scoring: [],
+    voidConditions: [],
   },
 ];
 

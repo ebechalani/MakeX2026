@@ -132,6 +132,7 @@ function RulesPanel({
   const [html, setHtml] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!rules.htmlUrl) { setHtml(null); return; }
     let cancel = false;
     fetch(rules.htmlUrl).then(r => r.text()).then(t => { if (!cancel) setHtml(t); }).catch(() => {});
     return () => { cancel = true; };
@@ -163,15 +164,31 @@ function RulesPanel({
     <div className="p-5 space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-500">{rules.title} · {rules.subtitle}</p>
-        <a href={rules.docxUrl} download
-           className="text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200">
-          ⬇ Download original .docx
-        </a>
+        <div className="flex gap-2">
+          {rules.docxUrl && (
+            <a href={rules.docxUrl} download
+              className="text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200">
+              ⬇ Download .docx
+            </a>
+          )}
+          {rules.pdfUrl && (
+            <a href={rules.pdfUrl} download target="_blank" rel="noopener noreferrer"
+              className="text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200">
+              ⬇ Download .pdf
+            </a>
+          )}
+        </div>
       </div>
-      <div className="bg-white border border-slate-200 rounded-xl p-6 max-h-[520px] overflow-y-auto rules-doc">
-        {html
-          ? <div className="rules-html" dangerouslySetInnerHTML={{ __html: html }} />
-          : <p className="text-sm text-slate-400">Loading rules document…</p>}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        {rules.pdfUrl ? (
+          <iframe src={rules.pdfUrl + '#toolbar=1&navpanes=0'} className="w-full" style={{ height: 600 }} title={rules.title} />
+        ) : html ? (
+          <div className="p-6 max-h-[520px] overflow-y-auto rules-doc">
+            <div className="rules-html" dangerouslySetInnerHTML={{ __html: html }} />
+          </div>
+        ) : (
+          <p className="p-6 text-sm text-slate-400">Loading rules document…</p>
+        )}
       </div>
 
       {acceptance ? (
