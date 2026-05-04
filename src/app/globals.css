@@ -1,1 +1,18 @@
 @import "tailwindcss";
+
+/* Word-document rendering used by the academy Rules panel */
+.rules-html { color: #0f172a; font-size: 14px; line-height: 1.55; }
+.rules-html h1 { font-size: 20px; font-weight: 700; margin: 0 0 12px; color: #0f172a; }
+.rules-html h2 { font-size: 17px; font-weight: 700; margin: 18px 0 8px; color: #1e293b; }
+.rules-html h3 { font-size: 15px; font-weight: 700; margin: 14px 0 6px; color: #334155; }
+.rules-html h4 { font-size: 14px; font-weight: 700; margin: 12px 0 4px; color: #334155; }
+.rules-html p { margin: 6px 0; }
+.rules-html ul, .rules-html ol { margin: 6px 0 6px 22px; }
+.rules-html li { margin: 2px 0; }
+.rules-html strong { font-weight: 700; }
+.rules-html em { font-style: italic; }
+.rules-html table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+.rules-html th, .rules-html td { border: 1px solid #cbd5e1; padding: 6px 10px; font-size: 13px; vertical-align: top; }
+.rules-html th { background: #f1f5f9; font-weight: 600; text-align: left; }
+.rules-html img { max-width: 100%; height: auto; }
+.rules-html a { color: #1d4ed8; text-decoration: underline; }

@@ -74,7 +74,8 @@
       "Bash(node --env-file=.env.local scripts/dedupe_r1.mjs)",
       "Bash(node --env-file=.env.local scripts/add_academies.mjs)",
       "Bash(powershell -Command 'Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::OpenRead\\('\\\\''01_SportsWonderland_Rules.docx'\\\\''\\).Entries | Where-Object { $_.FullName -eq '\\\\''word/document.xml'\\\\'' } | ForEach-Object { $r = New-Object IO.StreamReader\\($_.Open\\(\\)\\); $r.ReadToEnd\\(\\) }')",
-      "Bash(powershell -Command 'Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::OpenRead\\('\\\\''SportsWonderland_Scoresheet_updated.docx'\\\\''\\).Entries | Where-Object { $_.FullName -eq '\\\\''word/document.xml'\\\\'' } | ForEach-Object { $r = New-Object IO.StreamReader\\($_.Open\\(\\)\\); $r.ReadToEnd\\(\\) }')"
+      "Bash(powershell -Command 'Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::OpenRead\\('\\\\''SportsWonderland_Scoresheet_updated.docx'\\\\''\\).Entries | Where-Object { $_.FullName -eq '\\\\''word/document.xml'\\\\'' } | ForEach-Object { $r = New-Object IO.StreamReader\\($_.Open\\(\\)\\); $r.ReadToEnd\\(\\) }')",
+      "Bash(node scripts/convert_rules.mjs)"
     ]
   }
 }

@@ -128,6 +128,13 @@ function RulesPanel({
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [html, setHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancel = false;
+    fetch(rules.htmlUrl).then(r => r.text()).then(t => { if (!cancel) setHtml(t); }).catch(() => {});
+    return () => { cancel = true; };
+  }, [rules.htmlUrl]);
 
   async function submit() {
     setErr('');
@@ -153,36 +160,17 @@ function RulesPanel({
 
   return (
     <div className="p-5 space-y-4">
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 max-h-[480px] overflow-y-auto">
-        <h4 className="font-bold text-slate-800">{rules.title}</h4>
-        <p className="text-xs text-slate-500 mb-4">{rules.subtitle}</p>
-        {rules.sections.map(sec => (
-          <div key={sec.heading} className="mb-3">
-            <p className="font-semibold text-slate-700 text-sm mb-1">{sec.heading}</p>
-            <ul className="text-xs text-slate-600 space-y-0.5 list-disc pl-5">
-              {sec.body.map((b, i) => <li key={i}>{b}</li>)}
-            </ul>
-          </div>
-        ))}
-        <div className="mt-4">
-          <p className="font-semibold text-slate-700 text-sm mb-1">Scoring</p>
-          <table className="text-xs text-slate-600 w-full">
-            <tbody>
-              {rules.scoring.map(s => (
-                <tr key={s.label} className="border-t border-slate-200">
-                  <td className="py-1 pr-2">{s.label}</td>
-                  <td className="py-1 font-mono font-bold text-right">{s.points}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3">
-          <p className="font-semibold text-red-800 text-xs mb-1">Round-loss conditions</p>
-          <ul className="text-xs text-red-700 space-y-0.5 list-disc pl-5">
-            {rules.voidConditions.map((c, i) => <li key={i}>{c}</li>)}
-          </ul>
-        </div>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-500">{rules.title} · {rules.subtitle}</p>
+        <a href={rules.docxUrl} download
+           className="text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200">
+          ⬇ Download original .docx
+        </a>
+      </div>
+      <div className="bg-white border border-slate-200 rounded-xl p-6 max-h-[520px] overflow-y-auto rules-doc">
+        {html
+          ? <div className="rules-html" dangerouslySetInnerHTML={{ __html: html }} />
+          : <p className="text-sm text-slate-400">Loading rules document…</p>}
       </div>
 
       {acceptance ? (

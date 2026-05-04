@@ -4,6 +4,8 @@ export type RulesDoc = {
   title: string;
   subtitle: string;
   appliesTo: RegExp;       // matches category.name
+  htmlUrl: string;         // converted-from-docx HTML, served from /public
+  docxUrl: string;         // original Word document, served from /public
   sections: { heading: string; body: string[] }[];
   scoring: { label: string; points: string }[];
   voidConditions: string[];
@@ -16,6 +18,8 @@ export const RULES: RulesDoc[] = [
     title: 'SportsWonderland — All-Star Pickup',
     subtitle: 'Official Rules · Ages 4–7 · Match: 120 seconds',
     appliesTo: /sports\s*wonderland/i,
+    htmlUrl: '/rules/sportswonderland_rules.html',
+    docxUrl: '/rules/sportswonderland_rules.docx',
     sections: [
       {
         heading: 'What this game is about',
