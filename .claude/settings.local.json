@@ -67,7 +67,8 @@
       "Bash(node -e ' *)",
       "Bash(node scripts/convert_credentials_to_xlsx.mjs)",
       "Bash(node scripts/inspect_xlsx.mjs)",
-      "Bash(node --env-file=.env.local scripts/backfill_dob.mjs)"
+      "Bash(node --env-file=.env.local scripts/backfill_dob.mjs)",
+      "Bash(node --env-file=.env.local scripts/generate_schedule.mjs)"
     ]
   }
 }

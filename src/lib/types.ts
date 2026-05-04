@@ -60,6 +60,7 @@ export interface Passation {
   score: number | null;
   time_seconds: number | null;
   notes: string | null;
+  round_number: number;
   signature_image: string | null;
   judge_name: string | null;
   finalized_at: string | null;
