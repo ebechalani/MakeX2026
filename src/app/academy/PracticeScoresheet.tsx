@@ -176,6 +176,78 @@ const SHEETS: Sheet[] = [
     },
   },
 
+  // ── MakeX Inspire — Code Courier ───────────────────────────────────────
+  {
+    key: 'codecourier',
+    name: 'Code Courier',
+    tag: 'MakeX Inspire 8–12',
+    ages: '8–12 · Fully autonomous',
+    duration: '150 seconds',
+    durationSec: 150,
+    color: 'from-purple-600 to-indigo-700',
+    sections: [
+      {
+        title: '1. Rings on Signal Towers (+50 each)',
+        subtitle: 'Ring color matches the tower, ring fully inserted onto the matching tower, upright, no contact with the robot at end. 4 rings of each color × 4 colors = max 16 rings × 50 = 800 pts.',
+        items: [
+          { id: 'tower_red',    title: '🔴 Red rings on red tower', choices: [
+            { label: '0', value: 0 }, { label: '1 (+50)', value: 50 }, { label: '2 (+100)', value: 100 }, { label: '3 (+150)', value: 150 }, { label: '4 (+200)', value: 200 },
+          ] },
+          { id: 'tower_yellow', title: '🟡 Yellow rings on yellow tower', choices: [
+            { label: '0', value: 0 }, { label: '1 (+50)', value: 50 }, { label: '2 (+100)', value: 100 }, { label: '3 (+150)', value: 150 }, { label: '4 (+200)', value: 200 },
+          ] },
+          { id: 'tower_blue',   title: '🔵 Blue rings on blue tower', choices: [
+            { label: '0', value: 0 }, { label: '1 (+50)', value: 50 }, { label: '2 (+100)', value: 100 }, { label: '3 (+150)', value: 150 }, { label: '4 (+200)', value: 200 },
+          ] },
+          { id: 'tower_green',  title: '🟢 Green rings on green tower', choices: [
+            { label: '0', value: 0 }, { label: '1 (+50)', value: 50 }, { label: '2 (+100)', value: 100 }, { label: '3 (+150)', value: 150 }, { label: '4 (+200)', value: 200 },
+          ] },
+        ],
+      },
+      {
+        title: '2. Rings in Matching Color Zone (+10 each)',
+        subtitle: 'Ring color matches, ring upright inside the matching delivery area, no robot contact — but NOT inserted onto the tower. Don\'t double-count rings already counted above.',
+        items: [
+          { id: 'zone_red',    title: '🔴 Red rings in red zone (not on tower)', choices: [
+            { label: '0', value: 0 }, { label: '1 (+10)', value: 10 }, { label: '2 (+20)', value: 20 }, { label: '3 (+30)', value: 30 }, { label: '4 (+40)', value: 40 },
+          ] },
+          { id: 'zone_yellow', title: '🟡 Yellow rings in yellow zone (not on tower)', choices: [
+            { label: '0', value: 0 }, { label: '1 (+10)', value: 10 }, { label: '2 (+20)', value: 20 }, { label: '3 (+30)', value: 30 }, { label: '4 (+40)', value: 40 },
+          ] },
+          { id: 'zone_blue',   title: '🔵 Blue rings in blue zone (not on tower)', choices: [
+            { label: '0', value: 0 }, { label: '1 (+10)', value: 10 }, { label: '2 (+20)', value: 20 }, { label: '3 (+30)', value: 30 }, { label: '4 (+40)', value: 40 },
+          ] },
+          { id: 'zone_green',  title: '🟢 Green rings in green zone (not on tower)', choices: [
+            { label: '0', value: 0 }, { label: '1 (+10)', value: 10 }, { label: '2 (+20)', value: 20 }, { label: '3 (+30)', value: 30 }, { label: '4 (+40)', value: 40 },
+          ] },
+        ],
+      },
+      {
+        title: '3. Penalties (E02 Violations)',
+        subtitle: 'Each confirmed rule violation deducts 20 points. Warnings (E01) do NOT deduct points.',
+        items: [
+          { id: 'cc_violations', title: 'Confirmed violations × −20', choices: [
+            { label: '0', value: 0 },
+            { label: '1 (−20)', value: -20 },
+            { label: '2 (−40)', value: -40 },
+            { label: '3 (−60)', value: -60 },
+            { label: '4 (−80)', value: -80 },
+            { label: '5+ (−100)', value: -100 },
+          ] },
+        ],
+      },
+      {
+        title: '4. Match Validity',
+        subtitle: 'E04 — team violates the rules and the match is disqualified; E03 invalid prop already removed from scoring.',
+        items: [
+          { id: 'cc_void', title: 'Disqualified by referee (E04)', choices: [{ label: 'No', value: 0 }, { label: 'Yes → MATCH SCORE = 0', value: -9999 }] },
+        ],
+      },
+    ],
+    voidIds: ['cc_void'],
+    formula: v => Object.values(v).reduce((a, b) => a + b, 0),
+  },
+
   // ── Soccer — Capelli Cup ───────────────────────────────────────────────
   {
     key: 'soccer',
