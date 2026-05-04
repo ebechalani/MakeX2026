@@ -13,8 +13,7 @@ function randPwd() {
 }
 
 const newAcademies = [
-  { name: 'RoboHolic', username: 'roboholic', password: randPwd(), coach_name: null, whatsapp_number: null },
-  { name: 'Carmelites', username: 'carmelites', password: randPwd(), coach_name: null, whatsapp_number: null },
+  { name: 'ESJ Capucins Batroun', username: 'esj-capucins-batroun', password: randPwd(), coach_name: 'Rawi Noun', whatsapp_number: '81326235' },
 ];
 
 for (const a of newAcademies) {

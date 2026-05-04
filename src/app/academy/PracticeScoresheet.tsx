@@ -43,14 +43,27 @@ const SHEETS: Sheet[] = [
         ],
       },
       {
-        title: '2. Huddle Pad Bonus',
+        title: '2. Cone Penalties',
+        subtitle: 'Each cone touch = −1 pt. Referee resets the robot while the timer keeps running.',
+        items: [
+          { id: 'cones', title: 'Cone touches (−1 each, up to 4)', choices: [
+            { label: '0 touches', value: 0 },
+            { label: '1 touch (−1)', value: -1 },
+            { label: '2 touches (−2)', value: -2 },
+            { label: '3 touches (−3)', value: -3 },
+            { label: '4 touches (−4)', value: -4 },
+          ] },
+        ],
+      },
+      {
+        title: '3. Huddle Pad Bonus',
         subtitle: 'Robot fully inside the dashed Huddle Pad at STOP.',
         items: [
           { id: 'huddle', title: 'Huddle Pad bonus', choices: [{ label: 'Awarded (+5)', value: 5 }, { label: 'Not awarded', value: 0 }] },
         ],
       },
       {
-        title: '3. Run Validity',
+        title: '4. Run Validity',
         subtitle: 'If anyone except the referee touches the robot or items during the match, the team loses the round.',
         items: [
           { id: 'sw_void', title: 'Illegal touch (robot or items) after GO', choices: [{ label: 'No', value: 0 }, { label: 'Yes → ROUND LOST', value: -9999 }] },

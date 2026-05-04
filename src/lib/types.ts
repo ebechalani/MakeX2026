@@ -80,6 +80,20 @@ export interface Academy {
   created_at: string;
 }
 
+export interface RulesAcceptance {
+  id: string;
+  academy_id: string;
+  category_id: string;
+  rules_key: string;
+  rules_version: string;
+  signer_name: string;
+  signer_role: string | null;
+  signature_image: string;
+  signed_at: string;
+  academy?: Academy;
+  category?: Category;
+}
+
 export type ChangeAction = 'add' | 'update' | 'delete';
 export type ChangeStatus = 'pending' | 'approved' | 'rejected';
 
