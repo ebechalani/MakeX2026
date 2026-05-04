@@ -10,7 +10,9 @@ const supabase = createClient(url, key, { auth: { persistSession: false } });
 
 const EVENT_DATE = '2026-05-31'; // Sunday
 const SLOT_MINUTES = 5;
-const MAX_PER_TABLE_PER_ROUND = 12; // 60 / 5
+const NOMINAL_ROUND_MINUTES = 60;
+const NOMINAL_SLOTS = NOMINAL_ROUND_MINUTES / SLOT_MINUTES; // 12; just informational
+const MAX_PER_TABLE_PER_ROUND = Infinity; // place everyone, overflow reported below
 
 function startTimeFor(catName) {
   if (/sports\s*wonderland/i.test(catName)) return `${EVENT_DATE}T14:00:00`;
@@ -91,7 +93,12 @@ for (const cat of cats) {
     }
   }
 
-  console.log(`\n→ ${cat.name} ${cat.age_range_label || ''} — ${catStudents.length} students across ${catTables.length} tables`);
+  // Compute peak duration: largest bucket × slot
+  const peak = Math.max(...buckets.map(b => b.length));
+  const peakMinutes = peak * SLOT_MINUTES;
+  const overflowMin = Math.max(0, peakMinutes - NOMINAL_ROUND_MINUTES);
+  const overflowFlag = overflowMin > 0 ? `   ⚠ peak table runs ${peakMinutes}min (${overflowMin}min over the 60-min round window)` : '';
+  console.log(`\n→ ${cat.name} ${cat.age_range_label || ''} — ${catStudents.length} students across ${catTables.length} tables${overflowFlag}`);
   for (let i = 0; i < buckets.length; i++) {
     const t = catTables[i];
     const lbl = t.display_label || `Table ${t.table_number}`;
@@ -100,7 +107,7 @@ for (const cat of cats) {
       const slot1 = new Date(startMs + q * SLOT_MINUTES * 60000).toISOString();
       const slot2 = new Date(round2StartMs + q * SLOT_MINUTES * 60000).toISOString();
       const queuePos = q + 1;
-      const queuePos2 = MAX_PER_TABLE_PER_ROUND + queuePos; // round 2 sits after all round 1 in queue order
+      const queuePos2 = 1000 + queuePos; // round 2 always sorts after round 1 by queue_position
       console.log(`     ${queuePos.toString().padStart(2)} ${new Date(slot1).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}  ${p.team_name}  (${p.club_name || '—'})`);
       round1Updates.push({
         id: p.id,
