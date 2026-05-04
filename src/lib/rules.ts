@@ -125,6 +125,29 @@ export const RULES: RulesDoc[] = [
       'Anyone except the referee touches an item during the match → ROUND LOST',
     ],
   },
+  {
+    key: 'smartlogistics',
+    version: 'v1',
+    title: 'Smart Logistics — Capelli Sports Inspire',
+    subtitle: 'Official Rules · Ages 8–12 · Match: 150 seconds · Fully autonomous',
+    appliesTo: /capelli\s*inspire/i,
+    htmlUrl: '/rules/smartlogistics_rules.html',
+    docxUrl: '/rules/smartlogistics_rules.docx',
+    sections: [], // shown via embedded HTML; legacy fields kept for backward compat
+    scoring: [
+      { label: 'Cube delivered to correct bay (each, 3 max)', points: '+20' },
+      { label: 'Cube delivered to wrong bay (each)', points: '−10' },
+      { label: 'BLUE cube untouched at end', points: '+10' },
+      { label: 'BLUE cube moved but still inside locker', points: '0' },
+      { label: 'BLUE cube fully outside locker', points: '−20' },
+      { label: 'Robot in Finish zone at STOP (partial or full)', points: '+10' },
+      { label: 'Maximum possible score', points: '80' },
+    ],
+    voidConditions: [
+      'Anyone except the referee touches the robot, cubes, or field after GO → RUN VOIDED',
+      'Student uses a remote, joystick, or any manual control → RUN VOIDED',
+    ],
+  },
 ];
 
 export function rulesForCategory(catName: string): RulesDoc | undefined {

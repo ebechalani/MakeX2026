@@ -78,7 +78,9 @@
       "Bash(node scripts/convert_rules.mjs)",
       "Bash(rm -f public/rules/sportswonderland_rules.docx)",
       "Bash(cp \"C:/Users/eddy.bachaalany/Downloads/01_SportsWonderland_Rules.docx\" public/rules/sportswonderland_rules.docx)",
-      "PowerShell($src = 'C:\\\\Users\\\\eddy.bachaalany\\\\Downloads\\\\01_SportsWonderland_Rules.docx'; $dst = 'C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\public\\\\rules\\\\sportswonderland_rules.docx'; try { Copy-Item -Path $src -Destination $dst -Force -ErrorAction Stop; Write-Output 'copied' } catch { Write-Output \\('blocked: ' + $_.Exception.Message\\) })"
+      "PowerShell($src = 'C:\\\\Users\\\\eddy.bachaalany\\\\Downloads\\\\01_SportsWonderland_Rules.docx'; $dst = 'C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\public\\\\rules\\\\sportswonderland_rules.docx'; try { Copy-Item -Path $src -Destination $dst -Force -ErrorAction Stop; Write-Output 'copied' } catch { Write-Output \\('blocked: ' + $_.Exception.Message\\) })",
+      "Bash(powershell -Command 'Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::OpenRead\\('\\\\''02_SmartLogistics_Rules.docx'\\\\''\\).Entries | Where-Object { $_.FullName -eq '\\\\''word/document.xml'\\\\'' } | ForEach-Object { $r = New-Object IO.StreamReader\\($_.Open\\(\\)\\); $r.ReadToEnd\\(\\) }')",
+      "Bash(powershell -Command 'Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::OpenRead\\('\\\\''SmartLogistics_Scoresheet \\(1\\).docx'\\\\''\\).Entries | Where-Object { $_.FullName -eq '\\\\''word/document.xml'\\\\'' } | ForEach-Object { $r = New-Object IO.StreamReader\\($_.Open\\(\\)\\); $r.ReadToEnd\\(\\) }')"
     ]
   }
 }

@@ -5,6 +5,7 @@ import path from 'path';
 
 const docs = [
   { src: 'public/rules/sportswonderland_rules.docx', out: 'public/rules/sportswonderland_rules.html' },
+  { src: 'public/rules/smartlogistics_rules.docx', out: 'public/rules/smartlogistics_rules.html' },
 ];
 
 for (const d of docs) {
