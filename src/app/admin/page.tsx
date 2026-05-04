@@ -1131,6 +1131,7 @@ function AdminDashboard() {
                                     if (/sports\s*wonderland/i.test(catName)) return 'sportswonderland';
                                     if (/capelli\s*inspire/i.test(catName)) return 'smartlogistics';
                                     if (/makex\s*inspire/i.test(catName)) return 'codecourier';
+                                    if (/makex\s*starter|signal\s*rise/i.test(catName)) return 'signalrise';
                                     return null;
                                   };
                                   return cats.map(c => {

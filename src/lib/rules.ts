@@ -150,6 +150,17 @@ export const RULES: RulesDoc[] = [
     ],
   },
   {
+    key: 'signalrise',
+    version: 'v1',
+    title: 'MakeX Starter — Signal Rise',
+    subtitle: 'Official 2026 MakeX Starter Signal Rise Rules · Ages 11–13',
+    appliesTo: /makex\s*starter|signal\s*rise/i,
+    pdfUrl: '/rules/signalrise_rules.pdf',
+    sections: [],
+    scoring: [],
+    voidConditions: [],
+  },
+  {
     key: 'codecourier',
     version: 'v1',
     title: 'MakeX Inspire — Code Courier',
