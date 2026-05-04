@@ -1126,8 +1126,17 @@ function AdminDashboard() {
                                   const myCatIds = new Set(g.list.map(p => p.category_id));
                                   const cats = categories.filter(c => myCatIds.has(c.id));
                                   if (cats.length === 0) return <span className="text-xs text-slate-300">—</span>;
+                                  // map category → rules_key (mirrors the regex matchers in src/lib/rules.ts)
+                                  const rulesKeyFor = (catName: string): string | null => {
+                                    if (/sports\s*wonderland/i.test(catName)) return 'sportswonderland';
+                                    if (/capelli\s*inspire/i.test(catName)) return 'smartlogistics';
+                                    return null;
+                                  };
                                   return cats.map(c => {
-                                    const signed = acceptances.find(a => a.academy_id === acc?.id && a.category_id === c.id);
+                                    const rk = rulesKeyFor(c.name);
+                                    const signed = rk
+                                      ? acceptances.find(a => a.academy_id === acc?.id && a.rules_key === rk)
+                                      : undefined;
                                     return (
                                       <span key={c.id}
                                         title={signed ? `Signed by ${signed.signer_name} on ${new Date(signed.signed_at).toLocaleString()}` : 'Not yet signed'}

@@ -43,8 +43,9 @@ export default function RulesTab({ academyId, academyName, passations, categorie
 
   useEffect(() => { load(); }, [academyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function acceptanceFor(catId: string, rulesKey: string, version: string) {
-    return acceptances.find(a => a.category_id === catId && a.rules_key === rulesKey && a.rules_version === version);
+  function acceptanceFor(_catId: string, rulesKey: string, version: string) {
+    // One signature per rules document covers all categories that share that document
+    return acceptances.find(a => a.rules_key === rulesKey && a.rules_version === version);
   }
 
   return (
