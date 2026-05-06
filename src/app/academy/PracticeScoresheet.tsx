@@ -150,11 +150,26 @@ const SHEETS: Sheet[] = [
       },
       {
         title: '2. Maze Sorting (3 tokens)',
-        subtitle: 'Each colored token must end fully inside its matching color target inside the maze.',
+        subtitle: 'Each colored token must end inside its matching color target. Fully inside = +10, partially inside = +5, wrong target = −10.',
         items: [
-          { id: 'mz_red', title: '🟥 RED token', choices: [{ label: 'Correct (+10)', value: 10 }, { label: 'Wrong target (−10)', value: -10 }, { label: 'Not delivered (0)', value: 0 }] },
-          { id: 'mz_grn', title: '🟩 GREEN token', choices: [{ label: 'Correct (+10)', value: 10 }, { label: 'Wrong target (−10)', value: -10 }, { label: 'Not delivered (0)', value: 0 }] },
-          { id: 'mz_blu', title: '🟦 BLUE token', choices: [{ label: 'Correct (+10)', value: 10 }, { label: 'Wrong target (−10)', value: -10 }, { label: 'Not delivered (0)', value: 0 }] },
+          { id: 'mz_red', title: '🟥 RED token', choices: [
+            { label: 'Fully inside (+10)', value: 10 },
+            { label: 'Partially inside (+5)', value: 5 },
+            { label: 'Wrong target (−10)', value: -10 },
+            { label: 'Not delivered (0)', value: 0 },
+          ] },
+          { id: 'mz_grn', title: '🟩 GREEN token', choices: [
+            { label: 'Fully inside (+10)', value: 10 },
+            { label: 'Partially inside (+5)', value: 5 },
+            { label: 'Wrong target (−10)', value: -10 },
+            { label: 'Not delivered (0)', value: 0 },
+          ] },
+          { id: 'mz_blu', title: '🟦 BLUE token', choices: [
+            { label: 'Fully inside (+10)', value: 10 },
+            { label: 'Partially inside (+5)', value: 5 },
+            { label: 'Wrong target (−10)', value: -10 },
+            { label: 'Not delivered (0)', value: 0 },
+          ] },
         ],
       },
       {

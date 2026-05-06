@@ -85,7 +85,8 @@
       "Bash(pdftotext -layout \"C:/Users/eddy.bachaalany/Downloads/[English] 2026 MakeX Inspire Code Courier Rules Gu_260503_171913.pdf\" \"C:/Users/eddy.bachaalany/Documents/GitHub/MakeX2026/cc.txt\")",
       "Bash(pdftoppm -v)",
       "Bash(node scripts/pdf_to_images.mjs public/rules/codecourier_rules.pdf tmp_cc_pages)",
-      "Bash(node scripts/pdf_to_pngs_mupdf.mjs public/rules/codecourier_rules.pdf tmp_cc)"
+      "Bash(node scripts/pdf_to_pngs_mupdf.mjs public/rules/codecourier_rules.pdf tmp_cc)",
+      "Bash(powershell -Command 'Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::OpenRead\\('\\\\''C:\\\\Users\\\\eddy.bachaalany\\\\Downloads\\\\03_LockerRoom_Rules.docx'\\\\''\\).Entries | Where-Object { $_.FullName -eq '\\\\''word/document.xml'\\\\'' } | ForEach-Object { $r = New-Object IO.StreamReader\\($_.Open\\(\\)\\); $r.ReadToEnd\\(\\) }')"
     ]
   }
 }
