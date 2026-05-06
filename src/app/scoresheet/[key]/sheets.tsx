@@ -52,7 +52,7 @@ const MatchInfo = ({ extraFields, round }: { extraFields?: { label: string; valu
 const Signatures = () => (
   <div className="sig-row">
     <div>
-      <div className="sig-line">Student / Team signature · Print name &amp; date</div>
+      <div className="sig-line">Student / Team signature · Print name</div>
     </div>
   </div>
 );
