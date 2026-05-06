@@ -255,7 +255,33 @@ function CodeCourierSheet() {
         title="CODE COURIER — MAKEX INSPIRE · Official Match Scoresheet"
         subtitle="Ages 8–12 · Match: 150 seconds · Fully autonomous · Max 800 pts (16 rings × 50)"
       />
-      <MatchInfo extraFields={[{ label: 'ROBOT PLATFORM' }, { label: 'ROBOT INSPECTION PASSED?' }]} />
+      <h2>1. Match Information</h2>
+      <table>
+        <tbody>
+          <tr>
+            <th style={{ width: '22%' }}>TEAM NAME</th>
+            <td colSpan={3}>&nbsp;</td>
+          </tr>
+          <tr>
+            <th>STUDENT NAME</th>
+            <td>&nbsp;</td>
+            <th style={{ width: '18%' }}>FIELD / TABLE #</th>
+            <td>&nbsp;</td>
+          </tr>
+          <tr>
+            <th>ROUND</th>
+            <td>☐ 1 &nbsp;&nbsp; ☐ 2</td>
+            <th>ROBOT INSPECTION PASSED?</th>
+            <td>☐ Yes &nbsp;&nbsp; ☐ No</td>
+          </tr>
+          <tr>
+            <th>REFEREE NAME</th>
+            <td>&nbsp;</td>
+            <th>JUDGE SIGNATURE</th>
+            <td>&nbsp;</td>
+          </tr>
+        </tbody>
+      </table>
 
       <h2>2. Rings on Signal Towers (+50 each)</h2>
       <p className="small">Color matches, ring upright in delivery area, no robot contact, ring fully inserted onto matching signal tower (a + b + c + d).</p>
