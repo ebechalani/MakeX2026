@@ -37,13 +37,20 @@ export default function PrintableScoresheetPage({ params }: { params: Promise<{ 
         .sheet .footer { margin-top: 8px; text-align: center; font-size: 7pt; color: #777; }
         .sheet .total-box { float: right; border: 1.5px solid #111; padding: 4px 8px; font-weight: 700; font-size: 10pt; min-width: 110px; text-align: right; }
         .sheet .small { font-size: 7.5pt; color: #444; margin: 1px 0; }
+        .sheet .round-badge { display: inline-block; background: #111; color: white; font-weight: 800; padding: 2px 10px; border-radius: 3px; font-size: 10pt; letter-spacing: 0.5px; margin-left: 8px; vertical-align: middle; }
+        .page-break { page-break-after: always; break-after: page; height: 0; }
+        @media print { .page-break { page-break-after: always; break-after: page; } }
       `}</style>
       <div className="no-print sticky top-0 bg-slate-100 border-b border-slate-300 px-4 py-2 flex justify-between items-center">
         <p className="text-sm text-slate-700">Press <kbd className="bg-white border border-slate-300 px-1.5 py-0.5 rounded">Ctrl+P</kbd> (or Cmd+P) to print this scoresheet.</p>
         <button onClick={() => window.print()} className="bg-slate-800 text-white px-4 py-1.5 rounded text-sm font-semibold">Print</button>
       </div>
       <div className="sheet">
-        <Body />
+        <Body round={1} />
+      </div>
+      <div className="page-break" />
+      <div className="sheet">
+        <Body round={2} />
       </div>
     </main>
   );

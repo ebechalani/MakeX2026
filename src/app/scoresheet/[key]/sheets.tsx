@@ -4,14 +4,14 @@ const Cb = ({ children }: { children: React.ReactNode }) => (
   <span><span className="check"></span>{children}</span>
 );
 
-const Header = ({ title, subtitle }: { title: string; subtitle: string }) => (
+const Header = ({ title, subtitle, round }: { title: string; subtitle: string; round?: number }) => (
   <>
-    <h1>{title}</h1>
+    <h1>{title}{round ? <span className="round-badge">ROUND {round}</span> : null}</h1>
     <p className="meta">{subtitle}</p>
   </>
 );
 
-const MatchInfo = ({ extraFields }: { extraFields?: { label: string }[] }) => (
+const MatchInfo = ({ extraFields, round }: { extraFields?: { label: string; value?: string }[]; round?: number }) => (
   <>
     <h2>1. Match Information</h2>
     <table>
@@ -23,20 +23,14 @@ const MatchInfo = ({ extraFields }: { extraFields?: { label: string }[] }) => (
         <tr>
           <th>STUDENT NAME</th>
           <td>&nbsp;</td>
-          <th style={{ width: '15%' }}>ACADEMY</th>
-          <td>&nbsp;</td>
-        </tr>
-        <tr>
-          <th>DATE</th>
-          <td>&nbsp;</td>
-          <th>FIELD / TABLE #</th>
+          <th style={{ width: '18%' }}>FIELD / TABLE #</th>
           <td>&nbsp;</td>
         </tr>
         <tr>
           <th>ROUND</th>
-          <td>☐ 1 &nbsp;&nbsp; ☐ 2</td>
-          <th>COACH NAME</th>
-          <td>&nbsp;</td>
+          <td>{round === 1 ? '☑ 1 ☐ 2' : round === 2 ? '☐ 1 ☑ 2' : '☐ 1 ☐ 2'}</td>
+          <th>ROBOT INSPECTION PASSED?</th>
+          <td>☐ Yes &nbsp;&nbsp; ☐ No</td>
         </tr>
         <tr>
           <th>REFEREE NAME</th>
@@ -47,7 +41,7 @@ const MatchInfo = ({ extraFields }: { extraFields?: { label: string }[] }) => (
         {extraFields?.map(f => (
           <tr key={f.label}>
             <th>{f.label}</th>
-            <td colSpan={3}>&nbsp;</td>
+            <td colSpan={3}>{f.value ?? ' '}</td>
           </tr>
         ))}
       </tbody>
@@ -58,23 +52,21 @@ const MatchInfo = ({ extraFields }: { extraFields?: { label: string }[] }) => (
 const Signatures = () => (
   <div className="sig-row">
     <div>
-      <div className="sig-line">Referee signature · Print name &amp; date</div>
-    </div>
-    <div>
-      <div className="sig-line">Coach / Team representative signature · Print name &amp; date</div>
+      <div className="sig-line">Student / Team signature · Print name &amp; date</div>
     </div>
   </div>
 );
 
 // ── SportsWonderland ─────────────────────────────────────────────────────
-function SportsWonderlandSheet() {
+function SportsWonderlandSheet({ round }: { round?: number }) {
   return (
     <>
       <Header
+        round={round}
         title="SPORTSWONDERLAND — ALL-STAR PICKUP · Official Match Scoresheet"
         subtitle="Match: 120 seconds · Robot: mTiny / CodyRockey · Tokens: Helmet 5 / Whistle 4 / Basketball 3 / Volleyball 2 / Tennis 1 · Bonus: +5 Huddle Pad · Cone touch: −1 each"
       />
-      <MatchInfo extraFields={[{ label: 'AGE CATEGORY' }]} />
+      <MatchInfo round={round} extraFields={[{ label: 'AGE CATEGORY' }]} />
       <p className="small" style={{ marginTop: 6 }}>Age category: ☐ 4–5 (Manual) &nbsp;&nbsp; ☐ 6–7 (Autonomous)</p>
 
       <h2>2. Token Collection</h2>
@@ -121,14 +113,15 @@ function SportsWonderlandSheet() {
 }
 
 // ── SmartLogistics ───────────────────────────────────────────────────────
-function SmartLogisticsSheet() {
+function SmartLogisticsSheet({ round }: { round?: number }) {
   return (
     <>
       <Header
+        round={round}
         title="SMART LOGISTICS — CAPELLI SPORTS INSPIRE · Official Match Scoresheet"
         subtitle="Season 1 · Match: 150s · Fully autonomous · Cubes: 3 mission (RED/GREEN) + 1 BLUE reserved · Combinations: 1 of 8"
       />
-      <MatchInfo extraFields={[{ label: 'COMBINATION # (1–8)' }, { label: 'ROBOT PLATFORM' }, { label: 'ROBOT INSPECTION PASSED?' }]} />
+      <MatchInfo round={round} extraFields={[{ label: 'COMBINATION # (1–8)' }, { label: 'ROBOT PLATFORM' }, { label: 'ROBOT INSPECTION PASSED?' }]} />
 
       <h2>2. Mission Cube Deliveries</h2>
       <p className="small">For each of the 3 mission cubes: mark its color and the delivery outcome. Correct = fully inside the matching colored bay. Wrong = inside the opposite colored bay. RED → Home, GREEN → Training.</p>
@@ -189,14 +182,15 @@ function SmartLogisticsSheet() {
 }
 
 // ── LockerRoom (Capelli Starter) ─────────────────────────────────────────
-function LockerRoomSheet() {
+function LockerRoomSheet({ round }: { round?: number }) {
   return (
     <>
       <Header
+        round={round}
         title="LOCKER ROOM MISSION — CAPELLI STARTER · Official Match Scoresheet"
         subtitle="Ages 13–15 · Match: 150 seconds · Fully autonomous"
       />
-      <MatchInfo extraFields={[{ label: 'TEAM COLOR DRAWN (RED / GREEN)' }, { label: 'ZONE OPTION # (1–6)' }]} />
+      <MatchInfo round={round} extraFields={[{ label: 'TEAM COLOR DRAWN (RED / GREEN)' }, { label: 'ZONE OPTION # (1–6)' }]} />
 
       <h2>2. Mission Phases (in order)</h2>
       <table>
@@ -248,40 +242,15 @@ function LockerRoomSheet() {
 }
 
 // ── MakeX Inspire — Code Courier ─────────────────────────────────────────
-function CodeCourierSheet() {
+function CodeCourierSheet({ round }: { round?: number }) {
   return (
     <>
       <Header
+        round={round}
         title="CODE COURIER — MAKEX INSPIRE · Official Match Scoresheet"
         subtitle="Ages 8–12 · Match: 150 seconds · Fully autonomous · Max 800 pts (16 rings × 50)"
       />
-      <h2>1. Match Information</h2>
-      <table>
-        <tbody>
-          <tr>
-            <th style={{ width: '22%' }}>TEAM NAME</th>
-            <td colSpan={3}>&nbsp;</td>
-          </tr>
-          <tr>
-            <th>STUDENT NAME</th>
-            <td>&nbsp;</td>
-            <th style={{ width: '18%' }}>FIELD / TABLE #</th>
-            <td>&nbsp;</td>
-          </tr>
-          <tr>
-            <th>ROUND</th>
-            <td>☐ 1 &nbsp;&nbsp; ☐ 2</td>
-            <th>ROBOT INSPECTION PASSED?</th>
-            <td>☐ Yes &nbsp;&nbsp; ☐ No</td>
-          </tr>
-          <tr>
-            <th>REFEREE NAME</th>
-            <td>&nbsp;</td>
-            <th>JUDGE SIGNATURE</th>
-            <td>&nbsp;</td>
-          </tr>
-        </tbody>
-      </table>
+      <MatchInfo round={round} />
 
       <h2>2. Rings on Signal Towers (+50 each)</h2>
       <p className="small">Color matches, ring upright in delivery area, no robot contact, ring fully inserted onto matching signal tower (a + b + c + d).</p>
@@ -333,7 +302,7 @@ function CodeCourierSheet() {
   );
 }
 
-export const SCORESHEETS: Record<string, { Body: () => React.JSX.Element }> = {
+export const SCORESHEETS: Record<string, { Body: (props: { round?: number }) => React.JSX.Element }> = {
   sportswonderland: { Body: SportsWonderlandSheet },
   smartlogistics:  { Body: SmartLogisticsSheet },
   lockerroom:      { Body: LockerRoomSheet },
