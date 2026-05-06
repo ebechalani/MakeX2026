@@ -181,16 +181,7 @@ function SmartLogisticsSheet() {
         </tbody>
       </table>
 
-      <h2>7. Tie-breaker Data</h2>
-      <table>
-        <tbody>
-          <tr><th style={{width:'40%'}}>Correct deliveries (out of 3)</th><td>______</td></tr>
-          <tr><th>Robot returned to Finish zone?</th><td>☐ Fully inside &nbsp; ☐ Partially inside &nbsp; ☐ No</td></tr>
-          <tr><th>Match ended by</th><td>☐ Time expired &nbsp; ☐ Run voided &nbsp; ☐ Stopped early</td></tr>
-        </tbody>
-      </table>
-
-      <h2>8. Signatures</h2>
+      <h2>7. Signatures</h2>
       <Signatures />
       <div className="footer">MakeX Lebanon · Capelli Sport · Smart Logistics — Season 1</div>
     </>
@@ -249,16 +240,7 @@ function LockerRoomSheet() {
       <div className="total-box">FINAL = A + B − |C| = ______</div>
       <div style={{ clear:'both' }} />
 
-      <h2>6. Tie-breaker Data</h2>
-      <table>
-        <tbody>
-          <tr><th style={{width:'40%'}}>Phases completed (out of 6)</th><td>______</td></tr>
-          <tr><th>Tokens scored (out of 3)</th><td>______</td></tr>
-          <tr><th>Match ended by</th><td>☐ Referee STOP &nbsp; ☐ Time expired &nbsp; ☐ Run voided</td></tr>
-        </tbody>
-      </table>
-
-      <h2>7. Signatures</h2>
+      <h2>6. Signatures</h2>
       <Signatures />
       <div className="footer">MakeX Lebanon · Capelli Sport · Locker Room Mission — Ages 13–15</div>
     </>
@@ -318,15 +300,7 @@ function CodeCourierSheet() {
       <div className="total-box">FINAL = A + B − C = ______</div>
       <div style={{ clear:'both' }} />
 
-      <h2>6. Tie-breaker Data</h2>
-      <table>
-        <tbody>
-          <tr><th style={{width:'40%'}}>Rings on towers (out of 16)</th><td>______</td></tr>
-          <tr><th>Match ended by</th><td>☐ Time expired &nbsp; ☐ Disqualified &nbsp; ☐ Stopped early</td></tr>
-        </tbody>
-      </table>
-
-      <h2>7. Signatures</h2>
+      <h2>6. Signatures</h2>
       <Signatures />
       <div className="footer">MakeX Lebanon · 2026 MakeX Inspire — Code Courier</div>
     </>
