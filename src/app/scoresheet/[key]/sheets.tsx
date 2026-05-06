@@ -113,16 +113,7 @@ function SportsWonderlandSheet() {
       <div className="total-box">FINAL = A + B = ______</div>
       <div style={{ clear:'both' }} />
 
-      <h2>6. Tie-breaker Data</h2>
-      <table>
-        <tbody>
-          <tr><th style={{width:'40%'}}>Tokens collected (out of 5)</th><td>______</td></tr>
-          <tr><th>Robot returned to Huddle Pad?</th><td>☐ Yes (fully inside) &nbsp; ☐ Partial &nbsp; ☐ No</td></tr>
-          <tr><th>Match ended by</th><td>☐ Time expired &nbsp; ☐ Team called STOP &nbsp; ☐ Round lost</td></tr>
-        </tbody>
-      </table>
-
-      <h2>7. Signatures</h2>
+      <h2>6. Signatures</h2>
       <Signatures />
       <div className="footer">MakeX Lebanon · Capelli Sport · SportsWonderland v2.0</div>
     </>
