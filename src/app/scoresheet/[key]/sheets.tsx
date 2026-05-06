@@ -121,7 +121,7 @@ function SmartLogisticsSheet({ round }: { round?: number }) {
         title="SMART LOGISTICS — CAPELLI SPORTS INSPIRE · Official Match Scoresheet"
         subtitle="Season 1 · Match: 150s · Fully autonomous · Cubes: 3 mission (RED/GREEN) + 1 BLUE reserved · Combinations: 1 of 8"
       />
-      <MatchInfo round={round} extraFields={[{ label: 'COMBINATION # (1–8)' }, { label: 'ROBOT PLATFORM' }, { label: 'ROBOT INSPECTION PASSED?' }]} />
+      <MatchInfo round={round} extraFields={[{ label: 'COMBINATION # (1–8)' }]} />
 
       <h2>2. Mission Cube Deliveries</h2>
       <p className="small">For each of the 3 mission cubes: mark its color and the delivery outcome. Correct = fully inside the matching colored bay. Wrong = inside the opposite colored bay. RED → Home, GREEN → Training.</p>
