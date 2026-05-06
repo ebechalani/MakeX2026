@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MakeX Lebanon — Sponsorship Proposal 2026</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --navy: #0a1628;
+      --navy-mid: #112240;
+      --navy-light: #1a3a6b;
+      --gold: #c8973a;
+      --gold-light: #e8b86d;
+      --gold-pale: #f5e6c8;
+      --silver: #8fa8c8;
+      --white: #f8f6f2;
+      --text: #dce6f0;
+      --muted: #8899aa;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: var(--navy);
+      color: var(--text);
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ── Background texture ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 15% 10%, rgba(200,151,58,0.06) 0%, transparent 55%),
+        radial-gradient(ellipse 60% 80% at 85% 90%, rgba(26,58,107,0.4) 0%, transparent 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative;
+      min-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px 40px 60px;
+      z-index: 1;
+      border-bottom: 1px solid rgba(200,151,58,0.2);
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 1px; height: 60px;
+      background: linear-gradient(to bottom, var(--gold), transparent);
+    }
+
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid rgba(200,151,58,0.4);
+      border-radius: 40px;
+      padding: 10px 24px;
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--gold-light);
+      margin-bottom: 48px;
+      background: rgba(200,151,58,0.05);
+      animation: fadeDown 0.8s ease both;
+    }
+
+    .logo-badge span {
+      width: 6px; height: 6px;
+      background: var(--gold);
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .hero h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(42px, 7vw, 88px);
+      font-weight: 700;
+      line-height: 1.05;
+      color: var(--white);
+      animation: fadeUp 0.9s ease 0.1s both;
+      max-width: 900px;
+    }
+
+    .hero h1 em {
+      font-style: italic;
+      color: var(--gold-light);
+    }
+
+    .hero-year {
+      font-family: 'DM Sans', sans-serif;
+      font-size: clamp(64px, 12vw, 160px);
+      font-weight: 300;
+      color: rgba(200,151,58,0.08);
+      line-height: 1;
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      letter-spacing: -4px;
+      pointer-events: none;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .hero-sub {
+      margin-top: 28px;
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 580px;
+      font-weight: 300;
+      animation: fadeUp 0.9s ease 0.25s both;
+    }
+
+    .hero-divider {
+      width: 60px; height: 1px;
+      background: linear-gradient(to right, transparent, var(--gold), transparent);
+      margin: 36px auto;
+      animation: fadeUp 0.9s ease 0.35s both;
+    }
+
+    /* ── Sections ── */
+    section {
+      position: relative;
+      z-index: 1;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 80px 40px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 600;
+      color: var(--white);
+      line-height: 1.2;
+      margin-bottom: 20px;
+    }
+
+    .section-body {
+      font-size: 16px;
+      color: var(--muted);
+      max-width: 600px;
+      font-weight: 300;
+    }
+
+    /* ── About strip ── */
+    .about-strip {
+      border-top: 1px solid rgba(200,151,58,0.15);
+      border-bottom: 1px solid rgba(200,151,58,0.15);
+    }
+
+    .about-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+    }
+
+    .stat-row {
+      display: flex;
+      gap: 40px;
+      margin-top: 36px;
+    }
+
+    .stat {
+      border-left: 2px solid var(--gold);
+      padding-left: 16px;
+    }
+
+    .stat-num {
+      font-family: 'Playfair Display', serif;
+      font-size: 38px;
+      color: var(--gold-light);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+
+    .about-quote {
+      background: rgba(200,151,58,0.06);
+      border: 1px solid rgba(200,151,58,0.2);
+      border-radius: 16px;
+      padding: 40px;
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      font-style: italic;
+      color: var(--white);
+      line-height: 1.6;
+    }
+
+    .about-quote cite {
+      display: block;
+      font-style: normal;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      color: var(--gold);
+      margin-top: 20px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* ── Packages overview ── */
+    .packages-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .packages-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+    }
+
+    .pkg-card {
+      border-radius: 16px;
+      padding: 36px 28px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      cursor: default;
+    }
+
+    .pkg-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+    }
+
+    .pkg-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      padding: 1px;
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+    }
+
+    /* Platinum */
+    .pkg-platinum {
+      background: linear-gradient(145deg, rgba(200,151,58,0.15), rgba(200,151,58,0.04));
+      border: 1px solid rgba(200,151,58,0.5);
+    }
+    .pkg-platinum .pkg-accent { color: var(--gold-light); }
+    .pkg-platinum .pkg-badge { background: var(--gold); color: var(--navy); }
+
+    /* Gold */
+    .pkg-gold {
+      background: linear-gradient(145deg, rgba(200,151,58,0.08), rgba(26,58,107,0.15));
+      border: 1px solid rgba(200,151,58,0.3);
+    }
+    .pkg-gold .pkg-accent { color: #d4aa60; }
+    .pkg-gold .pkg-badge { background: #b8892a; color: #fff; }
+
+    /* Silver */
+    .pkg-silver {
+      background: linear-gradient(145deg, rgba(143,168,200,0.1), rgba(26,58,107,0.1));
+      border: 1px solid rgba(143,168,200,0.3);
+    }
+    .pkg-silver .pkg-accent { color: var(--silver); }
+    .pkg-silver .pkg-badge { background: #6a8aaa; color: #fff; }
+
+    /* Bronze */
+    .pkg-bronze {
+      background: linear-gradient(145deg, rgba(176,106,60,0.1), rgba(26,58,107,0.1));
+      border: 1px solid rgba(176,106,60,0.3);
+    }
+    .pkg-bronze .pkg-accent { color: #c8825a; }
+    .pkg-bronze .pkg-badge { background: #9a5c36; color: #fff; }
+
+    /* In-Kind */
+    .pkg-inkind {
+      background: linear-gradient(145deg, rgba(100,120,160,0.08), rgba(26,58,107,0.08));
+      border: 1px solid rgba(100,120,160,0.2);
+    }
+    .pkg-inkind .pkg-accent { color: #7a99bb; }
+    .pkg-inkind .pkg-badge { background: #344a6a; color: #aac; }
+
+    .pkg-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+    }
+
+    .pkg-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px;
+      color: var(--white);
+      margin-bottom: 6px;
+    }
+
+    .pkg-price {
+      font-size: 32px;
+      font-weight: 500;
+      margin-bottom: 24px;
+    }
+
+    .pkg-price .currency {
+      font-size: 16px;
+      vertical-align: super;
+      margin-right: 2px;
+      opacity: 0.7;
+    }
+
+    .pkg-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.07);
+      margin-bottom: 20px;
+    }
+
+    .pkg-features {
+      list-style: none;
+      font-size: 14px;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .pkg-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .pkg-features li::before {
+      content: '◆';
+      font-size: 7px;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+
+    .pkg-platinum .pkg-features li::before { color: var(--gold); }
+    .pkg-gold .pkg-features li::before { color: #d4aa60; }
+    .pkg-silver .pkg-features li::before { color: var(--silver); }
+    .pkg-bronze .pkg-features li::before { color: #c8825a; }
+    .pkg-inkind .pkg-features li::before { color: #7a99bb; }
+
+    /* ── Detailed tiers ── */
+    .tiers-section { padding-top: 0; }
+
+    .tier-block {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 0;
+      border-radius: 20px;
+      overflow: hidden;
+      margin-bottom: 28px;
+      border: 1px solid rgba(200,151,58,0.1);
+      transition: border-color 0.3s;
+    }
+
+    .tier-block:hover { border-color: rgba(200,151,58,0.3); }
+
+    .tier-left {
+      padding: 44px 36px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .tier-right {
+      padding: 44px 44px;
+      border-left: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .tier-tag {
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .tier-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 36px;
+      color: var(--white);
+      margin-bottom: 12px;
+    }
+
+    .tier-amount {
+      font-size: 20px;
+      font-weight: 500;
+    }
+
+    .tier-benefits {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 24px;
+    }
+
+    .tier-benefits li {
+      font-size: 14.5px;
+      color: var(--muted);
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      line-height: 1.5;
+    }
+
+    .tier-benefits li .check {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      margin-top: 1px;
+    }
+
+    /* tier colour sets */
+    .t-platinum .tier-left { background: linear-gradient(160deg, #1a2e18, #0f1e28); }
+    .t-platinum .tier-tag { color: var(--gold-light); }
+    .t-platinum .tier-amount { color: var(--gold-light); }
+    .t-platinum .check { background: rgba(200,151,58,0.2); color: var(--gold); }
+
+    .t-gold .tier-left { background: linear-gradient(160deg, #1c2616, #0f1e28); }
+    .t-gold .tier-tag { color: #d4aa60; }
+    .t-gold .tier-amount { color: #d4aa60; }
+    .t-gold .check { background: rgba(212,170,96,0.15); color: #d4aa60; }
+
+    .t-silver .tier-left { background: linear-gradient(160deg, #14222e, #0f1e28); }
+    .t-silver .tier-tag { color: var(--silver); }
+    .t-silver .tier-amount { color: var(--silver); }
+    .t-silver .check { background: rgba(143,168,200,0.15); color: var(--silver); }
+
+    .t-bronze .tier-left { background: linear-gradient(160deg, #221614, #0f1e28); }
+    .t-bronze .tier-tag { color: #c8825a; }
+    .t-bronze .tier-amount { color: #c8825a; }
+    .t-bronze .check { background: rgba(200,130,90,0.15); color: #c8825a; }
+
+    .t-inkind .tier-left { background: linear-gradient(160deg, #141a26, #0f1e28); }
+    .t-inkind .tier-tag { color: #7a99bb; }
+    .t-inkind .tier-amount { color: #7a99bb; }
+    .t-inkind .check { background: rgba(122,153,187,0.15); color: #7a99bb; }
+
+    /* ── Contact ── */
+    .contact-section {
+      border-top: 1px solid rgba(200,151,58,0.15);
+    }
+
+    .contact-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: start;
+    }
+
+    .contact-card {
+      background: rgba(200,151,58,0.05);
+      border: 1px solid rgba(200,151,58,0.2);
+      border-radius: 20px;
+      padding: 48px;
+    }
+
+    .contact-detail {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-top: 32px;
+    }
+
+    .contact-item {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .contact-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: rgba(200,151,58,0.1);
+      border: 1px solid rgba(200,151,58,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .contact-item-label {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 4px;
+    }
+
+    .contact-item-value {
+      font-size: 15px;
+      color: var(--white);
+    }
+
+    .cta-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .cta-box .section-body {
+      margin-bottom: 36px;
+    }
+
+    .btn-primary {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--gold), var(--gold-light));
+      color: var(--navy);
+      font-weight: 500;
+      font-size: 14px;
+      letter-spacing: 1px;
+      padding: 16px 36px;
+      border-radius: 50px;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.2s;
+      align-self: flex-start;
+    }
+
+    .btn-primary:hover { opacity: 0.88; transform: translateY(-2px); }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid rgba(255,255,255,0.05);
+      text-align: center;
+      padding: 40px;
+      font-size: 13px;
+      color: rgba(136,153,170,0.5);
+      letter-spacing: 1px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(32px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: none;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      section { padding: 60px 24px; }
+      .about-inner,
+      .contact-inner,
+      .tier-block { grid-template-columns: 1fr; }
+      .tier-benefits { grid-template-columns: 1fr; }
+      .tier-right { border-left: none; border-top: 1px solid rgba(255,255,255,0.06); }
+      .stat-row { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ HERO ══ -->
+<div class="hero">
+  <div class="logo-badge"><span></span> MakeX Lebanon <span></span></div>
+  <h1>Sponsorship<br/><em>Proposal</em></h1>
+  <div class="hero-divider"></div>
+  <p class="hero-sub">Partner with Lebanon's premier robotics competition and place your brand at the forefront of youth innovation and STEM education.</p>
+  <div class="hero-year">2026</div>
+</div>
+
+<!-- ══ ABOUT ══ -->
+<section class="about-strip">
+  <div class="about-inner reveal">
+    <div>
+      <p class="section-label">About the Event</p>
+      <h2 class="section-title">Where young innovators compete</h2>
+      <p class="section-body">MakeX Lebanon unites students, schools, and families through world-class robotics competitions and immersive STEM experiences. Your sponsorship delivers meaningful brand visibility while championing the next generation of Lebanese engineers and creators.</p>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-num">500+</div>
+          <div class="stat-label">Student Participants</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">40+</div>
+          <div class="stat-label">Schools Represented</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">2 Days</div>
+          <div class="stat-label">May 30 &amp; 31, 2026</div>
+        </div>
+      </div>
+    </div>
+    <div class="about-quote">
+      "Robotics is not just a sport — it is a laboratory for problem-solving, teamwork, and the confidence to build a better future."
+      <cite>MakeX Lebanon — 2026 Vision</cite>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PACKAGES OVERVIEW ══ -->
+<section>
+  <div class="packages-header reveal">
+    <p class="section-label">Sponsorship Tiers</p>
+    <h2 class="section-title">Choose your level of impact</h2>
+    <p class="section-body" style="margin: 0 auto;">Five distinct partnership tiers, each crafted to match your organisation's goals and amplify your presence at the event and beyond.</p>
+  </div>
+
+  <div class="packages-grid reveal">
+
+    <!-- Platinum -->
+    <div class="pkg-card pkg-platinum">
+      <span class="pkg-badge">Platinum</span>
+      <div class="pkg-name">Platinum</div>
+      <div class="pkg-price pkg-accent"><span class="currency">$</span>1,500</div>
+      <div class="pkg-divider"></div>
+      <ul class="pkg-features">
+        <li>Large exhibition stand</li>
+        <li>Logo on all banners</li>
+        <li>Opening & awards mention</li>
+        <li>Brand video reposted</li>
+        <li>Social media spotlight</li>
+        <li>Photo & video credits</li>
+      </ul>
+    </div>
+
+    <!-- Gold -->
+    <div class="pkg-card pkg-gold">
+      <span class="pkg-badge">Gold</span>
+      <div class="pkg-name">Gold</div>
+      <div class="pkg-price pkg-accent"><span class="currency">$</span>1,200</div>
+      <div class="pkg-divider"></div>
+      <ul class="pkg-features">
+        <li>Medium exhibition stand</li>
+        <li>Main event banners</li>
+        <li>Ceremony mention</li>
+        <li>Brand video reposted</li>
+        <li>Social media visuals</li>
+        <li>Highlight reel credits</li>
+      </ul>
+    </div>
+
+    <!-- Silver -->
+    <div class="pkg-card pkg-silver">
+      <span class="pkg-badge">Silver</span>
+      <div class="pkg-name">Silver</div>
+      <div class="pkg-price pkg-accent"><span class="currency">$</span>700</div>
+      <div class="pkg-divider"></div>
+      <ul class="pkg-features">
+        <li>Selected event banners</li>
+        <li>Poster & digital logo</li>
+        <li>MC mention</li>
+        <li>2 branded social stories</li>
+        <li>Photo album inclusion</li>
+        <li>Reel credits</li>
+      </ul>
+    </div>
+
+    <!-- Bronze -->
+    <div class="pkg-card pkg-bronze">
+      <span class="pkg-badge">Bronze</span>
+      <div class="pkg-name">Bronze</div>
+      <div class="pkg-price pkg-accent"><span class="currency">$</span>400</div>
+      <div class="pkg-divider"></div>
+      <ul class="pkg-features">
+        <li>Sponsor wall logo</li>
+        <li>Digital creatives logo</li>
+        <li>Thank-you social mention</li>
+        <li>Photo album (sponsor section)</li>
+        <li>Highlight reel credits</li>
+      </ul>
+    </div>
+
+    <!-- In-Kind -->
+    <div class="pkg-card pkg-inkind">
+      <span class="pkg-badge">In-Kind</span>
+      <div class="pkg-name">In-Kind</div>
+      <div class="pkg-price pkg-accent" style="font-size:22px;">Value-Based</div>
+      <div class="pkg-divider"></div>
+      <ul class="pkg-features">
+        <li>Printing, giveaways, logistics or venue support</li>
+        <li>Benefits matched to Bronze, Silver, or Gold tier based on contribution value</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ══ DETAILED TIERS ══ -->
+<section class="tiers-section">
+  <div style="margin-bottom:48px;" class="reveal">
+    <p class="section-label">Full Breakdown</p>
+    <h2 class="section-title">What each tier includes</h2>
+  </div>
+
+  <!-- Platinum -->
+  <div class="tier-block t-platinum reveal">
+    <div class="tier-left">
+      <div class="tier-tag">Most Visible</div>
+      <div class="tier-name">Platinum</div>
+      <div class="tier-amount">$1,500</div>
+    </div>
+    <div class="tier-right">
+      <ul class="tier-benefits">
+        <li><span class="check">◆</span> Large exhibition stand to showcase your products and services</li>
+        <li><span class="check">◆</span> Logo featured on all event banners and sponsor wall</li>
+        <li><span class="check">◆</span> Logo on the official event poster and all digital creatives</li>
+        <li><span class="check">◆</span> Mention during both the opening and awards ceremony</li>
+        <li><span class="check">◆</span> Brand video reposted on our official social media page</li>
+        <li><span class="check">◆</span> Logo on social media sponsor visuals with a brand description</li>
+        <li><span class="check">◆</span> Included in the official event photo album</li>
+        <li><span class="check">◆</span> Brand name and logo featured in highlight reel credits</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Gold -->
+  <div class="tier-block t-gold reveal">
+    <div class="tier-left">
+      <div class="tier-tag">Premium</div>
+      <div class="tier-name">Gold</div>
+      <div class="tier-amount">$1,200</div>
+    </div>
+    <div class="tier-right">
+      <ul class="tier-benefits">
+        <li><span class="check">◆</span> Medium exhibition stand to present your products and services</li>
+        <li><span class="check">◆</span> Logo on main event banners and sponsor wall (Gold level)</li>
+        <li><span class="check">◆</span> Logo on official poster and digital creatives (Gold level)</li>
+        <li><span class="check">◆</span> Mention during opening and awards ceremony</li>
+        <li><span class="check">◆</span> Brand video reposted on our social media page</li>
+        <li><span class="check">◆</span> Logo on social media sponsor visuals with brand description</li>
+        <li><span class="check">◆</span> Included in the official photo album</li>
+        <li><span class="check">◆</span> Included in highlight reel credits (Gold level)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Silver -->
+  <div class="tier-block t-silver reveal">
+    <div class="tier-left">
+      <div class="tier-tag">Standard</div>
+      <div class="tier-name">Silver</div>
+      <div class="tier-amount">$700</div>
+    </div>
+    <div class="tier-right">
+      <ul class="tier-benefits">
+        <li><span class="check">◆</span> Logo on selected banners and sponsor wall (Silver level)</li>
+        <li><span class="check">◆</span> Logo on official event poster and digital creatives</li>
+        <li><span class="check">◆</span> One MC mention during the event</li>
+        <li><span class="check">◆</span> Two stories on social media featuring your brand</li>
+        <li><span class="check">◆</span> Included in the official photo album</li>
+        <li><span class="check">◆</span> Included in highlight reel credits (Silver level)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Bronze -->
+  <div class="tier-block t-bronze reveal">
+    <div class="tier-left">
+      <div class="tier-tag">Entry</div>
+      <div class="tier-name">Bronze</div>
+      <div class="tier-amount">$400</div>
+    </div>
+    <div class="tier-right">
+      <ul class="tier-benefits">
+        <li><span class="check">◆</span> Logo on sponsor wall (Bronze level)</li>
+        <li><span class="check">◆</span> Logo on digital creatives (Bronze level)</li>
+        <li><span class="check">◆</span> Thank-you mention on social media after the event</li>
+        <li><span class="check">◆</span> Included in the official photo album (sponsor section)</li>
+        <li><span class="check">◆</span> Included in highlight reel credits (Bronze level)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- In-Kind -->
+  <div class="tier-block t-inkind reveal">
+    <div class="tier-left">
+      <div class="tier-tag">Flexible</div>
+      <div class="tier-name">In-Kind</div>
+      <div class="tier-amount" style="font-size:16px;">Value-Based</div>
+    </div>
+    <div class="tier-right">
+      <ul class="tier-benefits">
+        <li><span class="check">◆</span> Contributions such as printing, giveaways, logistics, or venue support are welcome</li>
+        <li><span class="check">◆</span> Benefits matched to Bronze, Silver, or Gold tier depending on the total contribution value</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CONTACT ══ -->
+<section class="contact-section">
+  <div class="contact-inner">
+    <div class="cta-box reveal">
+      <p class="section-label">Get In Touch</p>
+      <h2 class="section-title">Ready to partner with us?</h2>
+      <p class="section-body">We would love to explore how we can create a meaningful partnership for your brand. Reach out directly and we'll respond promptly.</p>
+      <br/>
+      <a href="mailto:eddy.bachaalany@makexlebanon.com" class="btn-primary">Send an Email →</a>
+    </div>
+    <div class="contact-card reveal">
+      <p class="section-label">Contact Details</p>
+      <h3 style="font-family:'Playfair Display',serif; font-size:22px; color:var(--white); margin-bottom:4px;">Eddy Bachaalany</h3>
+      <p style="font-size:13px; color:var(--muted);">MakeX Lebanon — Partnership Lead</p>
+      <div class="contact-detail">
+        <div class="contact-item">
+          <div class="contact-icon">✉</div>
+          <div>
+            <div class="contact-item-label">Email</div>
+            <div class="contact-item-value">eddy.bachaalany@makexlebanon.com</div>
+          </div>
+        </div>
+        <div class="contact-item">
+          <div class="contact-icon">📱</div>
+          <div>
+            <div class="contact-item-label">Phone / WhatsApp</div>
+            <div class="contact-item-value">+961 78 85 98 98</div>
+          </div>
+        </div>
+        <div class="contact-item">
+          <div class="contact-icon">🌍</div>
+          <div>
+            <div class="contact-item-label">Organisation</div>
+            <div class="contact-item-value">MakeX Lebanon</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  &copy; 2026 MakeX Lebanon &nbsp;·&nbsp; Confidential Sponsorship Proposal &nbsp;·&nbsp; All Rights Reserved
+</footer>
+
+<script>
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) {
+        e.target.style.transitionDelay = (i % 3) * 0.1 + 's';
+        e.target.classList.add('visible');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  reveals.forEach(el => io.observe(el));
+</script>
+</body>
+</html>
