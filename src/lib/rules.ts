@@ -7,6 +7,7 @@ export type RulesDoc = {
   htmlUrl?: string;        // converted-from-docx HTML, served from /public (optional)
   docxUrl?: string;        // original Word document, served from /public (optional)
   pdfUrl?: string;         // original PDF, served from /public (optional)
+  extras?: { label: string; url: string; kind: 'pdf' | 'docx' | 'link' }[];
   sections: { heading: string; body: string[] }[];
   scoring: { label: string; points: string }[];
   voidConditions: string[];
@@ -21,6 +22,9 @@ export const RULES: RulesDoc[] = [
     appliesTo: /sports\s*wonderland/i,
     htmlUrl: '/rules/sportswonderland_rules.html',
     docxUrl: '/rules/sportswonderland_rules.docx',
+    extras: [
+      { label: 'mTiny — 8 Official Combinations (PDF)', url: '/rules/sportswonderland_combinations.pdf', kind: 'pdf' },
+    ],
     sections: [
       {
         heading: 'What this game is about',

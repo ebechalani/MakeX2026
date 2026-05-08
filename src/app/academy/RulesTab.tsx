@@ -177,6 +177,12 @@ function RulesPanel({
               ⬇ Download .pdf
             </a>
           )}
+          {rules.extras?.map(x => (
+            <a key={x.url} href={x.url} target="_blank" rel="noopener noreferrer"
+              className="text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg border border-amber-200">
+              ⬇ {x.label}
+            </a>
+          ))}
         </div>
       </div>
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
