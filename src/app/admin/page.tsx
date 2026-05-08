@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback, useMemo, Fragment } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { Category, Table, Passation, LiveStatus, PendingChange, Academy, RulesAcceptance } from '@/lib/types';
+import type { Category, Table, Passation, LiveStatus, PendingChange, Academy, RulesAcceptance, QuestionnaireResponse } from '@/lib/types';
 import Link from 'next/link';
 
 const ADMIN_PASSWORD = 'MakeX@2026';
@@ -140,6 +140,7 @@ function AdminDashboard() {
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
   const [academies, setAcademies] = useState<Academy[]>([]);
   const [acceptances, setAcceptances] = useState<RulesAcceptance[]>([]);
+  const [quizResponses, setQuizResponses] = useState<QuestionnaireResponse[]>([]);
   const [catForm, setCatForm] = useState({ name: '', age_range_label: '', table_count: 1 });
   const [editCatId, setEditCatId] = useState<string | null>(null);
   const [pasForm, setPasForm] = useState({
@@ -238,13 +239,14 @@ function AdminDashboard() {
   }
 
   const load = useCallback(async () => {
-    const [{ data: cats }, { data: tabs }, { data: pas }, { data: pcs }, { data: acs }, { data: rac }] = await Promise.all([
+    const [{ data: cats }, { data: tabs }, { data: pas }, { data: pcs }, { data: acs }, { data: rac }, { data: qrs }] = await Promise.all([
       supabase.from('categories').select('*').order('name'),
       supabase.from('tables').select('*').order('table_number'),
       supabase.from('passations').select('*, category:categories(*), table:tables(*)').order('scheduled_time').order('queue_position'),
       supabase.from('pending_changes').select('*, academy:academies(*), passation:passations(*)').order('created_at', { ascending: false }),
       supabase.from('academies').select('*').order('name'),
       supabase.from('rules_acceptances').select('*, academy:academies(*), category:categories(*)').order('signed_at', { ascending: false }),
+      supabase.from('questionnaire_responses').select('*, academy:academies(*)').order('submitted_at', { ascending: false }),
     ]);
     if (cats) setCategories(cats);
     if (tabs) setTables(tabs);
@@ -252,6 +254,7 @@ function AdminDashboard() {
     if (pcs) setPendingChanges(pcs as unknown as PendingChange[]);
     if (acs) setAcademies(acs);
     if (rac) setAcceptances(rac as unknown as RulesAcceptance[]);
+    if (qrs) setQuizResponses(qrs as unknown as QuestionnaireResponse[]);
   }, [supabase]);
 
   useEffect(() => { load(); }, [load]);
@@ -1154,6 +1157,7 @@ function AdminDashboard() {
                       <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Coach</th>
                       <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">WhatsApp</th>
                       <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Rules</th>
+                      <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Quizzes</th>
                       <th className="text-right px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Actions</th>
                     </tr>
                   </thead>
@@ -1227,6 +1231,50 @@ function AdminDashboard() {
                                 })()}
                               </div>
                             </td>
+                            <td className="px-3 py-3">
+                              <div className="flex flex-wrap gap-1">
+                                {(() => {
+                                  const myCatIds = new Set(g.list.map(p => p.category_id));
+                                  const cats = categories.filter(c => myCatIds.has(c.id));
+                                  const rulesKeyFor = (catName: string): string | null => {
+                                    if (/sports\s*wonderland/i.test(catName)) return 'sportswonderland';
+                                    if (/capelli\s*inspire/i.test(catName)) return 'smartlogistics';
+                                    if (/capelli\s*starter/i.test(catName)) return 'lockerroom';
+                                    if (/capelli\s*soccer/i.test(catName)) return 'soccer';
+                                    if (/makex\s*inspire/i.test(catName)) return 'codecourier';
+                                    if (/makex\s*starter|signal\s*rise/i.test(catName)) return 'signalrise';
+                                    return null;
+                                  };
+                                  // Unique rules keys for this academy
+                                  const seen = new Set<string>();
+                                  const items: { rk: string; catName: string }[] = [];
+                                  for (const c of cats) {
+                                    const rk = rulesKeyFor(c.name);
+                                    if (rk && !seen.has(rk)) { seen.add(rk); items.push({ rk, catName: c.name }); }
+                                  }
+                                  if (items.length === 0) return <span className="text-xs text-slate-300">—</span>;
+                                  return items.map(({ rk, catName }) => {
+                                    const r = quizResponses.find(q => q.academy_id === acc?.id && q.rules_key === rk);
+                                    if (!r) {
+                                      return (
+                                        <span key={rk} title={`${catName} — quiz not taken`}
+                                          className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500">
+                                          ⏳ {rk}
+                                        </span>
+                                      );
+                                    }
+                                    const passed = r.score >= Math.ceil(r.total * 0.8);
+                                    return (
+                                      <span key={rk}
+                                        title={`${catName} — ${r.score}/${r.total} by ${r.responder_name} on ${new Date(r.submitted_at).toLocaleString()}`}
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded ${passed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                        {passed ? '✓' : '⚠'} {rk} {r.score}/{r.total}
+                                      </span>
+                                    );
+                                  });
+                                })()}
+                              </div>
+                            </td>
                             <td className="px-3 py-3 text-right" onClick={e => e.stopPropagation()}>
                               <button
                                 disabled={g.list.length === 0}
@@ -1238,7 +1286,7 @@ function AdminDashboard() {
                           {isOpen && (
                             <tr className="bg-slate-50/60">
                               <td></td>
-                              <td colSpan={7} className="px-5 py-4">
+                              <td colSpan={8} className="px-5 py-4">
                                 {g.list.length === 0 ? (
                                   <p className="text-xs text-slate-400 italic">No students assigned to this academy.</p>
                                 ) : (
@@ -1306,7 +1354,7 @@ function AdminDashboard() {
                       );
                     })}
                     {filtered.length === 0 && (
-                      <tr><td colSpan={8} className="text-center py-12 text-slate-400">No academies match your search.</td></tr>
+                      <tr><td colSpan={9} className="text-center py-12 text-slate-400">No academies match your search.</td></tr>
                     )}
                   </tbody>
                 </table>

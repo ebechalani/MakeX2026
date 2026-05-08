@@ -94,6 +94,19 @@ export interface RulesAcceptance {
   category?: Category;
 }
 
+export interface QuestionnaireResponse {
+  id: string;
+  academy_id: string;
+  rules_key: string;
+  responder_name: string;
+  responder_role: string | null;
+  answers: Record<string, number>; // qid → choice index
+  score: number;
+  total: number;
+  submitted_at: string;
+  academy?: Academy;
+}
+
 export type ChangeAction = 'add' | 'update' | 'delete';
 export type ChangeStatus = 'pending' | 'approved' | 'rejected';
 

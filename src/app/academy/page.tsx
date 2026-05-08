@@ -5,6 +5,7 @@ import type { Academy, Category, Table, Passation, PendingChange } from '@/lib/t
 import Link from 'next/link';
 import PracticeScoresheet from './PracticeScoresheet';
 import RulesTab from './RulesTab';
+import QuizTab from './QuizTab';
 
 const SESSION_KEY = 'academy_session';
 
@@ -82,7 +83,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [pending, setPending] = useState<PendingChange[]>([]);
-  const [tab, setTab] = useState<'students' | 'rules' | 'practice'>('students');
+  const [tab, setTab] = useState<'students' | 'rules' | 'quiz' | 'practice'>('students');
   const [showForm, setShowForm] = useState(false);
   const [editingPas, setEditingPas] = useState<Passation | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -275,6 +276,14 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
             📜 Rules & Acceptance
           </button>
           <button
+            onClick={() => setTab('quiz')}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              tab === 'quiz' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            🧠 Knowledge Check
+          </button>
+          <button
             onClick={() => setTab('practice')}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
               tab === 'practice' ? 'border-cyan-600 text-cyan-700' : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -288,6 +297,8 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           <PracticeScoresheet />
         ) : tab === 'rules' ? (
           <RulesTab academyId={session.id} academyName={session.name} passations={passations} categories={categories} />
+        ) : tab === 'quiz' ? (
+          <QuizTab academyId={session.id} academyName={session.name} passations={passations} categories={categories} />
         ) : (
         <>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
