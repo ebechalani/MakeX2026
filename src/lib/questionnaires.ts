@@ -90,7 +90,7 @@ export const QUIZZES: Quiz[] = [
       { id: 'cc6', q: 'Maximum possible match score?', choices: ['400', '600', '800', '1000'], correct: 2 },
       { id: 'cc7', q: 'Each confirmed E02 violation deducts…', choices: ['−5', '−10', '−20', '−50'], correct: 2 },
       { id: 'cc8', q: 'E04 disqualifies the team for the match. Score becomes…', choices: ['Halved', 'Set to 0', 'Set to −100', 'Unchanged'], correct: 1 },
-      { id: 'cc9', q: 'Robot operating mode during the match?', choices: ['Manual via remote', 'Fully autonomous', 'Mix of manual and auto', 'Voice-controlled'], correct: 1 },
+      { id: 'cc9', q: 'How is the robot operated during the match?', choices: ['Fully autonomous', 'Bluetooth controller (remote)', 'Wired remote', 'Voice-controlled'], correct: 1 },
     ],
   },
 
