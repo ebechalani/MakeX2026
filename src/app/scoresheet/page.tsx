@@ -5,6 +5,7 @@ const sheets = [
   { key: 'smartlogistics',   title: 'Smart Logistics',                     meta: 'Ages 8–12 · 150 s · Capelli Inspire' },
   { key: 'lockerroom',       title: 'Locker Room Mission',                 meta: 'Ages 13–15 · 150 s · Capelli Starter' },
   { key: 'codecourier',      title: 'Code Courier',                         meta: 'Ages 8–12 · 150 s · MakeX Inspire' },
+  { key: 'soccer',           title: 'Capelli Sport Cup — Soccer (1-vs-1)',   meta: '2 halves × 2 min · mBot2 · Capelli Soccer' },
 ];
 
 export default function ScoresheetIndex() {

@@ -8,6 +8,7 @@ export default function PrintableScoresheetPage({ params }: { params: Promise<{ 
   const sheet = SCORESHEETS[key];
   if (!sheet) notFound();
   const Body = sheet.Body;
+  const rounds = sheet.rounds ?? 2;
 
   return (
     <main className="bg-white text-black min-h-screen">
@@ -45,13 +46,14 @@ export default function PrintableScoresheetPage({ params }: { params: Promise<{ 
         <p className="text-sm text-slate-700">Press <kbd className="bg-white border border-slate-300 px-1.5 py-0.5 rounded">Ctrl+P</kbd> (or Cmd+P) to print this scoresheet.</p>
         <button onClick={() => window.print()} className="bg-slate-800 text-white px-4 py-1.5 rounded text-sm font-semibold">Print</button>
       </div>
-      <div className="sheet">
-        <Body round={1} />
-      </div>
-      <div className="page-break" />
-      <div className="sheet">
-        <Body round={2} />
-      </div>
+      {Array.from({ length: rounds }, (_, i) => (
+        <div key={i}>
+          {i > 0 && <div className="page-break" />}
+          <div className="sheet">
+            <Body round={rounds > 1 ? i + 1 : undefined} />
+          </div>
+        </div>
+      ))}
     </main>
   );
 }

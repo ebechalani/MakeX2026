@@ -302,9 +302,108 @@ function CodeCourierSheet({ round }: { round?: number }) {
   );
 }
 
-export const SCORESHEETS: Record<string, { Body: (props: { round?: number }) => React.JSX.Element }> = {
-  sportswonderland: { Body: SportsWonderlandSheet },
-  smartlogistics:  { Body: SmartLogisticsSheet },
-  lockerroom:      { Body: LockerRoomSheet },
-  codecourier:     { Body: CodeCourierSheet },
+// ── Soccer (Capelli Sport Cup) ──────────────────────────────────────────
+function SoccerSheet() {
+  return (
+    <>
+      <Header
+        title="CAPELLI SPORT CUP — SOCCER · Official Match Scoresheet"
+        subtitle="1-vs-1 · 2 halves × 2 minutes · 30 s halftime · mBot2 · max 40 RPM · 22 × 22 cm · 1.5 kg"
+      />
+
+      <h2>1. Match Information</h2>
+      <table>
+        <tbody>
+          <tr><th style={{ width: '20%' }}>MATCH #</th><td>&nbsp;</td><th style={{ width: '20%' }}>FIELD / TABLE</th><td>&nbsp;</td></tr>
+          <tr><th>STAGE</th><td>☐ Group &nbsp; ☐ Round of 16 &nbsp; ☐ Quarter &nbsp; ☐ Semi &nbsp; ☐ Final</td><th>REFEREE</th><td>&nbsp;</td></tr>
+        </tbody>
+      </table>
+
+      <h2>2. Teams</h2>
+      <table>
+        <thead>
+          <tr><th style={{ width: '10%' }}></th><th>TEAM A</th><th>TEAM B</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>Student</th><td>&nbsp;</td><td>&nbsp;</td></tr>
+          <tr><th>Academy</th><td>&nbsp;</td><td>&nbsp;</td></tr>
+          <tr><th>Coin toss winner</th><td>☐ A</td><td>☐ B</td></tr>
+          <tr><th>1st-half kickoff</th><td>☐ A</td><td>☐ B</td></tr>
+        </tbody>
+      </table>
+
+      <h2>3. Pre-Match Inspection</h2>
+      <p className="small">Both teams must pass every item before the match starts.</p>
+      <table>
+        <thead><tr><th>Item</th><th style={{width:'18%', textAlign:'center'}}>Team A</th><th style={{width:'18%', textAlign:'center'}}>Team B</th></tr></thead>
+        <tbody>
+          <tr><td>Footprint fits 22 × 22 cm (arms extended)</td><td>☐ Pass ☐ Fail</td><td>☐ Pass ☐ Fail</td></tr>
+          <tr><td>Weight ≤ 1.5 kg</td><td>☐ Pass ☐ Fail</td><td>☐ Pass ☐ Fail</td></tr>
+          <tr><td>Battery ≥ 50 % charge</td><td>☐ Pass ☐ Fail</td><td>☐ Pass ☐ Fail</td></tr>
+          <tr><td>Firmware up-to-date</td><td>☐ Pass ☐ Fail</td><td>☐ Pass ☐ Fail</td></tr>
+          <tr><td>No sharp / aggressive components</td><td>☐ Pass ☐ Fail</td><td>☐ Pass ☐ Fail</td></tr>
+          <tr><td>Speed test passed (40 RPM, 7 s side-to-side)</td><td>☐ Pass ☐ Fail</td><td>☐ Pass ☐ Fail</td></tr>
+        </tbody>
+      </table>
+
+      <h2>4. Goals</h2>
+      <table>
+        <thead><tr><th>Half</th><th style={{width:'30%'}}>Team A goals</th><th style={{width:'30%'}}>Team B goals</th></tr></thead>
+        <tbody>
+          <tr><td>1st half (2 min)</td><td>Tally: ____&nbsp;&nbsp;&nbsp; Total: ____</td><td>Tally: ____&nbsp;&nbsp;&nbsp; Total: ____</td></tr>
+          <tr><td>2nd half (2 min)</td><td>Tally: ____&nbsp;&nbsp;&nbsp; Total: ____</td><td>Tally: ____&nbsp;&nbsp;&nbsp; Total: ____</td></tr>
+          <tr><th>SUBTOTAL</th><th>____</th><th>____</th></tr>
+        </tbody>
+      </table>
+
+      <h2>5. Free Kicks &amp; Resets</h2>
+      <table>
+        <tbody>
+          <tr><th style={{width:'40%'}}>Free kicks awarded to Team A</th><td>____</td><th style={{width:'15%'}}>To Team B</th><td>____</td></tr>
+          <tr><th>Resets used by Team A</th><td>____ / 2</td><th>By Team B</th><td>____ / 2</td></tr>
+        </tbody>
+      </table>
+
+      <h2>6. Penalty Shootout (only if tied after both halves)</h2>
+      <p className="small">Each team takes 3 alternate penalty kicks. If still tied → sudden death.</p>
+      <table>
+        <thead><tr><th></th><th style={{width:'15%'}}>Kick 1</th><th style={{width:'15%'}}>Kick 2</th><th style={{width:'15%'}}>Kick 3</th><th style={{width:'15%'}}>Goals</th></tr></thead>
+        <tbody>
+          <tr><th>Team A</th><td>☐ ✓ ☐ ✗</td><td>☐ ✓ ☐ ✗</td><td>☐ ✓ ☐ ✗</td><td>____</td></tr>
+          <tr><th>Team B</th><td>☐ ✓ ☐ ✗</td><td>☐ ✓ ☐ ✗</td><td>☐ ✓ ☐ ✗</td><td>____</td></tr>
+          <tr><td colSpan={5}>Sudden death (extra kicks if still tied):&nbsp;&nbsp; A: ______&nbsp;&nbsp;&nbsp; B: ______</td></tr>
+        </tbody>
+      </table>
+
+      <h2>7. Cards / Penalties</h2>
+      <table>
+        <tbody>
+          <tr><th style={{width:'40%'}}>Yellow card to Team A?</th><td>☐ No &nbsp; ☐ Yes — reason: ____________________</td></tr>
+          <tr><th>Yellow card to Team B?</th><td>☐ No &nbsp; ☐ Yes — reason: ____________________</td></tr>
+          <tr><th>Disqualification (boost mode / forbidden attachment / battery swap)</th><td>☐ Team A &nbsp; ☐ Team B &nbsp; ☐ None</td></tr>
+        </tbody>
+      </table>
+
+      <h2>8. Final Result</h2>
+      <table>
+        <tbody>
+          <tr><th style={{width:'30%'}}>Final score</th><td>A: ______ &nbsp;&nbsp; B: ______</td></tr>
+          <tr><th>Winner</th><td>☐ Team A &nbsp; ☐ Team B &nbsp; ☐ Draw (group stage only)</td></tr>
+          <tr><th>Decided by</th><td>☐ Regulation &nbsp; ☐ Penalty shootout &nbsp; ☐ Sudden death &nbsp; ☐ Disqualification</td></tr>
+        </tbody>
+      </table>
+
+      <h2>9. Signatures</h2>
+      <Signatures />
+      <div className="footer">MakeX Lebanon · Capelli Sport · Soccer Category</div>
+    </>
+  );
+}
+
+export const SCORESHEETS: Record<string, { Body: (props: { round?: number }) => React.JSX.Element; rounds?: number }> = {
+  sportswonderland: { Body: SportsWonderlandSheet, rounds: 2 },
+  smartlogistics:  { Body: SmartLogisticsSheet, rounds: 2 },
+  lockerroom:      { Body: LockerRoomSheet, rounds: 2 },
+  codecourier:     { Body: CodeCourierSheet, rounds: 2 },
+  soccer:          { Body: SoccerSheet, rounds: 1 },
 };
