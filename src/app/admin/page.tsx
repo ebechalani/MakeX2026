@@ -1068,6 +1068,81 @@ function AdminDashboard() {
                 </div>
               </div>
 
+              {(() => {
+                // Distribution matrix: rows = academies, columns = categories
+                const orderedCats = categories.slice().sort((a, b) => a.name.localeCompare(b.name));
+                const orderedSchools = groups.slice().sort((a, b) => a.name.localeCompare(b.name));
+                const colTotals = orderedCats.map(c => 0);
+                const cellCounts: number[][] = orderedSchools.map(g => orderedCats.map((c, ci) => {
+                  const n = g.list.filter(p => p.category_id === c.id).length;
+                  colTotals[ci] += n;
+                  return n;
+                }));
+                const rowTotals = cellCounts.map(row => row.reduce((a, b) => a + b, 0));
+                const grandTotal = rowTotals.reduce((a, b) => a + b, 0);
+                const catLabel = (c: Category) => c.age_range_label ? `${c.name} (${c.age_range_label})` : c.name;
+                const dl = () => {
+                  const headers = ['School / Academy', ...orderedCats.map(catLabel), 'Total'];
+                  const rows: (string | number)[][] = [headers];
+                  orderedSchools.forEach((g, i) => {
+                    rows.push([g.name, ...cellCounts[i], rowTotals[i]]);
+                  });
+                  rows.push(['TOTAL', ...colTotals, grandTotal]);
+                  downloadCsv('MakeX_School_Category_Distribution.csv', rows);
+                };
+
+                return (
+                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-5">
+                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h3 className="font-bold text-slate-800">Distribution Matrix · Schools × Categories</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Number of students per school in each category. Empty cells are shown as ·</p>
+                      </div>
+                      <button onClick={dl}
+                        className="text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg font-semibold">
+                        ⬇ Download Matrix CSV
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-100">
+                          <tr>
+                            <th className="text-left px-3 py-2 sticky left-0 bg-slate-50 border-r border-slate-200 min-w-[180px]">School / Academy</th>
+                            {orderedCats.map(c => (
+                              <th key={c.id} className="px-2 py-2 text-center" title={catLabel(c)}>
+                                <div className="font-semibold text-slate-700 max-w-[110px] mx-auto">{c.name}</div>
+                                {c.age_range_label && <div className="text-[10px] text-slate-400 font-normal">{c.age_range_label}</div>}
+                              </th>
+                            ))}
+                            <th className="px-3 py-2 text-center bg-slate-100">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {orderedSchools.map((g, ri) => (
+                            <tr key={g.name} className="hover:bg-slate-50/60">
+                              <td className="px-3 py-2 sticky left-0 bg-white border-r border-slate-200 font-medium text-slate-800 hover:bg-slate-50/60">{g.name}</td>
+                              {cellCounts[ri].map((n, ci) => (
+                                <td key={ci} className="px-2 py-2 text-center">
+                                  {n > 0 ? <span className="font-bold text-blue-700">{n}</span> : <span className="text-slate-300">·</span>}
+                                </td>
+                              ))}
+                              <td className="px-3 py-2 text-center bg-slate-50 font-bold text-slate-800">{rowTotals[ri]}</td>
+                            </tr>
+                          ))}
+                          <tr className="bg-slate-100 border-t-2 border-slate-300">
+                            <td className="px-3 py-2 sticky left-0 bg-slate-100 border-r border-slate-300 font-bold text-slate-800">TOTAL</td>
+                            {colTotals.map((n, ci) => (
+                              <td key={ci} className="px-2 py-2 text-center font-bold text-slate-800">{n}</td>
+                            ))}
+                            <td className="px-3 py-2 text-center bg-slate-200 font-black text-slate-900">{grandTotal}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-100">

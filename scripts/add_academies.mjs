@@ -13,7 +13,7 @@ function randPwd() {
 }
 
 const newAcademies = [
-  { name: 'IDEA', username: 'idea', password: randPwd(), coach_name: null, whatsapp_number: null },
+  { name: 'IC Ain Aar', username: 'ic-ain-aar', password: randPwd(), coach_name: null, whatsapp_number: null },
 ];
 
 for (const a of newAcademies) {

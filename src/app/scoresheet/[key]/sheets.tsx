@@ -375,12 +375,10 @@ function SoccerSheet() {
         </tbody>
       </table>
 
-      <h2>7. Cards / Penalties</h2>
+      <h2>7. Disqualification</h2>
       <table>
         <tbody>
-          <tr><th style={{width:'40%'}}>Yellow card to Team A?</th><td>☐ No &nbsp; ☐ Yes — reason: ____________________</td></tr>
-          <tr><th>Yellow card to Team B?</th><td>☐ No &nbsp; ☐ Yes — reason: ____________________</td></tr>
-          <tr><th>Disqualification (boost mode / forbidden attachment / battery swap)</th><td>☐ Team A &nbsp; ☐ Team B &nbsp; ☐ None</td></tr>
+          <tr><th style={{width:'40%'}}>Boost mode / forbidden attachment / battery swap</th><td>☐ Team A &nbsp; ☐ Team B &nbsp; ☐ None</td></tr>
         </tbody>
       </table>
 
