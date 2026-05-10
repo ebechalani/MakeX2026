@@ -176,6 +176,11 @@ function AdminDashboard() {
     return m;
   }, [passations]);
 
+  const studentCount = useMemo(
+    () => passations.filter(p => (p.round_number ?? 1) === 1).length,
+    [passations]
+  );
+
   function ageFromDob(dob: string | null): string {
     if (!dob) return '';
     const d = new Date(dob); if (isNaN(d.getTime())) return '';
@@ -529,7 +534,7 @@ function AdminDashboard() {
           {[
             { label: 'Categories', value: categories.length, color: 'text-blue-600', bg: 'bg-blue-50' },
             { label: 'Tables', value: tables.filter(t => t.active).length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-            { label: 'Passations', value: passations.length, color: 'text-violet-600', bg: 'bg-violet-50' },
+            { label: 'Students', value: studentCount, color: 'text-violet-600', bg: 'bg-violet-50' },
             { label: 'Finished', value: passations.filter(p => p.live_status === 'Finished').length, color: 'text-green-600', bg: 'bg-green-50' },
           ].map(s => (
             <div key={s.label} className={`${s.bg} rounded-2xl p-4 border border-white shadow-sm`}>
@@ -565,7 +570,7 @@ function AdminDashboard() {
               {tab}
               {tab === 'passations' && (
                 <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab ? 'bg-white/20' : 'bg-slate-100'}`}>
-                  {passations.length}
+                  {studentCount}
                 </span>
               )}
               {tab === 'categories' && (
@@ -633,7 +638,7 @@ function AdminDashboard() {
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
-                <h3 className="font-semibold text-slate-800">All Categories <span className="text-xs text-slate-400 font-normal">· {passations.length} total participants</span></h3>
+                <h3 className="font-semibold text-slate-800">All Categories <span className="text-xs text-slate-400 font-normal">· {studentCount} total students</span></h3>
                 <div className="flex gap-2">
                   <button onClick={downloadAllReport}
                     className="text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1.5">
@@ -759,8 +764,8 @@ function AdminDashboard() {
           <div className="space-y-5">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base font-bold text-slate-800">Passations</h2>
-                <p className="text-xs text-slate-400 mt-0.5">{passations.length} total</p>
+                <h2 className="text-base font-bold text-slate-800">Students</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{studentCount} total</p>
               </div>
               <button onClick={() => { resetPasForm(); setShowPasForm(!showPasForm); }}
                 className="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition flex items-center gap-2">
@@ -1039,7 +1044,7 @@ function AdminDashboard() {
             return Array.from(m.entries()).sort();
           };
 
-          const totalStudents = passations.length;
+          const totalStudents = studentCount;
           const linkedCount = groups.filter(g => g.list.length > 0).length;
 
           // Per-academy CSV
