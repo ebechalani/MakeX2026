@@ -10,9 +10,8 @@ const supabase = createClient(url, key, { auth: { persistSession: false } });
 const EVENT_DATE = '2026-05-31';
 const DEFAULT_SLOT = 5;
 
-function slotMinutesFor(catName) {
-  if (/capelli\s*starter/i.test(catName)) return 4;
-  if (/makex\s*inspire/i.test(catName)) return 4;
+function slotMinutesFor(_catName) {
+  // Per latest decision: every passation is 5 minutes
   return DEFAULT_SLOT;
 }
 
