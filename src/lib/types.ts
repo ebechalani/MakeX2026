@@ -80,6 +80,27 @@ export interface Academy {
   created_at: string;
 }
 
+export interface SoccerMatch {
+  id: string;
+  round_number: number;     // 1=R32, 2=R16, 3=QF, 4=SF, 5=Final
+  match_number: number;
+  table_id: string | null;
+  scheduled_time: string | null;
+  team_a_id: string | null;
+  team_b_id: string | null;
+  score_a: number | null;
+  score_b: number | null;
+  winner_id: string | null;
+  status: 'scheduled' | 'in_progress' | 'finished';
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  team_a?: Passation;
+  team_b?: Passation;
+  winner?: Passation;
+  table?: Table;
+}
+
 export interface RulesAcceptance {
   id: string;
   academy_id: string;

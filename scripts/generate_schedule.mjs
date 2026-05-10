@@ -20,7 +20,9 @@ function startTimeFor(catName) {
   return `${EVENT_DATE}T10:00:00`;
 }
 function isSkipped(catName) {
-  return /signal\s*rise/i.test(catName) || /makex\s*starter/i.test(catName);
+  // Soccer is handled by the dedicated bracket tab in admin, not the generic schedule.
+  // MakeX Starter is assigned manually by the user.
+  return /signal\s*rise/i.test(catName) || /makex\s*starter/i.test(catName) || /capelli\s*soccer/i.test(catName);
 }
 
 const { data: cats } = await supabase.from('categories').select('*').order('name');
