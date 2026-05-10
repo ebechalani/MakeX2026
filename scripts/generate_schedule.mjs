@@ -25,7 +25,13 @@ function isSkipped(catName) {
 
 const { data: cats } = await supabase.from('categories').select('*').order('name');
 const { data: tables } = await supabase.from('tables').select('*').eq('active', true).order('table_number');
-const { data: pass } = await supabase.from('passations').select('*');
+
+// Wipe any prior round-2 rows so we can rebuild cleanly.
+const { error: delR2 } = await supabase.from('passations').delete().eq('round_number', 2);
+if (delR2) { console.error('round-2 cleanup failed:', delR2.message); process.exit(1); }
+console.log('✓ cleared previous round-2 rows');
+
+const { data: pass } = await supabase.from('passations').select('*').eq('round_number', 1);
 
 console.log(`Categories: ${cats.length}, tables: ${tables.length}, students: ${pass.length}\n`);
 
@@ -36,7 +42,10 @@ for (const t of tables) {
 }
 
 const updates = [];
+const round2Inserts = [];
 const overflowReport = [];
+
+const ROUND2_OFFSET_MS = 60 * 60 * 1000; // round 2 starts 1 hour after round 1
 
 for (const cat of cats) {
   if (isSkipped(cat.name)) {
@@ -98,8 +107,26 @@ for (const cat of cats) {
     const parts = Array.from(clubsHere.entries()).map(([c, n]) => `${c}×${n}`).join(', ');
     console.log(`  [${lbl}] ${buckets[i].length} students — ${parts}`);
     buckets[i].forEach((p, q) => {
-      const slot = new Date(startMs + q * SLOT_MINUTES * 60000).toISOString();
-      updates.push({ id: p.id, table_id: t.id, scheduled_time: slot, queue_position: q + 1, round_number: 1 });
+      const slot1 = new Date(startMs + q * SLOT_MINUTES * 60000).toISOString();
+      const slot2 = new Date(startMs + ROUND2_OFFSET_MS + q * SLOT_MINUTES * 60000).toISOString();
+      updates.push({ id: p.id, table_id: t.id, scheduled_time: slot1, queue_position: q + 1, round_number: 1 });
+      // Round 2: clone the row, same table & same offset, +1 hour, queue offset 1000 so it sorts after R1
+      round2Inserts.push({
+        team_name: p.team_name,
+        student_names: p.student_names,
+        coach_name: p.coach_name,
+        parent_name: p.parent_name,
+        parent_contact: p.parent_contact,
+        club_name: p.club_name,
+        date_of_birth: p.date_of_birth,
+        category_id: p.category_id,
+        table_id: t.id,
+        scheduled_time: slot2,
+        queue_position: 1000 + q + 1,
+        live_status: 'Scheduled',
+        notes: p.notes,
+        round_number: 2,
+      });
     });
   }
   if (peakMin > 60) overflowReport.push(`${cat.name}: peak table runs ${peakMin}min (${peakMin - 60} over the 60-min round)`);
@@ -114,7 +141,18 @@ for (const u of updates) {
   done++;
   if (done % 50 === 0) console.log(`  ${done}/${updates.length}`);
 }
-console.log(`✓ ${done} students scheduled`);
+console.log(`✓ ${done} round-1 rows updated`);
+
+// Insert round 2 in chunks
+const CHUNK = 100;
+let r2Done = 0;
+for (let i = 0; i < round2Inserts.length; i += CHUNK) {
+  const slice = round2Inserts.slice(i, i + CHUNK);
+  const { error } = await supabase.from('passations').insert(slice);
+  if (error) { console.error('round-2 insert failed at', i, error.message); break; }
+  r2Done += slice.length;
+}
+console.log(`✓ ${r2Done} round-2 rows inserted`);
 
 if (overflowReport.length) {
   console.log('\n⚠ Categories that exceed the 60-min round window:');

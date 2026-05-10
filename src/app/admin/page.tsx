@@ -137,6 +137,7 @@ function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'passations' | 'categories' | 'academies' | 'schedule' | 'approvals'>('passations');
   const [expandedAcademy, setExpandedAcademy] = useState<Set<string>>(new Set());
   const [academySearch, setAcademySearch] = useState('');
+  const [scheduleRound, setScheduleRound] = useState<1 | 2>(1);
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
   const [academies, setAcademies] = useState<Academy[]>([]);
   const [acceptances, setAcceptances] = useState<RulesAcceptance[]>([]);
@@ -1375,10 +1376,11 @@ function AdminDashboard() {
           }
           for (const arr of tablesByCat2.values()) arr.sort((a, b) => a.table_number - b.table_number);
 
-          // Pre-build map: table_id → sorted slots
+          // Pre-build map: table_id → sorted slots, filtered by selected round
           const slotsByTable = new Map<string, Passation[]>();
           for (const p of passations) {
             if (!p.table_id) continue;
+            if ((p.round_number ?? 1) !== scheduleRound) continue;
             if (!slotsByTable.has(p.table_id)) slotsByTable.set(p.table_id, []);
             slotsByTable.get(p.table_id)!.push(p);
           }
@@ -1421,10 +1423,23 @@ function AdminDashboard() {
                   <h2 className="text-base font-bold text-slate-800">Live Schedule</h2>
                   <p className="text-xs text-slate-400 mt-0.5">Per-table timeline. Click ⬇ on any table to download its run sheet.</p>
                 </div>
-                <button onClick={downloadAllReport}
-                  className="text-sm bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-xl">
-                  ⬇ Download All Schedule (CSV)
-                </button>
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex bg-slate-100 border border-slate-200 rounded-xl p-1">
+                    {[1, 2].map(r => (
+                      <button key={r}
+                        onClick={() => setScheduleRound(r as 1 | 2)}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
+                          scheduleRound === r ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'
+                        }`}>
+                        Round {r}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={downloadAllReport}
+                    className="text-sm bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-xl">
+                    ⬇ Download All Schedule (CSV)
+                  </button>
+                </div>
               </div>
 
               {orderedCats.map(cat => {
