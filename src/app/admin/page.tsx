@@ -167,7 +167,9 @@ function AdminDashboard() {
 
   const passByCat = useMemo(() => {
     const m = new Map<string, Passation[]>();
+    // Only round-1 rows count toward "students" — round 2 is the same student running again.
     for (const p of passations) {
+      if ((p.round_number ?? 1) !== 1) continue;
       if (!m.has(p.category_id)) m.set(p.category_id, []);
       m.get(p.category_id)!.push(p);
     }
@@ -1010,8 +1012,9 @@ function AdminDashboard() {
           for (const a of academies) {
             byClub.set(norm(a.name), { name: a.name, list: [] });
           }
-          // Then bucket all passations by club_name
+          // Then bucket all passations by club_name — only round-1 rows, so each student appears once
           for (const p of passations) {
+            if ((p.round_number ?? 1) !== 1) continue;
             const k = norm(p.club_name);
             if (!k) continue;
             if (!byClub.has(k)) byClub.set(k, { name: p.club_name!, list: [] });

@@ -92,19 +92,38 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
     category_id: '', table_id: '', notes: '', date_of_birth: '',
   });
 
+  const [round2Times, setRound2Times] = useState<Map<string, string>>(new Map());
+
   const load = useCallback(async () => {
     const [pasRes, catRes, tabRes, pendRes] = await Promise.all([
+      // ALL rounds for this academy — we filter to round 1 for display, but keep R2 times for the lookup
       supabase.from('passations').select('*, category:categories(*), table:tables(*)')
         .eq('club_name', session.name).order('queue_position'),
       supabase.from('categories').select('*').order('name'),
       supabase.from('tables').select('*').order('table_number'),
       supabase.from('pending_changes').select('*').eq('academy_id', session.id).order('created_at', { ascending: false }),
     ]);
-    if (pasRes.data) setPassations(pasRes.data as unknown as Passation[]);
+    if (pasRes.data) {
+      const all = pasRes.data as unknown as Passation[];
+      // Round-1 rows = canonical student list (one per student)
+      const r1 = all.filter(p => (p.round_number ?? 1) === 1);
+      // Build a key → round-2 scheduled_time map so we can show both times in one row
+      const r2 = all.filter(p => p.round_number === 2);
+      const m = new Map<string, string>();
+      const keyFor = (p: Passation) => `${p.category_id}|${(p.team_name || '').trim().toLowerCase()}|${(p.club_name || '').trim().toLowerCase()}`;
+      for (const p of r2) if (p.scheduled_time) m.set(keyFor(p), p.scheduled_time);
+      setPassations(r1);
+      setRound2Times(m);
+    }
     if (catRes.data) setCategories(catRes.data);
     if (tabRes.data) setTables(tabRes.data);
     if (pendRes.data) setPending(pendRes.data as unknown as PendingChange[]);
   }, [supabase, session.id, session.name]);
+
+  const round2TimeFor = (p: Passation): string | null => {
+    const k = `${p.category_id}|${(p.team_name || '').trim().toLowerCase()}|${(p.club_name || '').trim().toLowerCase()}`;
+    return round2Times.get(k) ?? null;
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -388,7 +407,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                 <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">DOB / Age</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Category</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Table</th>
-                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Queue</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Match times</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Live Status</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Score</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">Request</th>
@@ -415,7 +434,19 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                       </td>
                       <td className="px-3 py-3 text-xs text-slate-500">{catLabel(p.category_id)}</td>
                       <td className="px-3 py-3 text-xs text-slate-600">{tableLabel(p.table_id)}</td>
-                      <td className="px-3 py-3 text-xs text-slate-500">#{p.queue_position}</td>
+                      <td className="px-3 py-3 text-xs">
+                        {p.scheduled_time ? (
+                          <div className="space-y-0.5">
+                            <div><span className="text-slate-400 font-bold w-7 inline-block">R1</span><span className="font-mono font-bold text-blue-700">{new Date(p.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span></div>
+                            {(() => {
+                              const r2 = round2TimeFor(p);
+                              return r2
+                                ? <div><span className="text-slate-400 font-bold w-7 inline-block">R2</span><span className="font-mono font-bold text-purple-700">{new Date(r2).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span></div>
+                                : <div className="text-slate-300 text-[10px]">R2 — not scheduled</div>;
+                            })()}
+                          </div>
+                        ) : <span className="text-slate-300">—</span>}
+                      </td>
                       <td className="px-3 py-3">
                         <span className={`text-xs font-semibold px-2 py-1 rounded-full ${liveBadge(p.live_status)}`}>{p.live_status}</span>
                       </td>
@@ -463,7 +494,8 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                             <Detail label="Category" v={catLabel(p.category_id)} />
                             <Detail label="Table" v={tableLabel(p.table_id)} />
                             <Detail label="Queue Position" v={`#${p.queue_position}`} />
-                            <Detail label="Scheduled Time" v={fmtDate(p.scheduled_time)} />
+                            <Detail label="Round 1 Time" v={fmtDate(p.scheduled_time)} />
+                            <Detail label="Round 2 Time" v={fmtDate(round2TimeFor(p))} />
                             <Detail label="Live Status" v={p.live_status} />
                             <Detail label="Final Result" v={p.final_result_status} />
                             <Detail label="Score" v={p.score != null ? String(p.score) : null} />
