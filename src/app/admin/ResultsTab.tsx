@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { createClient } from '@/lib/supabase/client';
 import { SHEETS, type Sheet } from '@/lib/scoresheets';
 import type { Category, Table, Passation } from '@/lib/types';
@@ -88,6 +89,108 @@ export default function ResultsTab() {
   function sheetForBreakdown(b: Breakdown | null): Sheet | undefined {
     if (!b) return undefined;
     return SHEETS.find(s => s.key === b.sheet);
+  }
+
+  function downloadXlsxReport() {
+    // Group by (category, table) and produce one sheet per group
+    const wb = XLSX.utils.book_new();
+    const groups = new Map<string, Passation[]>();
+    for (const p of passations) {
+      if (!p.table_id) continue;
+      const k = `${p.category_id}__${p.table_id}`;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k)!.push(p);
+    }
+    // Sort sheet entries by category name then table number
+    const sortedGroups = Array.from(groups.entries()).sort(([ka], [kb]) => {
+      const ca = categories.find(c => c.id === ka.split('__')[0]);
+      const cb = categories.find(c => c.id === kb.split('__')[0]);
+      const cn = (ca?.name || '').localeCompare(cb?.name || '');
+      if (cn !== 0) return cn;
+      const ta = tables.find(t => t.id === ka.split('__')[1]);
+      const tb = tables.find(t => t.id === kb.split('__')[1]);
+      return (ta?.table_number ?? 0) - (tb?.table_number ?? 0);
+    });
+
+    let summaryRows: (string | number)[][] = [
+      ['Sheet', 'Category', 'Table', 'Students', 'Finalized', 'Void', 'Absent']
+    ];
+
+    const usedNames = new Set<string>();
+    for (const [k, rows] of sortedGroups) {
+      const [catId, tabId] = k.split('__');
+      const cat = categories.find(c => c.id === catId);
+      const tab = tables.find(t => t.id === tabId);
+      if (!cat || !tab) continue;
+      // Sort rows: by round, then by scheduled_time, then by queue_position
+      rows.sort((a, b) => {
+        const ra = a.round_number ?? 1;
+        const rb = b.round_number ?? 1;
+        if (ra !== rb) return ra - rb;
+        const at = a.scheduled_time || '';
+        const bt = b.scheduled_time || '';
+        if (at !== bt) return at.localeCompare(bt);
+        return a.queue_position - b.queue_position;
+      });
+
+      const data: (string | number)[][] = [
+        ['Student', 'Academy / Club', 'Round', 'Points', 'Time (s)', 'Scheduled', 'Live Status', 'Final Result', 'Judge'],
+      ];
+      let fin = 0, vd = 0, abs = 0;
+      for (const p of rows) {
+        const isVoid = p.final_result_status === 'Void';
+        if (p.final_result_status === 'Finished' && !isVoid) fin++;
+        if (isVoid) vd++;
+        if (p.live_status === 'Absent') abs++;
+        data.push([
+          p.team_name || '',
+          p.club_name || '',
+          p.round_number ?? 1,
+          isVoid ? 'VOID' : (p.score ?? ''),
+          p.time_seconds ?? '',
+          p.scheduled_time ? new Date(p.scheduled_time).toLocaleString() : '',
+          p.live_status || '',
+          p.final_result_status || '',
+          p.judge_name || '',
+        ]);
+      }
+
+      // Excel sheet names cap at 31 chars and have illegal chars [/?*[]:\\]
+      const tabLabel = tab.display_label || `T${tab.table_number}`;
+      const rawName = `${cat.name.replace(/Sportswonderland/i, 'SW')} ${tabLabel}`;
+      let sheetName = rawName.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31).trim();
+      // Ensure uniqueness
+      let unique = sheetName, n = 2;
+      while (usedNames.has(unique)) { unique = (sheetName.slice(0, 28) + '_' + n).slice(0, 31); n++; }
+      usedNames.add(unique);
+
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      ws['!cols'] = [
+        { wch: 28 }, // Student
+        { wch: 28 }, // Club
+        { wch: 6 },  // Round
+        { wch: 8 },  // Points
+        { wch: 9 },  // Time
+        { wch: 18 }, // Scheduled
+        { wch: 12 }, // Live Status
+        { wch: 12 }, // Final Result
+        { wch: 18 }, // Judge
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, unique);
+
+      summaryRows.push([unique, cat.name + (cat.age_range_label ? ` (${cat.age_range_label})` : ''), tabLabel, rows.length, fin, vd, abs]);
+    }
+
+    // Prepend a Summary sheet
+    const summaryWs = XLSX.utils.aoa_to_sheet(summaryRows);
+    summaryWs['!cols'] = [{ wch: 30 }, { wch: 36 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 8 }];
+    // book_append_sheet appends; to put Summary first we re-create the book
+    const wb2 = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb2, summaryWs, 'Summary');
+    for (const nm of wb.SheetNames) XLSX.utils.book_append_sheet(wb2, wb.Sheets[nm], nm);
+
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    XLSX.writeFile(wb2, `MakeX_2026_Results_${stamp}.xlsx`);
   }
 
   async function clearJudgeData() {
@@ -183,12 +286,19 @@ export default function ResultsTab() {
             ✓ {stats.fin} finalized · ⚠ {stats.vd} void · ⊘ {stats.abs} absent · … {stats.sched} not yet judged
           </p>
         </div>
-        <button
-          onClick={clearJudgeData}
-          disabled={clearing}
-          className="bg-red-600 hover:bg-red-500 text-white text-sm font-semibold px-4 py-2 rounded-xl disabled:opacity-50">
-          {clearing ? 'Clearing…' : '🗑 Clear all judge test data'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={downloadXlsxReport}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-xl">
+            ⬇ Download Excel report
+          </button>
+          <button
+            onClick={clearJudgeData}
+            disabled={clearing}
+            className="bg-red-600 hover:bg-red-500 text-white text-sm font-semibold px-4 py-2 rounded-xl disabled:opacity-50">
+            {clearing ? 'Clearing…' : '🗑 Clear all judge test data'}
+          </button>
+        </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap gap-2">
