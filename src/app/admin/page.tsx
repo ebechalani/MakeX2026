@@ -5,7 +5,7 @@ import type { Category, Table, Passation, LiveStatus, PendingChange, Academy, Ru
 import SoccerBracket from './SoccerBracket';
 import Link from 'next/link';
 
-const ADMIN_PASSWORD = 'MakeX@2026';
+// Admin password is verified server-side via /api/admin-login. Never hardcoded here.
 
 const STATUS_COLORS: Record<string, string> = {
   Scheduled: 'bg-slate-100 text-slate-600',
@@ -32,17 +32,31 @@ const LIVE_STATUSES: LiveStatus[] = ['Scheduled', 'Prepare', 'Next', 'In Progres
 // ── Password Gate ──────────────────────────────────────────────────────────────
 function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
   const [value, setValue] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState('');
   const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  function attempt() {
-    if (value === ADMIN_PASSWORD) {
-      sessionStorage.setItem('admin_unlocked', 'true');
-      onUnlock();
-    } else {
-      setError(true);
+  async function attempt() {
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.ok) {
+        sessionStorage.setItem('admin_unlocked', 'true');
+        onUnlock();
+        return;
+      }
+      setError(data?.error || 'Wrong password.');
       setValue('');
-      setTimeout(() => setError(false), 2000);
+    } catch (e) {
+      setError('Network error. Try again.');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -96,15 +110,15 @@ function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              Incorrect password. Try again.
+              {error}
             </p>
           )}
           <button
             onClick={attempt}
-            disabled={!value}
+            disabled={!value || busy}
             className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold py-3 rounded-xl transition"
           >
-            Unlock Admin Panel
+            {busy ? 'Checking…' : 'Unlock Admin Panel'}
           </button>
         </div>
 
@@ -252,10 +266,10 @@ function AdminDashboard() {
       supabase.from('categories').select('*').order('name'),
       supabase.from('tables').select('*').order('table_number'),
       supabase.from('passations').select('*, category:categories(*), table:tables(*)').order('scheduled_time').order('queue_position'),
-      supabase.from('pending_changes').select('*, academy:academies(*), passation:passations(*)').order('created_at', { ascending: false }),
-      supabase.from('academies').select('*').order('name'),
-      supabase.from('rules_acceptances').select('*, academy:academies(*), category:categories(*)').order('signed_at', { ascending: false }),
-      supabase.from('questionnaire_responses').select('*, academy:academies(*)').order('submitted_at', { ascending: false }),
+      supabase.from('pending_changes').select('*, academy:academies(id, name, username, coach_name, whatsapp_number), passation:passations(*)').order('created_at', { ascending: false }),
+      supabase.from('academies').select('id, name, username, coach_name, whatsapp_number, created_at').order('name'),
+      supabase.from('rules_acceptances').select('*, academy:academies(id, name, username), category:categories(*)').order('signed_at', { ascending: false }),
+      supabase.from('questionnaire_responses').select('*, academy:academies(id, name, username)').order('submitted_at', { ascending: false }),
     ]);
     if (cats) setCategories(cats);
     if (tabs) setTables(tabs);

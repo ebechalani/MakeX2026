@@ -33,17 +33,40 @@ function Login({ onLogin }: { onLogin: (s: Session) => void }) {
   const [p, setP] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  // Simple client-side rate limit (best-effort; server-side would be ideal)
+  const [fails, setFails] = useState(0);
+  const [lockUntil, setLockUntil] = useState(0);
 
   async function attempt() {
+    const now = Date.now();
+    if (now < lockUntil) {
+      const secs = Math.ceil((lockUntil - now) / 1000);
+      setErr(`Too many failed attempts — wait ${secs}s before trying again.`);
+      return;
+    }
     setBusy(true); setErr('');
-    const { data, error } = await supabase
-      .from('academies')
-      .select('id, name, username, password, whatsapp_number')
-      .eq('username', u.trim().toLowerCase())
-      .maybeSingle();
+    // Call the SECURITY DEFINER RPC — server-side bcrypt verification, never exposes the password hash
+    const { data, error } = await supabase.rpc('verify_academy_login', {
+      p_username: u.trim().toLowerCase(),
+      p_password: p,
+    });
     setBusy(false);
-    if (error || !data || data.password !== p) { setErr('Invalid username or password'); return; }
-    onLogin({ id: data.id, name: data.name, username: data.username, whatsapp_number: data.whatsapp_number });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (error || !row) {
+      const newFails = fails + 1;
+      setFails(newFails);
+      if (newFails >= 3) {
+        // 30s after 3 fails, doubling each subsequent
+        const lockSecs = 30 * Math.pow(2, newFails - 3);
+        setLockUntil(Date.now() + lockSecs * 1000);
+        setErr(`Too many failed attempts — locked for ${lockSecs}s.`);
+      } else {
+        setErr(`Invalid username or password (${3 - newFails} attempt${3 - newFails === 1 ? '' : 's'} left).`);
+      }
+      return;
+    }
+    setFails(0); setLockUntil(0);
+    onLogin({ id: row.id, name: row.name, username: row.username, whatsapp_number: row.whatsapp_number });
   }
 
   return (
