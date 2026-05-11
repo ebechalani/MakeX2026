@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo, Fragment } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Category, Table, Passation, LiveStatus, PendingChange, Academy, RulesAcceptance, QuestionnaireResponse } from '@/lib/types';
 import SoccerBracket from './SoccerBracket';
+import JudgesTab from './JudgesTab';
 import Link from 'next/link';
 
 // Admin password is verified server-side via /api/admin-login. Never hardcoded here.
@@ -149,7 +150,7 @@ function AdminDashboard() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [passations, setPassations] = useState<Passation[]>([]);
-  const [activeTab, setActiveTab] = useState<'passations' | 'categories' | 'academies' | 'schedule' | 'soccer' | 'approvals'>('passations');
+  const [activeTab, setActiveTab] = useState<'passations' | 'categories' | 'academies' | 'schedule' | 'soccer' | 'judges' | 'approvals'>('passations');
   const [expandedAcademy, setExpandedAcademy] = useState<Set<string>>(new Set());
   const [academySearch, setAcademySearch] = useState('');
   const [scheduleRound, setScheduleRound] = useState<1 | 2>(1);
@@ -576,7 +577,7 @@ function AdminDashboard() {
 
         {/* Tabs */}
         <div className="flex gap-1.5 mb-6 bg-white border border-slate-200 rounded-xl p-1 w-fit shadow-sm">
-          {(['passations', 'categories', 'academies', 'schedule', 'soccer', 'approvals'] as const).map(tab => (
+          {(['passations', 'categories', 'academies', 'schedule', 'soccer', 'judges', 'approvals'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-5 py-2 rounded-lg font-semibold text-sm capitalize transition ${
                 activeTab === tab ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
@@ -1541,6 +1542,9 @@ function AdminDashboard() {
 
         {/* ── SOCCER TAB ── */}
         {activeTab === 'soccer' && <SoccerBracket />}
+
+        {/* ── JUDGES TAB ── */}
+        {activeTab === 'judges' && <JudgesTab />}
 
         {/* ── APPROVALS TAB ── */}
         {activeTab === 'approvals' && (

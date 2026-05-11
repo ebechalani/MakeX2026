@@ -22,13 +22,102 @@ const STATUS_COLORS: Record<string, string> = {
   Delayed: 'bg-orange-100 text-orange-600',
 };
 
+type JudgeSession = { id: string; name: string; username: string; table_ids: string[] };
+const JUDGE_SESSION_KEY = 'judge_session';
+
 export default function JudgePage() {
+  const supabase = useMemo(() => createClient(), []);
+  const [session, setSession] = useState<JudgeSession | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    const raw = typeof window !== 'undefined' ? sessionStorage.getItem(JUDGE_SESSION_KEY) : null;
+    if (raw) try { setSession(JSON.parse(raw)); } catch {}
+    setHydrated(true);
+  }, []);
+
+  if (!hydrated) return null;
+  if (!session) return <JudgeLogin onLogin={s => { sessionStorage.setItem(JUDGE_SESSION_KEY, JSON.stringify(s)); setSession(s); }} />;
+  return <JudgeWorkspace session={session} onLogout={() => { sessionStorage.removeItem(JUDGE_SESSION_KEY); setSession(null); }} />;
+}
+
+// ── Login ──────────────────────────────────────────────────────────────────
+function JudgeLogin({ onLogin }: { onLogin: (s: JudgeSession) => void }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [u, setU] = useState('');
+  const [p, setP] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [fails, setFails] = useState(0);
+  const [lockUntil, setLockUntil] = useState(0);
+
+  async function attempt() {
+    const now = Date.now();
+    if (now < lockUntil) {
+      setErr(`Too many failed attempts — wait ${Math.ceil((lockUntil - now) / 1000)}s.`);
+      return;
+    }
+    setBusy(true); setErr('');
+    const { data, error } = await supabase.rpc('verify_judge_login', {
+      p_username: u.trim().toLowerCase(),
+      p_password: p,
+    });
+    setBusy(false);
+    const row = Array.isArray(data) ? data[0] : data;
+    if (error || !row) {
+      const newFails = fails + 1;
+      setFails(newFails);
+      if (newFails >= 3) {
+        const lockSecs = 30 * Math.pow(2, newFails - 3);
+        setLockUntil(Date.now() + lockSecs * 1000);
+        setErr(`Too many failed attempts — locked for ${lockSecs}s.`);
+      } else {
+        setErr(`Invalid username or password (${3 - newFails} left).`);
+      }
+      return;
+    }
+    setFails(0); setLockUntil(0);
+    onLogin({ id: row.id, name: row.name, username: row.username, table_ids: row.table_ids || [] });
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center p-6">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold text-white mb-1">Judge Login</h1>
+          <p className="text-slate-400 text-sm">Sign in to access your assigned table</p>
+        </div>
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">Username</label>
+          <input value={u} onChange={e => setU(e.target.value)} autoFocus
+            className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-emerald-500/30 mb-4"
+            placeholder="judge-1" />
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
+          <input value={p} onChange={e => setP(e.target.value)} type="password"
+            onKeyDown={e => e.key === 'Enter' && attempt()}
+            className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-emerald-500/30 mb-4" />
+          {err && <p className="text-red-400 text-sm mb-3">{err}</p>}
+          <button onClick={attempt} disabled={busy || !u || !p}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold py-3 rounded-xl">
+            {busy ? 'Signing in…' : 'Sign In'}
+          </button>
+        </div>
+        <div className="text-center mt-6">
+          <Link href="/" className="text-slate-500 hover:text-slate-300 text-sm">← Back to home</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Workspace (the original judge UI) ─────────────────────────────────────
+function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout: () => void }) {
   const supabase = useMemo(() => createClient(), []);
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [selectedCatId, setSelectedCatId] = useState('');
   const [selectedTableId, setSelectedTableId] = useState('');
-  const [judgeName, setJudgeName] = useState('');
+  const judgeName = session.name;
   const [setup, setSetup] = useState(false);
   const [queue, setQueue] = useState<Passation[]>([]);
   const [current, setCurrent] = useState<Passation | null>(null);
@@ -39,7 +128,22 @@ export default function JudgePage() {
   const [sigError, setSigError] = useState('');
   const sigRef = useRef<SignatureCanvasType>(null);
 
-  const filteredTables = tables.filter(t => t.category_id === selectedCatId && t.active);
+  // Only show tables this judge is actually assigned to
+  const assignedTables = tables.filter(t => session.table_ids.includes(t.id) && t.active);
+  const filteredTables = assignedTables.filter(t => t.category_id === selectedCatId);
+
+  // If the judge has exactly one assigned table, auto-select it once tables load
+  useEffect(() => {
+    if (assignedTables.length === 1 && !selectedTableId) {
+      const t = assignedTables[0];
+      setSelectedCatId(t.category_id);
+      setSelectedTableId(t.id);
+    }
+  }, [assignedTables, selectedTableId]);
+
+  // Categories actually relevant to this judge (only the ones whose tables they own)
+  const relevantCategoryIds = new Set(assignedTables.map(t => t.category_id));
+  const visibleCategories = categories.filter(c => relevantCategoryIds.has(c.id));
 
   const loadQueue = useCallback(async () => {
     if (!selectedTableId) return;
@@ -76,11 +180,11 @@ export default function JudgePage() {
   }, [setup, loadQueue, supabase]);
 
   useEffect(() => {
-    supabase.from('categories').select('*').eq('active', true).order('name').then(({ data }) => {
-      if (data) setCategories(data as Category[]);
+    supabase.from('categories').select('*').eq('active', true).order('name').then((res: { data: Category[] | null }) => {
+      if (res.data) setCategories(res.data);
     });
-    supabase.from('tables').select('*').eq('active', true).order('table_number').then(({ data }) => {
-      if (data) setTables(data as Table[]);
+    supabase.from('tables').select('*').eq('active', true).order('table_number').then((res: { data: Table[] | null }) => {
+      if (res.data) setTables(res.data);
     });
   }, [supabase]);
 
@@ -174,30 +278,28 @@ export default function JudgePage() {
                   d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-white mb-1">Judge Setup</h1>
-            <p className="text-slate-400 text-sm">Select your category and table to begin</p>
+            <h1 className="text-2xl font-bold text-white mb-1">Welcome, {session.name}</h1>
+            <p className="text-slate-400 text-sm">
+              {assignedTables.length === 0 ? 'No tables assigned yet — ask the admin.' :
+               assignedTables.length === 1 ? 'Confirm to start judging your assigned table.' :
+               'Pick which of your assigned tables to start with.'}
+            </p>
           </div>
 
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Your Name</label>
-              <input className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
-                placeholder="Enter your name…"
-                value={judgeName} onChange={e => setJudgeName(e.target.value)} />
-            </div>
-
-            <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Category</label>
               <select className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
                 value={selectedCatId}
-                onChange={e => { setSelectedCatId(e.target.value); setSelectedTableId(''); }}>
+                onChange={e => { setSelectedCatId(e.target.value); setSelectedTableId(''); }}
+                disabled={visibleCategories.length === 0}>
                 <option value="">Select category…</option>
-                {categories.map(c => (
+                {visibleCategories.map(c => (
                   <option key={c.id} value={c.id}>{c.name}{c.age_range_label ? ` (${c.age_range_label})` : ''}</option>
                 ))}
               </select>
-              {categories.length === 0 && (
-                <p className="text-amber-400 text-xs mt-1.5">No categories found. Make sure the admin has set up the database.</p>
+              {visibleCategories.length === 0 && (
+                <p className="text-amber-400 text-xs mt-1.5">No assigned tables yet. Ask the admin to assign you a table in the Judges tab.</p>
               )}
             </div>
 
@@ -219,12 +321,13 @@ export default function JudgePage() {
             </div>
 
             <button
-              disabled={!judgeName.trim() || !selectedTableId}
+              disabled={!selectedTableId}
               onClick={() => setSetup(true)}
               className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold py-3.5 rounded-xl text-base transition">
               Start Judging
             </button>
 
+            <button onClick={onLogout} className="block w-full text-center text-sm text-red-400 hover:text-red-300 transition">Sign out</button>
             <Link href="/" className="block text-center text-sm text-slate-500 hover:text-slate-300 transition">← Back to home</Link>
           </div>
         </div>
@@ -250,10 +353,16 @@ export default function JudgePage() {
               </p>
             </div>
           </div>
-          <button onClick={() => setSetup(false)}
-            className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg transition">
-            Change Table
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setSetup(false)}
+              className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg transition">
+              {session.table_ids.length > 1 ? 'Change Table' : 'Settings'}
+            </button>
+            <button onClick={onLogout}
+              className="text-xs text-red-500 border border-red-200 px-3 py-1.5 rounded-lg transition">
+              Sign out
+            </button>
+          </div>
         </div>
       </header>
 
