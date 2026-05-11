@@ -123,6 +123,10 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
   // Structured scoring state for the current passation
   const [vals, setVals] = useState<Record<string, number>>({});
   const [counts, setCounts] = useState<Record<string, number>>({});
+  // Match countdown timer
+  const [remaining, setRemaining] = useState(0);
+  const [running, setRunning] = useState(false);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [queue, setQueue] = useState<Passation[]>([]);
   const [current, setCurrent] = useState<Passation | null>(null);
   const [score, setScore] = useState('');
@@ -198,7 +202,29 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
     // Reset the structured scoring form for the new passation
     setVals({});
     setCounts({});
+    // Reset the match countdown timer for the new passation
+    setRunning(false);
   }, [current?.id]);
+
+  // Tick the countdown every second when running
+  useEffect(() => {
+    if (!running) {
+      if (tickRef.current) clearInterval(tickRef.current);
+      return;
+    }
+    tickRef.current = setInterval(() => {
+      setRemaining(r => {
+        if (r <= 1) {
+          setRunning(false);
+          // simple audio beep when time runs out
+          try { new Audio('data:audio/wav;base64,UklGRl9vAQBXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQ==').play().catch(() => {}); } catch {}
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
+    return () => { if (tickRef.current) clearInterval(tickRef.current); };
+  }, [running]);
 
   // Derive the scoresheet for the current passation's category
   const currentSheet: Sheet | undefined = useMemo(() => {
@@ -214,6 +240,26 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
     return false;
   }) ?? false;
   const computedScore = currentSheet ? (isVoid ? 0 : currentSheet.formula({ ...vals, ...counts })) : null;
+
+  // When the current passation or its scoresheet changes, reset the countdown to the sheet's full duration
+  useEffect(() => {
+    setRemaining(currentSheet?.durationSec ?? 0);
+  }, [current?.id, currentSheet?.durationSec]);
+
+  function startPauseTimer() {
+    if (!currentSheet) return;
+    if (remaining === 0) setRemaining(currentSheet.durationSec);
+    setRunning(r => !r);
+  }
+  function resetTimer() {
+    setRunning(false);
+    setRemaining(currentSheet?.durationSec ?? 0);
+  }
+  const elapsedSec = currentSheet ? currentSheet.durationSec - remaining : 0;
+  const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
+  const ss = String(remaining % 60).padStart(2, '0');
+  const timerWarn = remaining > 0 && remaining <= 10;
+  const timerDone = remaining === 0 && currentSheet != null;
 
   function getSignatureDataUrl(): string | null {
     if (!sigRef.current) return null;
@@ -234,13 +280,15 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
     setLoading(true);
     // Use the structured scoresheet's computed total when available; otherwise fall back to manual score
     const finalScore = computedScore != null ? computedScore : (score ? Number(score) : null);
-    const breakdown = currentSheet ? JSON.stringify({ sheet: currentSheet.key, void: isVoid, vals, counts }) : null;
+    // If the judge used the timer (it ran), use elapsed time as mission_duration unless they typed one
+    const finalTime = timeVal ? Number(timeVal) : (elapsedSec > 0 ? elapsedSec : null);
+    const breakdown = currentSheet ? JSON.stringify({ sheet: currentSheet.key, void: isVoid, vals, counts, elapsedSec }) : null;
     const combinedNotes = [notes, breakdown ? `[score-breakdown: ${breakdown}]` : ''].filter(Boolean).join('\n\n') || null;
     await supabase.from('passations').update({
       live_status: 'Finished' as LiveStatus,
       final_result_status: isVoid ? 'Void' : 'Finished',
       score: finalScore,
-      time_seconds: timeVal ? Number(timeVal) : null,
+      time_seconds: finalTime,
       notes: combinedNotes,
       signature_image: sig,
       judge_name: judgeName,
@@ -424,16 +472,40 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
                 </button>
               )}
 
-              {/* Live computed score */}
+              {/* Live computed score + countdown timer */}
               {currentSheet && (
-                <div className={`rounded-xl p-4 flex items-center justify-between ${isVoid ? 'bg-red-50 border border-red-200' : 'bg-slate-100 border border-slate-200'}`}>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{currentSheet.name}</p>
-                    <p className="text-xs text-slate-500">{currentSheet.tag} · {currentSheet.duration}</p>
+                <div className={`rounded-xl p-4 ${isVoid ? 'bg-red-50 border border-red-200' : 'bg-slate-900 border border-slate-700'}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className={`text-[10px] font-bold uppercase tracking-widest ${isVoid ? 'text-red-700' : 'text-slate-400'}`}>{currentSheet.name}</p>
+                      <p className={`text-xs ${isVoid ? 'text-red-600' : 'text-slate-500'}`}>{currentSheet.tag} · {currentSheet.duration}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className={`text-[10px] font-bold uppercase tracking-widest ${isVoid ? 'text-red-700' : 'text-slate-400'}`}>Match Timer</p>
+                      <p className={`text-4xl font-black tabular-nums ${timerDone ? 'text-red-400' : timerWarn ? 'text-amber-400 animate-pulse' : isVoid ? 'text-red-700' : 'text-white'}`}>
+                        {mm}:{ss}
+                      </p>
+                      <div className="flex gap-1.5 justify-center mt-1.5">
+                        <button onClick={startPauseTimer}
+                          className={`text-xs font-semibold px-3 py-1 rounded-lg ${isVoid ? 'bg-red-100 text-red-700' : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'}`}>
+                          {running ? '⏸ Pause' : timerDone ? '↻ Restart' : remaining < (currentSheet.durationSec ?? 0) ? '▶ Resume' : '▶ Start'}
+                        </button>
+                        <button onClick={resetTimer}
+                          className={`text-xs font-semibold px-3 py-1 rounded-lg ${isVoid ? 'bg-red-100 text-red-700' : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'}`}>
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-[10px] font-bold uppercase tracking-widest ${isVoid ? 'text-red-700' : 'text-slate-400'}`}>{isVoid ? 'Run Voided' : 'Live Score'}</p>
+                      <p className={`text-4xl font-black tabular-nums ${isVoid ? 'text-red-700' : 'text-emerald-400'}`}>{isVoid ? 'VOID' : computedScore}</p>
+                    </div>
                   </div>
-                  <div className={`text-3xl font-black tabular-nums ${isVoid ? 'text-red-600' : 'text-slate-800'}`}>
-                    {isVoid ? 'VOID' : computedScore}
-                  </div>
+                  {elapsedSec > 0 && (
+                    <p className={`text-[10px] mt-2 text-center ${isVoid ? 'text-red-600' : 'text-slate-500'}`}>
+                      Elapsed: <span className="font-mono font-bold">{elapsedSec}s</span> — will be saved as mission duration on finish
+                    </p>
+                  )}
                 </div>
               )}
 
