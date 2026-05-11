@@ -324,16 +324,61 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
 
   async function handleDelay() {
     if (!current) return;
+    // Already used their one allowed delay? → automatically void this run
+    if ((current.delay_count ?? 0) >= 1) {
+      if (!confirm(`${current.team_name} has already been delayed once. Confirm to VOID this run (score = 0).`)) return;
+      setLoading(true);
+      await supabase.from('passations').update({
+        live_status: 'Finished' as LiveStatus,
+        final_result_status: 'Void',
+        score: 0,
+        time_seconds: null,
+        judge_name: judgeName,
+        finalized_at: new Date().toISOString(),
+        delay_count: (current.delay_count ?? 0) + 1,
+        notes: [current.notes, '[Auto-voided: 2nd delay]'].filter(Boolean).join('\n'),
+        updated_at: new Date().toISOString(),
+      }).eq('id', current.id);
+      const next = queue[0];
+      if (next) await supabase.from('passations').update({ live_status: 'In Progress' as LiveStatus, updated_at: new Date().toISOString() }).eq('id', next.id);
+      setScore(''); setTimeVal(''); setNotes('');
+      setVals({}); setCounts({}); setRunning(false);
+      if (sigRef.current) sigRef.current.clear();
+      setLoading(false);
+      loadQueue();
+      return;
+    }
+
+    // First delay: insert this team right AFTER the next team, before the one after that
+    if (queue.length === 0) {
+      alert('No following team on this table — cannot delay. Mark them Absent instead.');
+      return;
+    }
     setLoading(true);
-    const maxPos = queue.length > 0 ? Math.max(...queue.map(p => p.queue_position)) + 1 : current.queue_position + 1;
+    const next = queue[0];
+    const newPos = next.queue_position + 1;
+    // Bump any teams sitting at or past the new slot to make room
+    const toShift = queue.slice(1).filter(p => p.queue_position >= newPos);
+    for (const p of toShift) {
+      await supabase.from('passations').update({
+        queue_position: p.queue_position + 1,
+        updated_at: new Date().toISOString(),
+      }).eq('id', p.id);
+    }
+    // Place the delayed team at the new slot and increment delay_count
     await supabase.from('passations').update({
       live_status: 'Delayed' as LiveStatus,
-      queue_position: maxPos,
+      queue_position: newPos,
+      delay_count: (current.delay_count ?? 0) + 1,
       updated_at: new Date().toISOString(),
     }).eq('id', current.id);
-    const next = queue[0];
-    if (next) await supabase.from('passations').update({ live_status: 'In Progress' as LiveStatus, updated_at: new Date().toISOString() }).eq('id', next.id);
+    // Advance the next team to In Progress
+    await supabase.from('passations').update({
+      live_status: 'In Progress' as LiveStatus,
+      updated_at: new Date().toISOString(),
+    }).eq('id', next.id);
     setScore(''); setTimeVal(''); setNotes('');
+    setVals({}); setCounts({}); setRunning(false);
     if (sigRef.current) sigRef.current.clear();
     setLoading(false);
     loadQueue();
@@ -453,9 +498,16 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
                   <p className="text-emerald-200 text-xs font-semibold uppercase tracking-wider mb-1">Now Competing</p>
                   <h2 className="text-2xl font-black text-white leading-tight">{current.student_names || current.team_name}</h2>
                 </div>
-                <span className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold ${STATUS_COLORS[current.live_status] || 'bg-white/20 text-white'}`}>
-                  {current.live_status}
-                </span>
+                <div className="flex flex-col items-end gap-1.5">
+                  <span className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold ${STATUS_COLORS[current.live_status] || 'bg-white/20 text-white'}`}>
+                    {current.live_status}
+                  </span>
+                  {(current.delay_count ?? 0) >= 1 && (
+                    <span className="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                      ⚠ Delayed {current.delay_count}× — next delay voids
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -644,11 +696,17 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
                   Absent
                 </button>
                 <button onClick={handleDelay} disabled={loading}
-                  className="bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white py-4 rounded-2xl font-bold text-base transition flex flex-col items-center gap-1 shadow-sm shadow-orange-200">
+                  className={`disabled:opacity-40 text-white py-4 rounded-2xl font-bold text-base transition flex flex-col items-center gap-1 shadow-sm ${
+                    (current.delay_count ?? 0) >= 1
+                      ? 'bg-red-600 hover:bg-red-500 shadow-red-200'
+                      : 'bg-orange-500 hover:bg-orange-400 shadow-orange-200'
+                  }`}
+                  title={(current.delay_count ?? 0) >= 1 ? 'Already delayed once — pressing this will VOID the run' : 'Delay this team to play after the next one'}
+                >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Delay
+                  {(current.delay_count ?? 0) >= 1 ? 'Void (2nd delay)' : 'Delay'}
                 </button>
               </div>
             </div>

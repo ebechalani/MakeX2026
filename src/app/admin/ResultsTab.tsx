@@ -91,16 +91,25 @@ export default function ResultsTab() {
   }
 
   async function clearJudgeData() {
-    const finalizedCount = stats.fin + stats.vd + stats.abs;
-    if (finalizedCount === 0) {
-      alert('No judge-scored data to clear.');
+    // Anything that the trial could have touched
+    const touched = passations.filter(p =>
+      p.final_result_status || p.live_status !== 'Scheduled' || p.score != null ||
+      p.signature_image || p.judge_name || p.finalized_at ||
+      (p.delay_count ?? 0) > 0
+    );
+    if (touched.length === 0) {
+      alert('Nothing to clear — system is already in a clean state.');
       return;
     }
-    const phrase = `clear ${finalizedCount}`;
+    const phrase = `clear ${touched.length}`;
     const typed = prompt(
-      `This will reset score, time, signature, judge, finalized status, and the score-breakdown notes\n` +
-      `on ALL ${finalizedCount} judged passations.\n\n` +
-      `Scheduling (table, time, queue position, round) is NOT touched.\n\n` +
+      `This will reset EVERY trace of the trial run on ${touched.length} passations:\n\n` +
+      `  • score, time, signature, judge name, finalized timestamp\n` +
+      `  • live status → Scheduled, final result status → cleared\n` +
+      `  • delay count → 0\n` +
+      `  • queue positions → restored from original schedule order\n` +
+      `  • score-breakdown notes stripped\n\n` +
+      `Scheduling (table, scheduled time, round, students) is preserved.\n\n` +
       `Type exactly:  ${phrase}`
     );
     if (typed !== phrase) {
@@ -108,13 +117,10 @@ export default function ResultsTab() {
       return;
     }
     setClearing(true);
-    // Build the affected rows
-    const affected = passations.filter(p =>
-      p.final_result_status || p.live_status === 'Absent' || p.score != null ||
-      p.signature_image || p.judge_name || p.finalized_at
-    );
     let ok = 0, fail = 0;
-    for (const p of affected) {
+
+    // Phase 1 — clear trial fields on every touched row
+    for (const p of touched) {
       const cleanedNotes = stripBreakdown(p.notes);
       const { error } = await supabase.from('passations').update({
         score: null,
@@ -124,13 +130,45 @@ export default function ResultsTab() {
         finalized_at: null,
         live_status: 'Scheduled',
         final_result_status: null,
+        delay_count: 0,
         notes: cleanedNotes,
         updated_at: new Date().toISOString(),
       }).eq('id', p.id);
       if (error) fail++; else ok++;
     }
+
+    // Phase 2 — restore queue_position per (table, round) by re-sorting by scheduled_time.
+    // scheduled_time wasn't changed by delays, so it's the source of truth for the canonical order.
+    const allRows = passations.slice();
+    const byTableRound = new Map<string, Passation[]>();
+    for (const p of allRows) {
+      if (!p.table_id) continue;
+      const k = `${p.table_id}|${p.round_number ?? 1}`;
+      if (!byTableRound.has(k)) byTableRound.set(k, []);
+      byTableRound.get(k)!.push(p);
+    }
+    for (const [k, rows] of byTableRound) {
+      const [, roundStr] = k.split('|');
+      const isR2 = roundStr === '2';
+      const base = isR2 ? 1001 : 1; // matches the generator's offset
+      rows.sort((a, b) => {
+        const at = a.scheduled_time || '';
+        const bt = b.scheduled_time || '';
+        return at.localeCompare(bt);
+      });
+      for (let i = 0; i < rows.length; i++) {
+        const expected = base + i;
+        if (rows[i].queue_position !== expected) {
+          await supabase.from('passations').update({
+            queue_position: expected,
+            updated_at: new Date().toISOString(),
+          }).eq('id', rows[i].id);
+        }
+      }
+    }
+
     setClearing(false);
-    alert(`Cleared ${ok} passation${ok === 1 ? '' : 's'}.${fail ? ' Failed: ' + fail : ''}`);
+    alert(`Cleared ${ok} passation${ok === 1 ? '' : 's'}.${fail ? ' Failed: ' + fail : ''}\nQueue positions restored from scheduled times.`);
     load();
   }
 

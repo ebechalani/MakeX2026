@@ -61,6 +61,7 @@ export interface Passation {
   time_seconds: number | null;
   notes: string | null;
   round_number: number;
+  delay_count: number;
   signature_image: string | null;
   judge_name: string | null;
   finalized_at: string | null;
