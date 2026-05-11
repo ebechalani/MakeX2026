@@ -89,7 +89,9 @@
       "Bash(powershell -Command 'Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::OpenRead\\('\\\\''C:\\\\Users\\\\eddy.bachaalany\\\\Downloads\\\\03_LockerRoom_Rules.docx'\\\\''\\).Entries | Where-Object { $_.FullName -eq '\\\\''word/document.xml'\\\\'' } | ForEach-Object { $r = New-Object IO.StreamReader\\($_.Open\\(\\)\\); $r.ReadToEnd\\(\\) }')",
       "Bash(powershell -Command 'Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::OpenRead\\('\\\\''C:\\\\Users\\\\eddy.bachaalany\\\\Downloads\\\\04_Soccer_Rules.docx'\\\\''\\).Entries | Where-Object { $_.FullName -eq '\\\\''word/document.xml'\\\\'' } | ForEach-Object { $r = New-Object IO.StreamReader\\($_.Open\\(\\)\\); $r.ReadToEnd\\(\\) }')",
       "Bash(powershell -Command 'Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::OpenRead\\('\\\\''C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\public\\\\rules\\\\soccer_rules.docx'\\\\''\\).Entries | Where-Object { $_.FullName -eq '\\\\''word/document.xml'\\\\'' } | ForEach-Object { $r = New-Object IO.StreamReader\\($_.Open\\(\\)\\); $r.ReadToEnd\\(\\) }')",
-      "Bash(node --env-file=.env.local scripts/reduce_sw45_tables.mjs)"
+      "Bash(node --env-file=.env.local scripts/reduce_sw45_tables.mjs)",
+      "Bash(sed -n '4,321p' src/app/academy/PracticeScoresheet.tsx)",
+      "Read(//tmp/**)"
     ]
   }
 }

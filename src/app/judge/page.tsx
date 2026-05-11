@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Category, Table, Passation, LiveStatus } from '@/lib/types';
+import { sheetForCategoryName, type Sheet } from '@/lib/scoresheets';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import type SignatureCanvasType from 'react-signature-canvas';
@@ -119,6 +120,9 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
   const [selectedTableId, setSelectedTableId] = useState('');
   const judgeName = session.name;
   const [setup, setSetup] = useState(false);
+  // Structured scoring state for the current passation
+  const [vals, setVals] = useState<Record<string, number>>({});
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [queue, setQueue] = useState<Passation[]>([]);
   const [current, setCurrent] = useState<Passation | null>(null);
   const [score, setScore] = useState('');
@@ -191,7 +195,25 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
   useEffect(() => {
     if (sigRef.current) sigRef.current.clear();
     setSigError('');
+    // Reset the structured scoring form for the new passation
+    setVals({});
+    setCounts({});
   }, [current?.id]);
+
+  // Derive the scoresheet for the current passation's category
+  const currentSheet: Sheet | undefined = useMemo(() => {
+    if (!current?.category_id) return undefined;
+    const cat = categories.find(c => c.id === current.category_id);
+    if (!cat) return undefined;
+    return sheetForCategoryName(cat.name);
+  }, [current?.category_id, categories]);
+
+  const isVoid = currentSheet?.voidIds?.some(id => {
+    if (vals[id] === -9999) return true;
+    if (id === 'red_us' && (counts[id] ?? 0) >= 1) return true;
+    return false;
+  }) ?? false;
+  const computedScore = currentSheet ? (isVoid ? 0 : currentSheet.formula({ ...vals, ...counts })) : null;
 
   function getSignatureDataUrl(): string | null {
     if (!sigRef.current) return null;
@@ -210,12 +232,16 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
     if (!sig) { setSigError('A team signature is required before finishing.'); return; }
     setSigError('');
     setLoading(true);
+    // Use the structured scoresheet's computed total when available; otherwise fall back to manual score
+    const finalScore = computedScore != null ? computedScore : (score ? Number(score) : null);
+    const breakdown = currentSheet ? JSON.stringify({ sheet: currentSheet.key, void: isVoid, vals, counts }) : null;
+    const combinedNotes = [notes, breakdown ? `[score-breakdown: ${breakdown}]` : ''].filter(Boolean).join('\n\n') || null;
     await supabase.from('passations').update({
       live_status: 'Finished' as LiveStatus,
-      final_result_status: 'Finished',
-      score: score ? Number(score) : null,
+      final_result_status: isVoid ? 'Void' : 'Finished',
+      score: finalScore,
       time_seconds: timeVal ? Number(timeVal) : null,
-      notes: notes || null,
+      notes: combinedNotes,
       signature_image: sig,
       judge_name: judgeName,
       finalized_at: new Date().toISOString(),
@@ -224,6 +250,7 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
     const next = queue[0];
     if (next) await supabase.from('passations').update({ live_status: 'In Progress' as LiveStatus, updated_at: new Date().toISOString() }).eq('id', next.id);
     setScore(''); setTimeVal(''); setNotes('');
+    setVals({}); setCounts({});
     if (sigRef.current) sigRef.current.clear();
     setLoading(false);
     loadQueue();
@@ -397,23 +424,96 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
                 </button>
               )}
 
-              {/* Score + Mission Duration */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Score</label>
-                  <input type="number" className={inputCls + ' text-xl font-bold'}
-                    value={score} onChange={e => setScore(e.target.value)} placeholder="0" />
+              {/* Live computed score */}
+              {currentSheet && (
+                <div className={`rounded-xl p-4 flex items-center justify-between ${isVoid ? 'bg-red-50 border border-red-200' : 'bg-slate-100 border border-slate-200'}`}>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{currentSheet.name}</p>
+                    <p className="text-xs text-slate-500">{currentSheet.tag} · {currentSheet.duration}</p>
+                  </div>
+                  <div className={`text-3xl font-black tabular-nums ${isVoid ? 'text-red-600' : 'text-slate-800'}`}>
+                    {isVoid ? 'VOID' : computedScore}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Mission Duration
-                    <span className="ml-1 text-slate-400 font-normal normal-case">(seconds)</span>
-                  </label>
-                  <input type="number" className={inputCls + ' text-xl font-bold'}
-                    value={timeVal} onChange={e => setTimeVal(e.target.value)} placeholder="0" />
-                  <p className="text-xs text-slate-400 mt-1">How long the mission took to complete</p>
+              )}
+
+              {/* Structured scoresheet */}
+              {currentSheet ? (
+                <div className="space-y-3">
+                  {currentSheet.sections.map((sec, i) => (
+                    <div key={i} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                      <div className="px-4 py-2 bg-slate-50 border-b border-slate-100">
+                        <p className="font-bold text-sm text-slate-800">{sec.title}</p>
+                        {sec.subtitle && <p className="text-[11px] text-slate-500 mt-0.5">{sec.subtitle}</p>}
+                      </div>
+                      <div className="divide-y divide-slate-50">
+                        {sec.items.map(item => {
+                          if (item.kind === 'counter') {
+                            const c = counts[item.id] ?? 0;
+                            const min = item.min ?? 0;
+                            const max = item.max ?? 99;
+                            return (
+                              <div key={item.id} className="px-4 py-2.5 flex items-center gap-3">
+                                <div className="flex-1">
+                                  <p className="font-semibold text-sm text-slate-800">{item.title}</p>
+                                  {item.description && <p className="text-[11px] text-slate-500 mt-0.5">{item.description}</p>}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button onClick={() => setCounts(x => ({ ...x, [item.id]: Math.max(min, c - 1) }))} disabled={c <= min}
+                                    className="w-8 h-8 rounded-lg border border-slate-300 text-slate-700 font-bold disabled:opacity-30">−</button>
+                                  <span className="w-8 text-center font-mono font-bold text-slate-800">{c}</span>
+                                  <button onClick={() => setCounts(x => ({ ...x, [item.id]: Math.min(max, c + 1) }))} disabled={c >= max}
+                                    className="w-8 h-8 rounded-lg border border-slate-300 text-slate-700 font-bold disabled:opacity-30">+</button>
+                                </div>
+                              </div>
+                            );
+                          }
+                          const sel = vals[item.id];
+                          return (
+                            <div key={item.id} className="px-4 py-2.5">
+                              <p className="font-semibold text-sm text-slate-800 mb-2">{item.title}</p>
+                              {item.description && <p className="text-[11px] text-slate-500 -mt-1.5 mb-2">{item.description}</p>}
+                              <div className="grid grid-cols-2 gap-1.5">
+                                {item.choices.map((ch, ci) => {
+                                  const chosen = sel === ch.value;
+                                  const isVoidChoice = ch.value === -9999;
+                                  return (
+                                    <button key={ci}
+                                      onClick={() => setVals(x => ({ ...x, [item.id]: ch.value }))}
+                                      className={`text-left text-xs px-3 py-2 rounded-lg border transition ${
+                                        chosen
+                                          ? isVoidChoice
+                                            ? 'border-red-500 bg-red-50 text-red-900 font-bold'
+                                            : 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold'
+                                          : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                                      }`}>
+                                      {ch.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              ) : (
+                // Fallback: free-form score if no sheet matches this category (e.g. MakeX Starter)
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Score</label>
+                    <input type="number" className={inputCls + ' text-xl font-bold'}
+                      value={score} onChange={e => setScore(e.target.value)} placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Mission Duration <span className="font-normal normal-case text-slate-400">(s)</span></label>
+                    <input type="number" className={inputCls + ' text-xl font-bold'}
+                      value={timeVal} onChange={e => setTimeVal(e.target.value)} placeholder="0" />
+                  </div>
+                </div>
+              )}
 
               {/* Notes */}
               <div>
