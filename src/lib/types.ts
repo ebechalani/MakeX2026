@@ -62,6 +62,8 @@ export interface Passation {
   notes: string | null;
   round_number: number;
   delay_count: number;
+  team_group_id: string | null;
+  team_label: string | null;
   signature_image: string | null;
   judge_name: string | null;
   finalized_at: string | null;

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import PracticeScoresheet from './PracticeScoresheet';
 import RulesTab from './RulesTab';
 import QuizTab from './QuizTab';
+import TeamsTab from './TeamsTab';
 
 const SESSION_KEY = 'academy_session';
 
@@ -106,7 +107,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [pending, setPending] = useState<PendingChange[]>([]);
-  const [tab, setTab] = useState<'students' | 'rules' | 'quiz' | 'practice'>('students');
+  const [tab, setTab] = useState<'students' | 'teams' | 'rules' | 'quiz' | 'practice'>('students');
   const [showForm, setShowForm] = useState(false);
   const [editingPas, setEditingPas] = useState<Passation | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -309,6 +310,23 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           >
             My Students
           </button>
+          {/* Teams tab — only when this academy has students in a team-based category (MakeX Starter / Signal Rise) */}
+          {(() => {
+            const hasTeamable = passations.some(p => {
+              const cat = categories.find(c => c.id === p.category_id);
+              return cat && /makex\s*starter|signal\s*rise/i.test(cat.name);
+            });
+            return hasTeamable ? (
+              <button
+                onClick={() => setTab('teams')}
+                className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                  tab === 'teams' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                🤝 Teams
+              </button>
+            ) : null;
+          })()}
           <button
             onClick={() => setTab('rules')}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
@@ -341,6 +359,8 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           <RulesTab academyId={session.id} academyName={session.name} passations={passations} categories={categories} />
         ) : tab === 'quiz' ? (
           <QuizTab academyId={session.id} academyName={session.name} passations={passations} categories={categories} />
+        ) : tab === 'teams' ? (
+          <TeamsTab academyName={session.name} passations={passations} categories={categories} onChanged={load} />
         ) : (
         <>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
