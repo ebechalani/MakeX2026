@@ -51,9 +51,18 @@ export default function JudgesTab() {
     return m;
   }, [assignments]);
 
-  function tableLabel(t: Table) {
-    const cat = categories.find(c => c.id === t.category_id);
-    return `${cat?.name || '?'} · ${t.display_label || `Table ${t.table_number}`}`;
+  // Derive a judge's home category from their username prefix
+  function homeCategoryId(username: string): string | null {
+    const u = username.toLowerCase();
+    let pattern = '';
+    if (u.startsWith('csoccer'))   pattern = 'capelli soccer';
+    else if (u.startsWith('cinspire'))  pattern = 'capelli inspire';
+    else if (u.startsWith('cstarter'))  pattern = 'capelli starter';
+    else if (u.startsWith('minspire'))  pattern = 'makex inspire';
+    else if (u.startsWith('mstarter'))  pattern = 'makex starter';
+    if (!pattern) return null;
+    return categories.find(c => c.name.toLowerCase().includes(pattern.split(' ')[0]) &&
+                                c.name.toLowerCase().includes(pattern.split(' ')[1]))?.id ?? null;
   }
 
   async function toggle(judge_id: string, table_id: string, currentlyAssigned: boolean) {
@@ -74,6 +83,9 @@ export default function JudgesTab() {
     if (!tablesByCat.has(t.category_id)) tablesByCat.set(t.category_id, []);
     tablesByCat.get(t.category_id)!.push(t);
   }
+
+  const swCat = categories.find(c => /sportswonderland/i.test(c.name));
+  const swTables = swCat ? (tablesByCat.get(swCat.id) || []) : [];
 
   return (
     <div className="space-y-5">
@@ -117,15 +129,26 @@ export default function JudgesTab() {
               {j.whatsapp_number && <span className="text-xs text-slate-400 shrink-0">📱 {j.whatsapp_number}</span>}
             </div>
             <div className="p-4 space-y-3">
-              {Array.from(tablesByCat.entries()).map(([catId, catTables]) => {
-                const cat = categories.find(c => c.id === catId);
-                return (
-                  <div key={catId}>
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                      {cat?.name} {cat?.age_range_label && <span className="font-normal">({cat.age_range_label})</span>}
+              {(() => {
+                const homeCatId = homeCategoryId(j.username);
+                const homeTables = homeCatId ? (tablesByCat.get(homeCatId) || []) : [];
+                const homeCat = homeCatId ? categories.find(c => c.id === homeCatId) : null;
+
+                const sections: { label: string; tables: Table[]; isSW: boolean }[] = [];
+                if (homeTables.length > 0 && homeCatId !== swCat?.id) {
+                  sections.push({ label: homeCat?.name || 'My Category', tables: homeTables, isSW: false });
+                }
+                if (swTables.length > 0) {
+                  sections.push({ label: 'Sportswonderland', tables: swTables, isSW: true });
+                }
+
+                return sections.map(({ label, tables: sectionTables, isSW }) => (
+                  <div key={label}>
+                    <p className={`text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isSW ? 'text-orange-400' : 'text-slate-400'}`}>
+                      {label}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
-                      {catTables.map(t => {
+                      {sectionTables.map(t => {
                         const mine = my.has(t.id);
                         const ownerId = tableOwner.get(t.id);
                         const takenByOther = !!ownerId && !mine;
@@ -141,7 +164,9 @@ export default function JudgesTab() {
                                 ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-500'
                                 : takenByOther
                                   ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-60'
-                                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                  : isSW
+                                    ? 'bg-orange-50 border-orange-200 text-orange-700 hover:border-orange-300'
+                                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
                             }`}
                           >
                             {mine ? '✓ ' : takenByOther ? '🔒 ' : ''}{t.display_label || `Table ${t.table_number}`}
@@ -150,8 +175,8 @@ export default function JudgesTab() {
                       })}
                     </div>
                   </div>
-                );
-              })}
+                ));
+              })()}
             </div>
           </div>
         );
