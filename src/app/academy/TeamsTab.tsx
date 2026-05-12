@@ -78,15 +78,6 @@ function CategoryTeams({
   const [teamLabel, setTeamLabel] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  // Add-new-team form
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newTeam, setNewTeam] = useState({
-    label: '',
-    s1_name: '', s1_dob: '',
-    s2_name: '', s2_dob: '',
-    coach_name: '', coach_contact: '',
-  });
-  const [addErr, setAddErr] = useState('');
 
   // Group existing teams
   const teams = useMemo(() => {
@@ -145,50 +136,6 @@ function CategoryTeams({
     onChanged();
   }
 
-  async function submitNewTeam() {
-    setAddErr('');
-    if (!newTeam.s1_name.trim()) { setAddErr('At least one student name is required.'); return; }
-    setBusy(true);
-    const teamId = uuid();
-    const label = newTeam.label.trim() || null;
-    const members = [
-      { name: newTeam.s1_name.trim(), dob: newTeam.s1_dob || null },
-      ...(newTeam.s2_name.trim() ? [{ name: newTeam.s2_name.trim(), dob: newTeam.s2_dob || null }] : []),
-    ];
-    const rowsToInsert = members.map(m => ({
-      team_name: m.name,
-      student_names: m.name,
-      coach_name: newTeam.coach_name.trim() || null,
-      parent_name: null,
-      parent_contact: newTeam.coach_contact.trim() || null,
-      club_name: academyName,
-      date_of_birth: m.dob,
-      category_id: category.id,
-      // Placeholder — admin will schedule MakeX Starter manually
-      // table_id intentionally not set here; if your schema requires non-null, see the comment below.
-      live_status: 'Scheduled' as const,
-      queue_position: 0,
-      round_number: 1,
-      team_group_id: teamId,
-      team_label: label,
-    }));
-    // The schema requires table_id NOT NULL on passations. Use the first table of this category as a placeholder.
-    const { data: tables } = await supabase.from('tables').select('id').eq('category_id', category.id).eq('active', true).order('table_number').limit(1);
-    const placeholderTable = tables?.[0]?.id;
-    if (!placeholderTable) {
-      setBusy(false);
-      setAddErr('No active table found for this category. Ask the admin to add one.');
-      return;
-    }
-    const rowsWithTable = rowsToInsert.map(r => ({ ...r, table_id: placeholderTable }));
-    const { error } = await supabase.from('passations').insert(rowsWithTable);
-    setBusy(false);
-    if (error) { setAddErr(error.message); return; }
-    setNewTeam({ label: '', s1_name: '', s1_dob: '', s2_name: '', s2_dob: '', coach_name: '', coach_contact: '' });
-    setShowAddForm(false);
-    onChanged();
-  }
-
   async function disbandTeam(teamId: string) {
     if (!confirm('Disband this team? Members will become ungrouped.')) return;
     setBusy(true);
@@ -204,72 +151,12 @@ function CategoryTeams({
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-      <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
-        <div>
-          <h3 className="font-bold text-slate-800">{category.name} <span className="text-slate-400 font-normal">{category.age_range_label}</span></h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {teams.length} team{teams.length === 1 ? '' : 's'} formed · {ungrouped.length} student{ungrouped.length === 1 ? '' : 's'} not yet in a team
-          </p>
-        </div>
-        <button
-          onClick={() => setShowAddForm(s => !s)}
-          className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg">
-          {showAddForm ? 'Cancel' : '+ Add new team'}
-        </button>
+      <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+        <h3 className="font-bold text-slate-800">{category.name} <span className="text-slate-400 font-normal">{category.age_range_label}</span></h3>
+        <p className="text-xs text-slate-500 mt-0.5">
+          {teams.length} team{teams.length === 1 ? '' : 's'} formed · {ungrouped.length} student{ungrouped.length === 1 ? '' : 's'} not yet in a team
+        </p>
       </div>
-
-      {showAddForm && (
-        <div className="px-5 py-4 bg-indigo-50/40 border-b border-slate-100 space-y-3">
-          <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Add a brand-new team to {category.name}</p>
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Team name (optional)</label>
-            <input value={newTeam.label} onChange={e => setNewTeam(n => ({ ...n, label: e.target.value }))}
-              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm" placeholder="e.g. RoboHolic Alpha" />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Student 1 name *</label>
-              <input value={newTeam.s1_name} onChange={e => setNewTeam(n => ({ ...n, s1_name: e.target.value }))}
-                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Student 1 DOB</label>
-              <input type="date" value={newTeam.s1_dob} onChange={e => setNewTeam(n => ({ ...n, s1_dob: e.target.value }))}
-                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Student 2 name (optional)</label>
-              <input value={newTeam.s2_name} onChange={e => setNewTeam(n => ({ ...n, s2_name: e.target.value }))}
-                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm" placeholder="Leave blank for a 1-person team" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Student 2 DOB</label>
-              <input type="date" value={newTeam.s2_dob} onChange={e => setNewTeam(n => ({ ...n, s2_dob: e.target.value }))}
-                disabled={!newTeam.s2_name.trim()}
-                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm disabled:bg-slate-100" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Coach name</label>
-              <input value={newTeam.coach_name} onChange={e => setNewTeam(n => ({ ...n, coach_name: e.target.value }))}
-                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Coach contact</label>
-              <input value={newTeam.coach_contact} onChange={e => setNewTeam(n => ({ ...n, coach_contact: e.target.value }))}
-                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm" placeholder="Phone or email" />
-            </div>
-          </div>
-          {addErr && <p className="text-xs text-red-600">{addErr}</p>}
-          <div className="flex gap-2">
-            <button onClick={submitNewTeam} disabled={busy || !newTeam.s1_name.trim()}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2 rounded-lg">
-              {busy ? 'Saving…' : 'Create team'}
-            </button>
-            <button onClick={() => { setShowAddForm(false); setAddErr(''); }}
-              className="text-xs text-slate-500 hover:text-slate-700 px-3 py-2">Cancel</button>
-          </div>
-        </div>
-      )}
 
       {/* Existing teams */}
       {teams.length > 0 && (
