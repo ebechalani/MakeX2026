@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Category, Table } from '@/lib/types';
 
-type Judge = { id: string; name: string; username: string; whatsapp_number: string | null };
+type Judge = { id: string; name: string; username: string; whatsapp_number: string | null; password_plain: string | null };
 type Assignment = { judge_id: string; table_id: string };
 
 export default function JudgesTab() {
@@ -18,7 +18,7 @@ export default function JudgesTab() {
   const load = useCallback(async () => {
     setLoading(true);
     const [j, t, c, a] = await Promise.all([
-      supabase.from('judges').select('id, name, username, whatsapp_number').order('username'),
+      supabase.from('judges').select('id, name, username, whatsapp_number, password_plain').order('username'),
       supabase.from('tables').select('*').eq('active', true).order('category_id').order('table_number'),
       supabase.from('categories').select('*').order('name'),
       supabase.from('judge_tables').select('judge_id, table_id'),
@@ -94,15 +94,27 @@ export default function JudgesTab() {
         const my = byJudge.get(j.id) || new Set<string>();
         return (
           <div key={j.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-800">{j.name} <span className="text-slate-400 font-normal">· @{j.username}</span></h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {my.size === 0 ? <span className="text-amber-600">⚠ no tables assigned</span> :
-                   `${my.size} table${my.size === 1 ? '' : 's'} assigned`}
-                </p>
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-slate-800">{j.name}</h3>
+                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                  <span className="inline-flex items-center gap-1 text-xs font-mono bg-slate-100 border border-slate-200 text-slate-700 px-2 py-0.5 rounded">
+                    <span className="text-slate-400 font-sans">user</span> {j.username}
+                  </span>
+                  {j.password_plain ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-mono bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 rounded">
+                      <span className="text-amber-400 font-sans">pw</span> {j.password_plain}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400 italic">password hidden</span>
+                  )}
+                  <span className="text-xs text-slate-400">
+                    {my.size === 0 ? <span className="text-amber-600 not-italic">⚠ no tables assigned</span> :
+                     `${my.size} table${my.size === 1 ? '' : 's'} assigned`}
+                  </span>
+                </div>
               </div>
-              {j.whatsapp_number && <span className="text-xs text-slate-400">📱 {j.whatsapp_number}</span>}
+              {j.whatsapp_number && <span className="text-xs text-slate-400 shrink-0">📱 {j.whatsapp_number}</span>}
             </div>
             <div className="p-4 space-y-3">
               {Array.from(tablesByCat.entries()).map(([catId, catTables]) => {
