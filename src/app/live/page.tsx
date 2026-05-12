@@ -2,7 +2,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Category, Table, Passation } from '@/lib/types';
-import Link from 'next/link';
 
 interface TableDisplay {
   table: Table;
@@ -12,7 +11,6 @@ interface TableDisplay {
   prepare: Passation | null;
 }
 
-// Show student name — fall back to team_name for old records
 function getName(p: Passation | null): string {
   if (!p) return '';
   return p.student_names || p.team_name || '—';
@@ -22,6 +20,16 @@ function getTime(p: Passation | null): string {
   if (!p?.scheduled_time) return '';
   return new Date(p.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+// Assign a consistent accent color per category index
+const CAT_ACCENTS = [
+  { hdr: '#1e40af', pill: '#3b82f6', glow: 'rgba(59,130,246,0.15)' },
+  { hdr: '#7c2d12', pill: '#f97316', glow: 'rgba(249,115,22,0.15)' },
+  { hdr: '#14532d', pill: '#22c55e', glow: 'rgba(34,197,94,0.15)' },
+  { hdr: '#4c1d95', pill: '#a78bfa', glow: 'rgba(167,139,250,0.15)' },
+  { hdr: '#7f1d1d', pill: '#f87171', glow: 'rgba(248,113,113,0.15)' },
+  { hdr: '#0c4a6e', pill: '#38bdf8', glow: 'rgba(56,189,248,0.15)' },
+];
 
 export default function LivePage() {
   const supabase = useMemo(() => createClient(), []);
@@ -52,7 +60,7 @@ export default function LivePage() {
       const cat = (cats as Category[]).find(c => c.id === table.category_id);
       if (!cat) return null;
       const tp = (pas as Passation[]).filter(p => p.table_id === table.id);
-      const nowP = tp.find(p => p.live_status === 'In Progress') || tp[0] || null;
+      const nowP = tp.find(p => p.live_status === 'In Progress') || tp.find(p => p.live_status === 'Next') || tp[0] || null;
       const rest = tp.filter(p => p.id !== nowP?.id);
       return { table, category: cat, now: nowP, next: rest[0] || null, prepare: rest[1] || null };
     }).filter(Boolean) as TableDisplay[];
@@ -72,50 +80,58 @@ export default function LivePage() {
     ? displays.filter(d => d.category.id === filterCatId)
     : displays;
 
-  // Group by category
-  const groups = filtered.reduce<{ cat: Category; rows: TableDisplay[] }[]>((acc, d) => {
+  // Group by category (preserve insertion order)
+  const groups = filtered.reduce<{ cat: Category; rows: TableDisplay[]; idx: number }[]>((acc, d) => {
     const g = acc.find(x => x.cat.id === d.category.id);
     if (g) g.rows.push(d);
-    else acc.push({ cat: d.category, rows: [d] });
+    else acc.push({ cat: d.category, rows: [d], idx: acc.length });
     return acc;
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#0b0f1a', color: '#fff' }}>
+    <div className="min-h-screen flex flex-col select-none"
+      style={{ background: '#060a12', color: '#fff', fontFamily: "'Inter', system-ui, sans-serif" }}>
 
-      {/* ── HEADER BAR ── */}
-      <header style={{ background: '#111827', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
-        className="flex items-center justify-between px-6 py-3 sticky top-0 z-40">
+      {/* ── HEADER ── */}
+      <header style={{ background: 'linear-gradient(90deg,#0f172a 0%,#111827 100%)', borderBottom: '2px solid rgba(59,130,246,0.4)' }}
+        className="flex items-center justify-between px-8 py-4 sticky top-0 z-40">
 
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-6">
           <div>
-            <p className="text-xl font-black tracking-tight text-white">
+            <p style={{ fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1 }}>
               MakeX <span style={{ color: '#3b82f6' }}>2026</span>
-              <span className="text-white/40 font-normal text-sm ml-3">Live Board</span>
+            </p>
+            <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: '2px' }}>
+              Lebanon · Live Board
             </p>
           </div>
-          {/* Connection pill */}
-          <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-            style={{ background: connected ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: connected ? '#4ade80' : '#f87171' }}>
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: connected ? '#4ade80' : '#f87171', boxShadow: connected ? '0 0 6px #4ade80' : 'none' }} />
+          {/* Live pill */}
+          <span style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            fontSize: '0.85rem', fontWeight: 800, letterSpacing: '0.08em',
+            padding: '5px 14px', borderRadius: '999px',
+            background: connected ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+            color: connected ? '#4ade80' : '#f87171',
+            border: `1px solid ${connected ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`,
+          }}>
+            <span style={{
+              width: 9, height: 9, borderRadius: '50%',
+              background: connected ? '#4ade80' : '#f87171',
+              boxShadow: connected ? '0 0 8px #4ade80' : 'none',
+              animation: connected ? 'livepulse 1.8s ease-in-out infinite' : 'none',
+            }} />
             {connected ? 'LIVE' : 'Connecting…'}
           </span>
         </div>
 
-        <div className="flex items-center gap-5">
-          {/* Clock */}
-          <div className="text-right">
-            <p className="text-3xl font-black tabular-nums" style={{ color: '#e2e8f0', letterSpacing: '-0.02em' }}>
-              {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
-            <p className="text-xs text-white/30 mt-0.5">
-              {clock.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}
-            </p>
-          </div>
+        <div className="flex items-center gap-8">
           {/* Category filter */}
           <select
-            className="text-sm rounded-xl px-3 py-2 focus:outline-none"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#e2e8f0' }}
+            style={{
+              background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)',
+              color: '#e2e8f0', borderRadius: '10px', padding: '8px 14px', fontSize: '0.9rem',
+              fontWeight: 600, cursor: 'pointer',
+            }}
             value={filterCatId}
             onChange={e => setFilterCatId(e.target.value)}>
             <option value="">All Categories</option>
@@ -125,159 +141,231 @@ export default function LivePage() {
               </option>
             ))}
           </select>
-          <Link href="/" className="text-xs text-white/25 hover:text-white/50 transition">← Home</Link>
+
+          {/* Big clock */}
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ fontSize: '3rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, color: '#f1f5f9', fontVariantNumeric: 'tabular-nums' }}>
+              {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)', textAlign: 'right', marginTop: 2 }}>
+              {clock.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+          </div>
         </div>
       </header>
 
-      {/* ── MAIN CONTENT ── */}
-      <div className="flex-1 p-5 pb-12 space-y-8 overflow-auto">
+      {/* ── MAIN ── */}
+      <div style={{ flex: 1, padding: '20px 24px 80px', overflow: 'auto' }}>
 
         {groups.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-32">
-            <p className="text-4xl font-black text-white/10 mb-3">No Active Tables</p>
-            <p className="text-white/20 text-sm">Waiting for admin to assign passations</p>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+            <p style={{ fontSize: '3rem', fontWeight: 900, color: 'rgba(255,255,255,0.07)', marginBottom: 8 }}>No Active Tables</p>
+            <p style={{ color: 'rgba(255,255,255,0.15)', fontSize: '1.1rem' }}>Waiting for judge activity…</p>
           </div>
         )}
 
-        {groups.map(({ cat, rows }) => (
-          <section key={cat.id}>
-            {/* Category banner */}
-            <div className="flex items-center gap-4 mb-4">
-              <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
-              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <span className="text-xs font-bold uppercase tracking-widest text-white/50">
-                  {cat.name}
-                </span>
-                {cat.age_range_label && (
-                  <span className="text-xs text-white/30">{cat.age_range_label}</span>
-                )}
-              </div>
-              <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
-            </div>
+        {groups.map(({ cat, rows, idx }) => {
+          const accent = CAT_ACCENTS[idx % CAT_ACCENTS.length];
+          return (
+            <section key={cat.id} style={{ marginBottom: 28 }}>
 
-            {/* Table cards */}
-            <div className="grid gap-4"
-              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
-              {rows.map(({ table, now, next, prepare }) => {
-                const hasAny = !!(now || next || prepare);
-                return (
-                  <div key={table.id}
-                    className="rounded-2xl overflow-hidden flex flex-col"
-                    style={{
-                      background: '#141b2d',
-                      border: hasAny ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.04)',
-                      boxShadow: hasAny ? '0 4px 24px rgba(0,0,0,0.5)' : 'none',
+              {/* Category banner */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <div style={{ height: 2, flex: 1, background: `linear-gradient(90deg, transparent, ${accent.pill}40)` }} />
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 20px', borderRadius: '999px',
+                  background: accent.glow,
+                  border: `1px solid ${accent.pill}50`,
+                }}>
+                  <span style={{ fontSize: '1.05rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: accent.pill }}>
+                    {cat.name}
+                  </span>
+                  {cat.age_range_label && (
+                    <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>
+                      {cat.age_range_label}
+                    </span>
+                  )}
+                </div>
+                <div style={{ height: 2, flex: 1, background: `linear-gradient(90deg, ${accent.pill}40, transparent)` }} />
+              </div>
+
+              {/* Table cards grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(auto-fill, minmax(320px, 1fr))`,
+                gap: 14,
+              }}>
+                {rows.map(({ table, now, next, prepare }) => {
+                  const isActive = now?.live_status === 'In Progress';
+                  return (
+                    <div key={table.id} style={{
+                      borderRadius: 16,
+                      overflow: 'hidden',
+                      background: '#0d1220',
+                      border: isActive
+                        ? `2px solid ${accent.pill}70`
+                        : '1px solid rgba(255,255,255,0.08)',
+                      boxShadow: isActive ? `0 0 32px ${accent.pill}25` : '0 2px 12px rgba(0,0,0,0.5)',
+                      display: 'flex', flexDirection: 'column',
                     }}>
 
-                    {/* Table header */}
-                    <div className="flex items-center justify-between px-4 py-3"
-                      style={{ background: '#1e2a3d', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                      <span className="font-black text-lg text-white">
-                        {table.display_label || `Table ${table.table_number}`}
-                      </span>
-                      {now && (
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5"
-                          style={{ background: 'rgba(34,197,94,0.2)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)' }}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-400"
-                            style={{ boxShadow: '0 0 6px #4ade80', animation: 'pulse 2s infinite' }} />
-                          ACTIVE
+                      {/* Table header */}
+                      <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 16px',
+                        background: isActive ? accent.hdr : '#141b2d',
+                        borderBottom: '1px solid rgba(255,255,255,0.08)',
+                      }}>
+                        <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+                          {table.display_label || `Table ${table.table_number}`}
                         </span>
-                      )}
-                    </div>
-
-                    {/* ── NOW ── */}
-                    <div className="px-4 pt-4 pb-4 flex-1"
-                      style={{ background: now ? 'rgba(22,163,74,0.25)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-black uppercase tracking-widest"
-                          style={{ color: now ? '#4ade80' : 'rgba(255,255,255,0.2)' }}>
-                          ▶ NOW
-                        </span>
-                        {now && getTime(now) && (
-                          <span className="text-xs font-mono px-2 py-0.5 rounded-md"
-                            style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(74,222,128,0.8)' }}>
-                            {getTime(now)}
+                        {isActive && (
+                          <span style={{
+                            fontSize: '0.78rem', fontWeight: 800, letterSpacing: '0.1em',
+                            padding: '3px 10px', borderRadius: '999px',
+                            background: 'rgba(34,197,94,0.25)', color: '#4ade80',
+                            border: '1px solid rgba(74,222,128,0.4)',
+                            display: 'flex', alignItems: 'center', gap: 5,
+                          }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px #4ade80', display: 'inline-block' }} />
+                            ON AIR
                           </span>
                         )}
                       </div>
-                      {now ? (
-                        <p className="font-black text-white leading-tight"
-                          style={{ fontSize: 'clamp(1.1rem, 2.5vw, 1.5rem)' }}>
-                          {getName(now)}
-                        </p>
-                      ) : (
-                        <p className="font-semibold" style={{ color: 'rgba(255,255,255,0.1)', fontSize: '1rem' }}>
-                          — Waiting —
-                        </p>
-                      )}
-                    </div>
 
-                    {/* ── NEXT ── */}
-                    <div className="px-4 py-3"
-                      style={{ background: next ? 'rgba(37,99,235,0.25)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-black uppercase tracking-widest"
-                          style={{ color: next ? '#60a5fa' : 'rgba(255,255,255,0.15)' }}>
-                          ⏭ NEXT
-                        </span>
-                        {next && getTime(next) && (
-                          <span className="text-xs font-mono px-2 py-0.5 rounded-md"
-                            style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(96,165,250,0.7)' }}>
-                            {getTime(next)}
+                      {/* NOW */}
+                      <div style={{
+                        padding: '14px 16px',
+                        background: now ? (isActive ? 'rgba(22,163,74,0.18)' : 'rgba(59,130,246,0.12)') : 'transparent',
+                        borderBottom: '1px solid rgba(255,255,255,0.06)',
+                        flex: '0 0 auto',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <span style={{
+                            fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+                            color: isActive ? '#4ade80' : (now ? '#60a5fa' : 'rgba(255,255,255,0.18)'),
+                          }}>
+                            {isActive ? '▶ NOW RUNNING' : (now ? '▶ CURRENT' : '▶ NOW')}
                           </span>
+                          {now && getTime(now) && (
+                            <span style={{ fontSize: '0.82rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)', padding: '2px 8px', background: 'rgba(0,0,0,0.3)', borderRadius: 6 }}>
+                              {getTime(now)}
+                            </span>
+                          )}
+                        </div>
+                        {now ? (
+                          <p style={{ fontSize: '1.6rem', fontWeight: 900, color: '#fff', lineHeight: 1.15, letterSpacing: '-0.02em', wordBreak: 'break-word' }}>
+                            {getName(now)}
+                          </p>
+                        ) : (
+                          <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.12)', fontStyle: 'italic' }}>— Waiting —</p>
+                        )}
+                        {now?.club_name && (
+                          <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.4)', marginTop: 3, fontWeight: 500 }}>
+                            {now.club_name}
+                          </p>
                         )}
                       </div>
-                      {next ? (
-                        <p className="font-bold text-white text-base leading-tight">{getName(next)}</p>
-                      ) : (
-                        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.1)' }}>—</p>
-                      )}
-                    </div>
 
-                    {/* ── PREPARE ── */}
-                    <div className="px-4 py-3"
-                      style={{ background: prepare ? 'rgba(180,83,9,0.2)' : 'transparent' }}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-black uppercase tracking-widest"
-                          style={{ color: prepare ? '#fbbf24' : 'rgba(255,255,255,0.12)' }}>
-                          ⚑ PREPARE
-                        </span>
-                        {prepare && getTime(prepare) && (
-                          <span className="text-xs font-mono px-2 py-0.5 rounded-md"
-                            style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(251,191,36,0.7)' }}>
-                            {getTime(prepare)}
+                      {/* NEXT */}
+                      <div style={{
+                        padding: '10px 16px',
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        background: next ? 'rgba(37,99,235,0.1)' : 'transparent',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: next ? '#60a5fa' : 'rgba(255,255,255,0.15)' }}>
+                            ⏭ NEXT
                           </span>
+                          {next && getTime(next) && (
+                            <span style={{ fontSize: '0.78rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', padding: '1px 7px', background: 'rgba(0,0,0,0.25)', borderRadius: 5 }}>
+                              {getTime(next)}
+                            </span>
+                          )}
+                        </div>
+                        {next ? (
+                          <>
+                            <p style={{ fontSize: '1.25rem', fontWeight: 800, color: '#e2e8f0', lineHeight: 1.2, letterSpacing: '-0.01em', wordBreak: 'break-word' }}>
+                              {getName(next)}
+                            </p>
+                            {next.club_name && (
+                              <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+                                {next.club_name}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.1)', fontStyle: 'italic' }}>—</p>
                         )}
                       </div>
-                      {prepare ? (
-                        <p className="font-semibold text-sm leading-tight" style={{ color: 'rgba(255,255,255,0.85)' }}>
-                          {getName(prepare)}
-                        </p>
-                      ) : (
-                        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.1)' }}>—</p>
-                      )}
-                    </div>
 
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+                      {/* PREPARE */}
+                      <div style={{
+                        padding: '9px 16px',
+                        background: prepare ? 'rgba(180,83,9,0.1)' : 'transparent',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: prepare ? '#fbbf24' : 'rgba(255,255,255,0.12)' }}>
+                            ⚑ PREPARE
+                          </span>
+                          {prepare && getTime(prepare) && (
+                            <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', padding: '1px 7px', background: 'rgba(0,0,0,0.2)', borderRadius: 5 }}>
+                              {getTime(prepare)}
+                            </span>
+                          )}
+                        </div>
+                        {prepare ? (
+                          <>
+                            <p style={{ fontSize: '1.05rem', fontWeight: 700, color: 'rgba(255,255,255,0.75)', lineHeight: 1.2, wordBreak: 'break-word' }}>
+                              {getName(prepare)}
+                            </p>
+                            {prepare.club_name && (
+                              <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.28)', marginTop: 2 }}>
+                                {prepare.club_name}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.1)', fontStyle: 'italic' }}>—</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
       </div>
 
-      {/* ── STATUS FOOTER ── */}
-      <div className="fixed bottom-0 left-0 right-0 py-2 px-6 flex items-center justify-between"
-        style={{ background: 'rgba(11,15,26,0.95)', borderTop: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)' }}>
-        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>
+      {/* ── FOOTER ── */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        padding: '8px 28px',
+        background: 'rgba(6,10,18,0.96)',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        backdropFilter: 'blur(12px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.2)', fontWeight: 600, letterSpacing: '0.05em' }}>
           MakeX 2026 · Lebanon National Competition
         </p>
-        <p className="text-xs tabular-nums" style={{ color: 'rgba(255,255,255,0.15)' }}>
+        <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.15)', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
           {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </p>
       </div>
 
+      <style>{`
+        @keyframes livepulse {
+          0%, 100% { opacity: 1; box-shadow: 0 0 8px #4ade80; }
+          50% { opacity: 0.5; box-shadow: 0 0 3px #4ade80; }
+        }
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+      `}</style>
     </div>
   );
 }
