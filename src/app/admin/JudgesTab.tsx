@@ -42,10 +42,12 @@ export default function JudgesTab() {
     return m;
   }, [assignments]);
 
-  // tables that have at least one judge already
-  const tableJudgeCount = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const a of assignments) m.set(a.table_id, (m.get(a.table_id) ?? 0) + 1);
+  // table_id → judge_id that owns it (first assignment wins)
+  const tableOwner = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of assignments) {
+      if (!m.has(a.table_id)) m.set(a.table_id, a.judge_id);
+    }
     return m;
   }, [assignments]);
 
@@ -113,21 +115,24 @@ export default function JudgesTab() {
                     <div className="flex flex-wrap gap-1.5">
                       {catTables.map(t => {
                         const mine = my.has(t.id);
-                        const otherJudges = (tableJudgeCount.get(t.id) ?? 0) - (mine ? 1 : 0);
+                        const ownerId = tableOwner.get(t.id);
+                        const takenByOther = !!ownerId && !mine;
+                        const ownerName = takenByOther ? judges.find(jj => jj.id === ownerId)?.name : null;
                         const busy = busyKey === j.id + '|' + t.id;
                         return (
                           <button key={t.id}
-                            onClick={() => toggle(j.id, t.id, mine)}
-                            disabled={busy}
-                            title={otherJudges > 0 ? `Also assigned to ${otherJudges} other judge${otherJudges === 1 ? '' : 's'}` : ''}
-                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition disabled:opacity-50 ${
+                            onClick={() => !takenByOther && toggle(j.id, t.id, mine)}
+                            disabled={busy || takenByOther}
+                            title={takenByOther ? `Already assigned to ${ownerName || 'another judge'}` : ''}
+                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition ${
                               mine
                                 ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-500'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                : takenByOther
+                                  ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-60'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
                             }`}
                           >
-                            {mine ? '✓ ' : ''}{t.display_label || `Table ${t.table_number}`}
-                            {otherJudges > 0 && <span className="ml-1 text-[10px] opacity-70">·{otherJudges}</span>}
+                            {mine ? '✓ ' : takenByOther ? '🔒 ' : ''}{t.display_label || `Table ${t.table_number}`}
                           </button>
                         );
                       })}
