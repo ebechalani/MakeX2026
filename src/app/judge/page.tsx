@@ -23,7 +23,7 @@ const STATUS_COLORS: Record<string, string> = {
   Delayed: 'bg-orange-100 text-orange-600',
 };
 
-type JudgeSession = { id: string; name: string; username: string; table_ids: string[] };
+type JudgeSession = { id: string; name: string; username: string; table_ids: string[]; isDemo?: boolean };
 const JUDGE_SESSION_KEY = 'judge_session';
 
 export default function JudgePage() {
@@ -59,6 +59,20 @@ function JudgeLogin({ onLogin }: { onLogin: (s: JudgeSession) => void }) {
       return;
     }
     setBusy(true); setErr('');
+
+    // ── Demo / test account — no DB writes ever ──────────────────────────────
+    if (u.trim().toLowerCase() === 'swtest' && p === 'sw2026') {
+      const { data: swCats } = await supabase.from('categories').select('id').ilike('name', '%sportswonderland%');
+      const catId = swCats?.[0]?.id ?? '';
+      const { data: swTabs } = catId
+        ? await supabase.from('tables').select('id').eq('category_id', catId).eq('active', true)
+        : { data: [] };
+      setBusy(false);
+      onLogin({ id: 'demo', name: 'Demo Judge', username: 'swtest', table_ids: (swTabs ?? []).map((t: { id: string }) => t.id), isDemo: true });
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     const { data, error } = await supabase.rpc('verify_judge_login', {
       p_username: u.trim().toLowerCase(),
       p_password: p,
@@ -114,6 +128,7 @@ function JudgeLogin({ onLogin }: { onLogin: (s: JudgeSession) => void }) {
 // ── Workspace (the original judge UI) ─────────────────────────────────────
 function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout: () => void }) {
   const supabase = useMemo(() => createClient(), []);
+  const isDemo = !!session.isDemo;
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [selectedCatId, setSelectedCatId] = useState('');
@@ -268,6 +283,7 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
   }
 
   async function markInProgress(p: Passation) {
+    if (isDemo) { loadQueue(); return; }
     await supabase.from('passations').update({ live_status: 'In Progress' as LiveStatus, updated_at: new Date().toISOString() }).eq('id', p.id);
     loadQueue();
   }
@@ -276,6 +292,15 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
     if (!current) return;
     const sig = getSignatureDataUrl();
     if (!sig) { setSigError('A team signature is required before finishing.'); return; }
+    // Demo mode: simulate finish without writing to DB
+    if (isDemo) {
+      setScore(''); setTimeVal(''); setNotes('');
+      setVals({}); setCounts({});
+      if (sigRef.current) sigRef.current.clear();
+      setLoading(false);
+      loadQueue();
+      return;
+    }
     setSigError('');
     setLoading(true);
     // Use the structured scoresheet's computed total when available; otherwise fall back to manual score
@@ -306,6 +331,7 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
 
   async function handleAbsent() {
     if (!current) return;
+    if (isDemo) { setScore(''); setTimeVal(''); setNotes(''); if (sigRef.current) sigRef.current.clear(); loadQueue(); return; }
     setLoading(true);
     await supabase.from('passations').update({
       live_status: 'Absent' as LiveStatus,
@@ -324,6 +350,7 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
 
   async function handleDelay() {
     if (!current) return;
+    if (isDemo) { setScore(''); setTimeVal(''); setNotes(''); setVals({}); setCounts({}); setRunning(false); if (sigRef.current) sigRef.current.clear(); loadQueue(); return; }
     // Already used their one allowed delay? → automatically void this run
     if ((current.delay_count ?? 0) >= 1) {
       if (!confirm(`${current.team_name} has already been delayed once. Confirm to VOID this run (score = 0).`)) return;
@@ -390,6 +417,11 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
   if (!setup) {
     return (
       <div className="min-h-screen bg-[#0a0f1e] flex flex-col items-center justify-center p-6">
+        {isDemo && (
+          <div className="w-full max-w-md mb-4 bg-amber-400 text-amber-900 rounded-xl px-4 py-2.5 text-sm font-bold text-center">
+            🧪 DEMO MODE — no changes will be saved to the database
+          </div>
+        )}
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <div className="inline-flex p-4 bg-emerald-900/40 border border-emerald-700/50 rounded-2xl mb-4">
@@ -461,6 +493,12 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
   // ── Judge active screen ──
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Demo mode banner */}
+      {isDemo && (
+        <div className="sticky top-0 z-50 bg-amber-400 text-amber-900 text-center py-2 px-4 font-bold text-sm flex items-center justify-center gap-2">
+          🧪 DEMO MODE — You are viewing live data but <span className="underline">nothing you do will be saved</span>
+        </div>
+      )}
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 py-3.5 flex items-center justify-between">
