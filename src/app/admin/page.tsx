@@ -6,6 +6,7 @@ import SoccerBracket from './SoccerBracket';
 import JudgesTab from './JudgesTab';
 import ResultsTab from './ResultsTab';
 import RulesTab from './RulesTab';
+import CertificatesTab from './CertificatesTab';
 import Link from 'next/link';
 
 // Admin password is verified server-side via /api/admin-login. Never hardcoded here.
@@ -152,7 +153,7 @@ function AdminDashboard() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [passations, setPassations] = useState<Passation[]>([]);
-  const [activeTab, setActiveTab] = useState<'passations' | 'categories' | 'academies' | 'schedule' | 'soccer' | 'judges' | 'results' | 'approvals' | 'rules'>('passations');
+  const [activeTab, setActiveTab] = useState<'passations' | 'categories' | 'academies' | 'schedule' | 'soccer' | 'judges' | 'results' | 'approvals' | 'rules' | 'certificates'>('passations');
   const [expandedAcademy, setExpandedAcademy] = useState<Set<string>>(new Set());
   const [academySearch, setAcademySearch] = useState('');
   const [scheduleRound, setScheduleRound] = useState<1 | 2>(1);
@@ -579,7 +580,7 @@ function AdminDashboard() {
 
         {/* Tabs */}
         <div className="flex gap-1.5 mb-6 bg-white border border-slate-200 rounded-xl p-1 w-fit shadow-sm">
-          {(['passations', 'categories', 'academies', 'schedule', 'soccer', 'judges', 'results', 'approvals', 'rules'] as const).map(tab => (
+          {(['passations', 'categories', 'academies', 'schedule', 'soccer', 'judges', 'results', 'approvals', 'rules', 'certificates'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-5 py-2 rounded-lg font-semibold text-sm capitalize transition ${
                 activeTab === tab ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
@@ -1553,6 +1554,9 @@ function AdminDashboard() {
 
         {/* ── RULES TAB ── */}
         {activeTab === 'rules' && <RulesTab />}
+
+        {/* ── CERTIFICATES TAB ── */}
+        {activeTab === 'certificates' && <CertificatesTab />}
 
         {/* ── APPROVALS TAB ── */}
         {activeTab === 'approvals' && (

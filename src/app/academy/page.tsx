@@ -7,6 +7,7 @@ import PracticeScoresheet from './PracticeScoresheet';
 import RulesTab from './RulesTab';
 import QuizTab from './QuizTab';
 import TeamsTab from './TeamsTab';
+import CertificatesTab from './CertificatesTab';
 
 const SESSION_KEY = 'academy_session';
 
@@ -107,7 +108,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [pending, setPending] = useState<PendingChange[]>([]);
-  const [tab, setTab] = useState<'students' | 'teams' | 'rules' | 'quiz' | 'practice'>('students');
+  const [tab, setTab] = useState<'students' | 'teams' | 'rules' | 'quiz' | 'practice' | 'certificates'>('students');
   const [showForm, setShowForm] = useState(false);
   const [editingPas, setEditingPas] = useState<Passation | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -351,9 +352,19 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           >
             🎯 Practice Scoresheet
           </button>
+          <button
+            onClick={() => setTab('certificates')}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              tab === 'certificates' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            🎓 Certificates
+          </button>
         </div>
 
-        {tab === 'practice' ? (
+        {tab === 'certificates' ? (
+          <CertificatesTab academyName={session.name} passations={passations} categories={categories} />
+        ) : tab === 'practice' ? (
           <PracticeScoresheet />
         ) : tab === 'rules' ? (
           <RulesTab academyId={session.id} academyName={session.name} passations={passations} categories={categories} />
