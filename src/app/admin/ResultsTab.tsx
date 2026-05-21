@@ -73,6 +73,7 @@ type RankedStudent = {
   key: string;
   teamName: string;
   clubName: string;
+  tableLabel: string;
   type: 'School' | 'Club';
   r1: RoundResult;
   r2: RoundResult;
@@ -85,7 +86,13 @@ type CategoryRankings = {
   clubs: RankedStudent[];
 };
 
-function buildRankings(r1rows: Passation[], r2rows: Passation[]): CategoryRankings {
+function buildRankings(r1rows: Passation[], r2rows: Passation[], tables: Table[]): CategoryRankings {
+  const getTableLabel = (tableId: string | null | undefined) => {
+    if (!tableId) return '—';
+    const t = tables.find(t => t.id === tableId);
+    return t ? (t.display_label || `Table ${t.table_number}`) : '—';
+  };
+
   // Deduplicate by (team_name, club_name) — keep R1 and R2 per student
   const r1map = new Map<string, Passation>();
   const r2map = new Map<string, Passation>();
@@ -108,6 +115,7 @@ function buildRankings(r1rows: Passation[], r2rows: Passation[]): CategoryRankin
       key: k,
       teamName: ref.team_name,
       clubName: ref.club_name || '',
+      tableLabel: getTableLabel(r1p?.table_id || r2p?.table_id),
       type: orgType(ref.club_name),
       r1: r1res,
       r2: r2res,
@@ -168,10 +176,10 @@ export default function ResultsTab() {
     for (const cat of categories) {
       const r1 = passations.filter(p => p.category_id === cat.id && (p.round_number ?? 1) === 1);
       const r2 = passations.filter(p => p.category_id === cat.id && p.round_number === 2);
-      map.set(cat.id, buildRankings(r1, r2));
+      map.set(cat.id, buildRankings(r1, r2, tables));
     }
     return map;
-  }, [passations, categories]);
+  }, [passations, categories, tables]);
 
   // ── Filtered raw view ─────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -244,14 +252,16 @@ export default function ResultsTab() {
     XLSX.utils.book_append_sheet(wb2, summaryWs, 'Summary');
 
     // ── Ranking sheets per category (schools + clubs separately) ─────────
+    // Columns: A=Rank B=Student C=Club D=Table E=R1pts F=R1time G=R1status
+    //          H=R2pts I=R2time J=R2status K=BestPts L=BestTime
     const rankHeader = [
-      'Rank', 'Student', 'Club / Academy',
+      'Rank', 'Student', 'Club / Academy', 'Table',
       'R1 Points', 'R1 Time (s)', 'R1 Status',
       'R2 Points', 'R2 Time (s)', 'R2 Status',
       'Best Points', 'Best Time (s)',
     ];
     const rankCols = [
-      { wch: 6 }, { wch: 28 }, { wch: 28 },
+      { wch: 6 }, { wch: 28 }, { wch: 28 }, { wch: 10 },
       { wch: 10 }, { wch: 11 }, { wch: 12 },
       { wch: 10 }, { wch: 11 }, { wch: 12 },
       { wch: 11 }, { wch: 12 },
@@ -264,7 +274,7 @@ export default function ResultsTab() {
       const data: (string | number | null)[][] = [rankHeader];
       for (const s of rows) {
         data.push([
-          s.rank, s.teamName, s.clubName,
+          s.rank, s.teamName, s.clubName, s.tableLabel,
           s.r1.score ?? '—', s.r1.time ?? '—', s.r1.status,
           s.r2.score ?? '—', s.r2.time ?? '—', s.r2.status,
           s.best.score ?? '—', s.best.time ?? '—',
@@ -274,58 +284,58 @@ export default function ResultsTab() {
       ws['!cols'] = rankCols;
 
       // ── Inject Excel formulas so manual edits to R1/R2 recalculate automatically ──
-      // Columns: A=Rank B=Student C=Club D=R1pts E=R1time F=R1status
-      //          G=R2pts H=R2time I=R2status J=BestPts K=BestTime
+      // Columns: A=Rank B=Student C=Club D=Table E=R1pts F=R1time G=R1status
+      //          H=R2pts I=R2time J=R2status K=BestPts L=BestTime
       for (let excelRow = 2; excelRow <= lastRow; excelRow++) {
         const ri = excelRow - 1; // 0-based row index for SheetJS encode_cell
         const r  = excelRow;     // 1-based Excel row number used inside formula strings
 
-        // Best Points (col J, c=9):
+        // Best Points (col K, c=10):
         // Pick the score from whichever round wins (higher pts → winner; tie → lower time)
         const bpf =
-          `IF(ISNUMBER(D${r}),` +
-            `IF(ISNUMBER(G${r}),` +
-              `IF(D${r}>G${r},D${r},` +
-              `IF(G${r}>D${r},G${r},` +
-              `IF(ISNUMBER(E${r}),` +
-                `IF(ISNUMBER(H${r}),IF(E${r}<=H${r},D${r},G${r}),D${r}),` +
-                `IF(ISNUMBER(H${r}),G${r},D${r})))),` +
-            `D${r}),` +
-          `IF(ISNUMBER(G${r}),G${r},""))`;
-
-        // Best Time (col K, c=10):
-        // Pick the time from the SAME winning round as Best Points
-        const btf =
-          `IF(ISNUMBER(D${r}),` +
-            `IF(ISNUMBER(G${r}),` +
-              `IF(D${r}>G${r},E${r},` +
-              `IF(G${r}>D${r},H${r},` +
-              `IF(ISNUMBER(E${r}),` +
-                `IF(ISNUMBER(H${r}),IF(E${r}<=H${r},E${r},H${r}),E${r}),` +
-                `IF(ISNUMBER(H${r}),H${r},"")))),` +
+          `IF(ISNUMBER(E${r}),` +
+            `IF(ISNUMBER(H${r}),` +
+              `IF(E${r}>H${r},E${r},` +
+              `IF(H${r}>E${r},H${r},` +
+              `IF(ISNUMBER(F${r}),` +
+                `IF(ISNUMBER(I${r}),IF(F${r}<=I${r},E${r},H${r}),E${r}),` +
+                `IF(ISNUMBER(I${r}),H${r},E${r})))),` +
             `E${r}),` +
           `IF(ISNUMBER(H${r}),H${r},""))`;
+
+        // Best Time (col L, c=11):
+        // Pick the time from the SAME winning round as Best Points
+        const btf =
+          `IF(ISNUMBER(E${r}),` +
+            `IF(ISNUMBER(H${r}),` +
+              `IF(E${r}>H${r},F${r},` +
+              `IF(H${r}>E${r},I${r},` +
+              `IF(ISNUMBER(F${r}),` +
+                `IF(ISNUMBER(I${r}),IF(F${r}<=I${r},F${r},I${r}),F${r}),` +
+                `IF(ISNUMBER(I${r}),I${r},""))))),` +
+            `F${r}),` +
+          `IF(ISNUMBER(I${r}),I${r},""))`;
 
         // Rank (col A, c=0):
         // Count students ranked above: higher best-pts, or same pts + lower best-time
         const rf =
-          `IF(ISNUMBER(J${r}),` +
+          `IF(ISNUMBER(K${r}),` +
             `SUMPRODUCT(` +
-              `(ISNUMBER($J$2:$J$${lastRow})*($J$2:$J$${lastRow}>J${r}))+` +
-              `(ISNUMBER($J$2:$J$${lastRow})*($J$2:$J$${lastRow}=J${r})*` +
-               `ISNUMBER(K${r})*ISNUMBER($K$2:$K$${lastRow})*($K$2:$K$${lastRow}<K${r}))` +
+              `(ISNUMBER($K$2:$K$${lastRow})*($K$2:$K$${lastRow}>K${r}))+` +
+              `(ISNUMBER($K$2:$K$${lastRow})*($K$2:$K$${lastRow}=K${r})*` +
+               `ISNUMBER(L${r})*ISNUMBER($L$2:$L$${lastRow})*($L$2:$L$${lastRow}<L${r}))` +
             `)+1,"")`;
 
-        // Write formula cells (preserve static cached value for v so the file
-        // shows data even before Excel recalculates)
+        // Write formula cells (preserve static cached value so file shows data
+        // even before Excel recalculates)
         const setF = (c: number, f: string, v: number | string) => {
           const addr = XLSX.utils.encode_cell({ r: ri, c });
           ws[addr] = typeof v === 'number' ? { t: 'n', v, f } : { t: 's', v, f };
         };
 
         const s = rows[excelRow - 2];
-        setF(9,  bpf, s.best.score ?? '');
-        setF(10, btf, s.best.time  ?? '');
+        setF(10, bpf, s.best.score ?? '');
+        setF(11, btf, s.best.time  ?? '');
         setF(0,  rf,  s.rank);
       }
 
@@ -629,6 +639,7 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle }: {
               <th className="text-center px-3 py-2 text-xs font-bold text-slate-500 uppercase w-12">Rank</th>
               <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 uppercase">Student</th>
               <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 uppercase">Academy / Club</th>
+              <th className="text-left px-2 py-2 text-xs font-bold text-slate-400 uppercase">Table</th>
               <th className="text-right px-3 py-2 text-xs font-bold text-slate-500 uppercase">R1 pts</th>
               <th className="text-right px-3 py-2 text-xs font-bold text-slate-400 uppercase">R1 time</th>
               <th className="text-right px-3 py-2 text-xs font-bold text-slate-500 uppercase">R2 pts</th>
@@ -648,6 +659,7 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle }: {
                   </td>
                   <td className="px-3 py-2.5 font-semibold text-slate-800">{s.teamName}</td>
                   <td className="px-3 py-2.5 text-xs text-slate-600">{s.clubName || '—'}</td>
+                  <td className="px-2 py-2.5 text-xs text-slate-500 whitespace-nowrap">{s.tableLabel}</td>
                   <RoundCell res={s.r1} highlight={s.r1 === s.best} />
                   <TimeCell  res={s.r1} highlight={s.r1 === s.best} />
                   <RoundCell res={s.r2} highlight={s.r2 === s.best} />
