@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useMemo, Fragment } from 'react';
+import * as XLSX from 'xlsx';
 import { createClient } from '@/lib/supabase/client';
 import type { Category, Table, Passation, LiveStatus, PendingChange, Academy, RulesAcceptance, QuestionnaireResponse } from '@/lib/types';
 import SoccerBracket from './SoccerBracket';
@@ -263,6 +264,137 @@ function AdminDashboard() {
       for (const p of list) rows.push(passToRow(p));
     }
     downloadCsv('MakeX_All_Categories_Report.csv', rows);
+  }
+
+  // ── Per-table Excel schedule (one sheet per table, both rounds) ─────────────
+  function downloadPerTableSchedule() {
+    const wb = XLSX.utils.book_new();
+    const used = new Set<string>();
+    const fmtTime = (s: string | null) => s ? new Date(s).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+    const uniqueName = (raw: string) => {
+      let name = raw.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31).trim();
+      let n = 2;
+      while (used.has(name)) { name = (raw.slice(0, 28) + '_' + n).slice(0, 31); n++; }
+      used.add(name);
+      return name;
+    };
+
+    // ── Overview sheet ────────────────────────────────────────────────────
+    const overview: (string | number)[][] = [
+      ['Category', 'Table', 'Round', 'Slots', 'First', 'Last'],
+    ];
+    // Per-table sheets
+    const sortedTables = tables.slice().filter(t => t.active).sort((a, b) => {
+      const ca = categories.find(c => c.id === a.category_id)?.name || '';
+      const cb = categories.find(c => c.id === b.category_id)?.name || '';
+      if (ca !== cb) return ca.localeCompare(cb);
+      return a.table_number - b.table_number;
+    });
+
+    for (const t of sortedTables) {
+      const cat = categories.find(c => c.id === t.category_id);
+      const tblLabel = t.display_label || `Table ${t.table_number}`;
+
+      // Get R1 and R2 slots for this table
+      const r1 = passations.filter(p => p.table_id === t.id && (p.round_number ?? 1) === 1)
+        .sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || '') || a.queue_position - b.queue_position);
+      const r2 = passations.filter(p => p.table_id === t.id && p.round_number === 2)
+        .sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || '') || a.queue_position - b.queue_position);
+
+      if (r1.length === 0 && r2.length === 0) continue;
+
+      // Build sheet rows
+      const rows: (string | number)[][] = [
+        [`${cat?.name || ''}${cat?.age_range_label ? ' (' + cat.age_range_label + ')' : ''} — ${tblLabel}`],
+        [],
+        ['─── ROUND 1 ───'],
+        ['#', 'Time', 'Student', 'Student Names', 'Academy / Club', 'Coach', 'DOB', 'Age', 'Queue', 'Status'],
+      ];
+
+      const ageOf = (dob: string | null) => {
+        if (!dob) return '';
+        const d = new Date(dob); const n = new Date();
+        let a = n.getFullYear() - d.getFullYear();
+        const m = n.getMonth() - d.getMonth();
+        if (m < 0 || (m === 0 && n.getDate() < d.getDate())) a--;
+        return String(a);
+      };
+
+      r1.forEach((p, i) => {
+        rows.push([
+          i + 1,
+          fmtTime(p.scheduled_time),
+          p.team_name || '',
+          p.student_names || '',
+          p.club_name || '',
+          p.coach_name || '',
+          p.date_of_birth || '',
+          ageOf(p.date_of_birth),
+          `#${p.queue_position}`,
+          p.live_status || '',
+        ]);
+      });
+
+      rows.push([]);
+      rows.push(['─── ROUND 2 ───']);
+      rows.push(['#', 'Time', 'Student', 'Student Names', 'Academy / Club', 'Coach', 'DOB', 'Age', 'Queue', 'Status']);
+      r2.forEach((p, i) => {
+        rows.push([
+          i + 1,
+          fmtTime(p.scheduled_time),
+          p.team_name || '',
+          p.student_names || '',
+          p.club_name || '',
+          p.coach_name || '',
+          p.date_of_birth || '',
+          ageOf(p.date_of_birth),
+          `#${p.queue_position}`,
+          p.live_status || '',
+        ]);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [
+        { wch: 4 }, { wch: 8 }, { wch: 26 }, { wch: 28 }, { wch: 22 },
+        { wch: 22 }, { wch: 12 }, { wch: 6 }, { wch: 7 }, { wch: 14 },
+      ];
+
+      // Overview row
+      const catShort = (cat?.name || '').replace(/Sportswonderland/i, 'SW').replace(/Capelli/i, 'Cap').replace(/MakeX/i, 'MX');
+      overview.push([
+        catShort + (cat?.age_range_label ? ` (${cat.age_range_label})` : ''),
+        tblLabel, 1, r1.length,
+        fmtTime(r1[0]?.scheduled_time || null),
+        fmtTime(r1[r1.length - 1]?.scheduled_time || null),
+      ]);
+      if (r2.length > 0) {
+        overview.push([
+          catShort + (cat?.age_range_label ? ` (${cat.age_range_label})` : ''),
+          tblLabel, 2, r2.length,
+          fmtTime(r2[0]?.scheduled_time || null),
+          fmtTime(r2[r2.length - 1]?.scheduled_time || null),
+        ]);
+      }
+
+      const sheetName = uniqueName(`${catShort.slice(0, 6)} ${tblLabel}`.slice(0, 31));
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+
+    // Prepend overview as first sheet
+    const ovWs = XLSX.utils.aoa_to_sheet(overview);
+    ovWs['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 7 }, { wch: 7 }, { wch: 8 }, { wch: 8 }];
+    // Insert overview at position 0
+    XLSX.utils.book_append_sheet(wb, ovWs, uniqueName('Overview'));
+    // Reorder so Overview comes first
+    const sheetNames = wb.SheetNames;
+    const ovIdx = sheetNames.indexOf('Overview');
+    if (ovIdx > 0) {
+      sheetNames.splice(ovIdx, 1);
+      sheetNames.unshift('Overview');
+    }
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `MakeX_PerTable_Schedule_${stamp}.xlsx`);
   }
 
   const load = useCallback(async () => {
@@ -1465,9 +1597,13 @@ function AdminDashboard() {
                       </button>
                     ))}
                   </div>
+                  <button onClick={downloadPerTableSchedule}
+                    className="text-sm bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-xl">
+                    ⬇ Per-Table Schedule (Excel)
+                  </button>
                   <button onClick={downloadAllReport}
                     className="text-sm bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-xl">
-                    ⬇ Download All Schedule (CSV)
+                    ⬇ All Schedule (CSV)
                   </button>
                 </div>
               </div>

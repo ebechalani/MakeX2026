@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useMemo, Fragment } from 'react';
+import * as XLSX from 'xlsx';
 import { createClient } from '@/lib/supabase/client';
 import type { Academy, Category, Table, Passation, PendingChange } from '@/lib/types';
 import Link from 'next/link';
@@ -265,6 +266,109 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
     if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) a--;
     return a;
   };
+  // ── Download my students' schedule ──────────────────────────────────────────
+  function fmtTimeOnly(s: string | null) {
+    return s ? new Date(s).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+  }
+  function fmtDateOnly(s: string | null) {
+    return s ? new Date(s).toLocaleDateString() : '';
+  }
+  function downloadMySchedule() {
+    if (passations.length === 0) { alert('No students to export yet.'); return; }
+    const wb = XLSX.utils.book_new();
+
+    // Sort by category, then by R1 time, then by table
+    const sorted = passations.slice().sort((a, b) => {
+      const ca = categories.find(c => c.id === a.category_id)?.name || '';
+      const cb = categories.find(c => c.id === b.category_id)?.name || '';
+      if (ca !== cb) return ca.localeCompare(cb);
+      const at = a.scheduled_time || '';
+      const bt = b.scheduled_time || '';
+      if (at !== bt) return at.localeCompare(bt);
+      return a.queue_position - b.queue_position;
+    });
+
+    const headers = ['#', 'Category', 'Student / Team', 'Student Names', 'DOB', 'Age', 'Coach', 'Table', 'Queue', 'R1 Time', 'R2 Time', 'Date'];
+    const rows: (string | number)[][] = [headers];
+
+    sorted.forEach((p, i) => {
+      const cat = categories.find(c => c.id === p.category_id);
+      const tbl = tables.find(t => t.id === p.table_id);
+      const r2 = round2TimeFor(p);
+      const catName = cat ? `${cat.name}${cat.age_range_label ? ` (${cat.age_range_label})` : ''}` : '';
+      const tblName = tbl ? (tbl.display_label || `Table ${tbl.table_number}`) : '';
+      const age = calcAge(p.date_of_birth);
+      rows.push([
+        i + 1,
+        catName,
+        p.team_name || '',
+        p.student_names || '',
+        fmtDateOnly(p.date_of_birth),
+        age != null ? `${age} yrs` : '',
+        p.coach_name || '',
+        tblName,
+        `#${p.queue_position}`,
+        fmtTimeOnly(p.scheduled_time),
+        fmtTimeOnly(r2),
+        p.scheduled_time ? new Date(p.scheduled_time).toLocaleDateString() : '',
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 4 }, { wch: 26 }, { wch: 26 }, { wch: 28 },
+      { wch: 12 }, { wch: 7 }, { wch: 22 }, { wch: 12 },
+      { wch: 7 }, { wch: 10 }, { wch: 10 }, { wch: 12 },
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, 'My Schedule');
+
+    // Per-table breakdown sheets
+    const byTable = new Map<string, Passation[]>();
+    for (const p of passations) {
+      if (!p.table_id) continue;
+      if (!byTable.has(p.table_id)) byTable.set(p.table_id, []);
+      byTable.get(p.table_id)!.push(p);
+    }
+    const usedNames = new Set(['My Schedule']);
+    const sortedTables = Array.from(byTable.entries()).sort(([a], [b]) => {
+      const ta = tables.find(t => t.id === a);
+      const tb = tables.find(t => t.id === b);
+      return (ta?.table_number ?? 0) - (tb?.table_number ?? 0);
+    });
+
+    for (const [tableId, list] of sortedTables) {
+      const tbl = tables.find(t => t.id === tableId);
+      const cat = categories.find(c => c.id === list[0].category_id);
+      if (!tbl) continue;
+      const sheetRows: (string | number)[][] = [
+        [`${cat?.name || ''} — ${tbl.display_label || `Table ${tbl.table_number}`}`],
+        [],
+        ['#', 'Student', 'Coach', 'R1 Time', 'R2 Time', 'Status'],
+      ];
+      list.slice().sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || ''))
+        .forEach((p, i) => {
+          sheetRows.push([
+            i + 1,
+            p.team_name || '',
+            p.coach_name || '',
+            fmtTimeOnly(p.scheduled_time),
+            fmtTimeOnly(round2TimeFor(p)),
+            p.live_status || '',
+          ]);
+        });
+      const ws2 = XLSX.utils.aoa_to_sheet(sheetRows);
+      ws2['!cols'] = [{ wch: 4 }, { wch: 26 }, { wch: 22 }, { wch: 10 }, { wch: 10 }, { wch: 14 }];
+      let name = (tbl.display_label || `T${tbl.table_number}`).replace(/[\\/?*[\]:]/g, ' ').slice(0, 31).trim();
+      let n = 2;
+      while (usedNames.has(name)) { name = (name.slice(0, 28) + '_' + n).slice(0, 31); n++; }
+      usedNames.add(name);
+      XLSX.utils.book_append_sheet(wb, ws2, name);
+    }
+
+    const safe = session.name.replace(/[^a-z0-9]+/gi, '_');
+    XLSX.writeFile(wb, `${safe}_Schedule.xlsx`);
+  }
+
   const liveBadge = (s: string) => {
     const map: Record<string, string> = {
       Scheduled: 'bg-slate-100 text-slate-600',
@@ -385,11 +489,18 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           <strong>Note:</strong> All edits, deletions, and additions require admin approval before taking effect.
         </div>
 
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-2">
           <h2 className="text-base font-bold text-slate-800">Your Students</h2>
-          <button onClick={openAdd} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-sm font-semibold">
-            + Request New Student
-          </button>
+          <div className="flex gap-2">
+            <button onClick={downloadMySchedule}
+              disabled={passations.length === 0}
+              className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-4 py-2 rounded-xl text-sm font-semibold">
+              ⬇ Download My Schedule
+            </button>
+            <button onClick={openAdd} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-sm font-semibold">
+              + Request New Student
+            </button>
+          </div>
         </div>
 
         {showForm && (
