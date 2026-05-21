@@ -14,19 +14,19 @@ const POS = {
   mentorSig: { x: 380, y: 181.5, size: 11 },
 };
 
-// White cover boxes — narrow width (just around text) but generous height
-// so ascenders/descenders of Y / x / y are fully erased.
-// Measured placeholder widths: YYYYY@17.9 ≈ 60pt, YYYYY@11.6 ≈ 39pt, xxxxx@11 ≈ 28pt.
-// Centered placeholders → text x-range ≈ 268–328 (name) and 278–317 (category).
+// White cover boxes — moderate width centered on each placeholder.
+// The template font is wider than Helvetica metrics suggested, so be generous.
+// Centered band wide enough to swallow the whole YYYYY but stops before the
+// left "MAKE" logo and the right border decoration.
 const COVERS = [
-  // YYYYY name (centered ~268-328)
-  { x: 260, y: 375, w: 80, h: 42 },
-  // YYYYY category (centered ~278-317)
-  { x: 268, y: 362, w: 62, h: 33 },
-  // xxxxx member (x ≈ 208-236)
-  { x: 200, y: 173, w: 44, h: 30 },
-  // xxxxx mentor (x ≈ 388-416)
-  { x: 380, y: 173, w: 44, h: 30 },
+  // YYYYY name — wide centered band (x: 170 → 430)
+  { x: 170, y: 375, w: 260, h: 42 },
+  // YYYYY category — wide centered band (x: 210 → 390)
+  { x: 210, y: 362, w: 180, h: 33 },
+  // xxxxx member signature
+  { x: 195, y: 173, w: 60, h: 30 },
+  // xxxxx mentor signature
+  { x: 370, y: 173, w: 60, h: 30 },
 ];
 
 const TEMPLATE_PATH = path.join(process.cwd(), 'scripts', 'cert-template.pdf');
