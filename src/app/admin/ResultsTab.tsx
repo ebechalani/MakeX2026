@@ -78,12 +78,15 @@ type RankedStudent = {
   r1: RoundResult;
   r2: RoundResult;
   best: RoundResult;
-  overallRank: number;
-  schoolRank: number | null;
-  clubRank: number | null;
+  rank: number; // rank within their own group (school or club)
 };
 
-function buildRankings(r1rows: Passation[], r2rows: Passation[]): RankedStudent[] {
+type CategoryRankings = {
+  schools: RankedStudent[];
+  clubs: RankedStudent[];
+};
+
+function buildRankings(r1rows: Passation[], r2rows: Passation[]): CategoryRankings {
   // Deduplicate by (team_name, club_name) — keep R1 and R2 per student
   const r1map = new Map<string, Passation>();
   const r2map = new Map<string, Passation>();
@@ -92,16 +95,17 @@ function buildRankings(r1rows: Passation[], r2rows: Passation[]): RankedStudent[
   for (const p of r2rows) r2map.set(key(p), p);
 
   const allKeys = new Set([...r1map.keys(), ...r2map.keys()]);
-  const students: Omit<RankedStudent, 'overallRank' | 'schoolRank' | 'clubRank'>[] = [];
+  const schools: Omit<RankedStudent, 'rank'>[] = [];
+  const clubs:   Omit<RankedStudent, 'rank'>[] = [];
 
   for (const k of allKeys) {
     const r1p = r1map.get(k);
     const r2p = r2map.get(k);
-    const ref = r1p || r2p!;
+    const ref  = r1p || r2p!;
     const r1res = roundResult(r1p);
     const r2res = roundResult(r2p);
-    const best = betterResult(r1res, r2res);
-    students.push({
+    const best  = betterResult(r1res, r2res);
+    const entry = {
       key: k,
       teamName: ref.team_name,
       clubName: ref.club_name || '',
@@ -109,20 +113,17 @@ function buildRankings(r1rows: Passation[], r2rows: Passation[]): RankedStudent[
       r1: r1res,
       r2: r2res,
       best,
-    });
+    };
+    if (entry.type === 'School') schools.push(entry);
+    else clubs.push(entry);
   }
 
-  // Sort overall by best result
-  students.sort((a, b) => compareResults(a.best, b.best));
+  const rank = (arr: Omit<RankedStudent, 'rank'>[]): RankedStudent[] => {
+    arr.sort((a, b) => compareResults(a.best, b.best));
+    return arr.map((s, i) => ({ ...s, rank: i + 1 }));
+  };
 
-  // Assign overall, school, club ranks
-  let overallRank = 0, schoolRank = 0, clubRank = 0;
-  return students.map(s => {
-    overallRank++;
-    const sr = s.type === 'School' ? ++schoolRank : null;
-    const cr = s.type === 'Club' ? ++clubRank : null;
-    return { ...s, overallRank, schoolRank: sr, clubRank: cr };
-  });
+  return { schools: rank(schools), clubs: rank(clubs) };
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -164,7 +165,7 @@ export default function ResultsTab() {
 
   // ── Rankings per category ─────────────────────────────────────────────────
   const rankingsByCat = useMemo(() => {
-    const map = new Map<string, RankedStudent[]>();
+    const map = new Map<string, CategoryRankings>();
     for (const cat of categories) {
       const r1 = passations.filter(p => p.category_id === cat.id && (p.round_number ?? 1) === 1);
       const r2 = passations.filter(p => p.category_id === cat.id && p.round_number === 2);
@@ -243,54 +244,42 @@ export default function ResultsTab() {
     summaryWs['!cols'] = [{ wch: 36 }, { wch: 14 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 8 }];
     XLSX.utils.book_append_sheet(wb2, summaryWs, 'Summary');
 
-    // ── Ranking sheet per category ────────────────────────────────────────
-    for (const cat of categories) {
-      const rankings = rankingsByCat.get(cat.id) || [];
-      if (rankings.length === 0) continue;
+    // ── Ranking sheets per category (schools + clubs separately) ─────────
+    const rankHeader = [
+      'Rank', 'Student', 'Club / Academy',
+      'R1 Points', 'R1 Time (s)', 'R1 Status',
+      'R2 Points', 'R2 Time (s)', 'R2 Status',
+      'Best Points', 'Best Time (s)',
+    ];
+    const rankCols = [
+      { wch: 6 }, { wch: 28 }, { wch: 28 },
+      { wch: 10 }, { wch: 11 }, { wch: 12 },
+      { wch: 10 }, { wch: 11 }, { wch: 12 },
+      { wch: 11 }, { wch: 12 },
+    ];
 
-      const header = [
-        'Overall Rank', 'School Rank', 'Club Rank', 'Type',
-        'Student', 'Club / Academy',
-        'R1 Points', 'R1 Time (s)', 'R1 Status',
-        'R2 Points', 'R2 Time (s)', 'R2 Status',
-        'Best Points', 'Best Time (s)',
-      ];
-      const rows: (string | number | null)[][] = [header];
-
-      for (const s of rankings) {
-        const showRow = rankType === 'all'
-          || (rankType === 'school' && s.type === 'School')
-          || (rankType === 'club' && s.type === 'Club');
-        if (!showRow) continue;
-
-        rows.push([
-          s.overallRank,
-          s.schoolRank ?? '—',
-          s.clubRank ?? '—',
-          s.type,
-          s.teamName,
-          s.clubName,
-          s.r1.score ?? '—',
-          s.r1.time ?? '—',
-          s.r1.status,
-          s.r2.score ?? '—',
-          s.r2.time ?? '—',
-          s.r2.status,
-          s.best.score ?? '—',
-          s.best.time ?? '—',
+    function writeRankSheet(label: string, rows: RankedStudent[]) {
+      if (rows.length === 0) return;
+      const data: (string | number | null)[][] = [rankHeader];
+      for (const s of rows) {
+        data.push([
+          s.rank, s.teamName, s.clubName,
+          s.r1.score ?? '—', s.r1.time ?? '—', s.r1.status,
+          s.r2.score ?? '—', s.r2.time ?? '—', s.r2.status,
+          s.best.score ?? '—', s.best.time ?? '—',
         ]);
       }
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      ws['!cols'] = rankCols;
+      XLSX.utils.book_append_sheet(wb2, ws, uniqueName(label));
+    }
 
-      const catShortName = cat.name.replace(/Sportswonderland/i, 'SW').replace(/Capelli/i, 'Cap').replace(/MakeX/i, 'MX');
-      const rankWs = XLSX.utils.aoa_to_sheet(rows);
-      rankWs['!cols'] = [
-        { wch: 12 }, { wch: 11 }, { wch: 10 }, { wch: 7 },
-        { wch: 26 }, { wch: 26 },
-        { wch: 9 }, { wch: 10 }, { wch: 12 },
-        { wch: 9 }, { wch: 10 }, { wch: 12 },
-        { wch: 11 }, { wch: 12 },
-      ];
-      XLSX.utils.book_append_sheet(wb2, rankWs, uniqueName(`Rank ${catShortName}${cat.age_range_label ? ' ' + cat.age_range_label.replace(/[^0-9–-]/g, '') : ''}`));
+    for (const cat of categories) {
+      const { schools, clubs } = rankingsByCat.get(cat.id) || { schools: [], clubs: [] };
+      const catShort = cat.name.replace(/Sportswonderland/i, 'SW').replace(/Capelli/i, 'Cap').replace(/MakeX/i, 'MX');
+      const ageTag   = cat.age_range_label ? ' ' + cat.age_range_label.replace(/[^0-9–-]/g, '') : '';
+      writeRankSheet(`${catShort}${ageTag} Schools`, schools);
+      writeRankSheet(`${catShort}${ageTag} Clubs`,   clubs);
     }
 
     // ── Raw results per table ─────────────────────────────────────────────
@@ -432,7 +421,7 @@ export default function ResultsTab() {
       {/* ── RANKINGS VIEW ── */}
       {view === 'rankings' && (
         <div className="space-y-4">
-          {/* Controls */}
+          {/* Category filter */}
           <div className="flex flex-wrap gap-2 items-center">
             <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
               className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm">
@@ -445,7 +434,7 @@ export default function ResultsTab() {
                   className={`px-3 py-1 text-xs font-bold rounded transition ${
                     rankType === t ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
                   }`}>
-                  {t === 'all' ? 'All' : t === 'school' ? '🏫 Schools' : '🏢 Clubs'}
+                  {t === 'all' ? 'All' : t === 'school' ? '🏫 Schools only' : '🏢 Clubs only'}
                 </button>
               ))}
             </div>
@@ -455,91 +444,40 @@ export default function ResultsTab() {
           {categories
             .filter(cat => !filterCat || cat.id === filterCat)
             .map(cat => {
-              const rankings = (rankingsByCat.get(cat.id) || []).filter(s =>
-                rankType === 'all' || (rankType === 'school' ? s.type === 'School' : s.type === 'Club')
-              );
-              if (rankings.length === 0) return null;
+              const { schools, clubs } = rankingsByCat.get(cat.id) || { schools: [], clubs: [] };
+              if (schools.length === 0 && clubs.length === 0) return null;
 
-              const schoolCount = rankings.filter(s => s.type === 'School').length;
-              const clubCount   = rankings.filter(s => s.type === 'Club').length;
-              const finalized   = rankings.filter(s => s.best.score != null).length;
+              const catTitle = cat.name + (cat.age_range_label ? ` (${cat.age_range_label})` : '');
 
               return (
-                <div key={cat.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
-                    <div>
-                      <h3 className="font-bold text-slate-800">{cat.name}
-                        {cat.age_range_label && <span className="ml-2 text-slate-400 font-normal text-sm">({cat.age_range_label})</span>}
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {rankings.length} students · {finalized} scored · 🏫 {schoolCount} schools · 🏢 {clubCount} clubs
-                      </p>
-                    </div>
-                    <div className="flex gap-3 text-xs text-slate-400">
-                      <span>Best of R1 &amp; R2 · points → time</span>
-                    </div>
+                <div key={cat.id} className="space-y-3">
+                  {/* Category header */}
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-bold text-slate-800 text-base">{cat.name}
+                      {cat.age_range_label && <span className="ml-2 text-slate-400 font-normal text-sm">({cat.age_range_label})</span>}
+                    </h3>
+                    <span className="text-xs text-slate-400">Best of R1 &amp; R2 · points → time</span>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50/60 border-b border-slate-100">
-                        <tr>
-                          <th className="text-center px-3 py-2 text-xs font-bold text-slate-500 uppercase w-12">Rank</th>
-                          <th className="text-center px-2 py-2 text-xs font-bold text-slate-400 uppercase w-16">
-                            <span className="text-blue-600">🏫</span>
-                          </th>
-                          <th className="text-center px-2 py-2 text-xs font-bold text-slate-400 uppercase w-16">
-                            <span className="text-purple-600">🏢</span>
-                          </th>
-                          <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 uppercase">Student</th>
-                          <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 uppercase">Academy / Club</th>
-                          <th className="text-center px-2 py-2 text-xs font-bold text-slate-400 uppercase w-12">Type</th>
-                          <th className="text-right px-3 py-2 text-xs font-bold text-slate-500 uppercase">R1 pts</th>
-                          <th className="text-right px-3 py-2 text-xs font-bold text-slate-400 uppercase">R1 time</th>
-                          <th className="text-right px-3 py-2 text-xs font-bold text-slate-500 uppercase">R2 pts</th>
-                          <th className="text-right px-3 py-2 text-xs font-bold text-slate-400 uppercase">R2 time</th>
-                          <th className="text-right px-3 py-2 text-xs font-bold text-emerald-700 uppercase">Best pts</th>
-                          <th className="text-right px-3 py-2 text-xs font-bold text-emerald-600 uppercase">Best time</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {rankings.map((s, idx) => {
-                          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
-                          const isTop = idx < 3 && s.best.score != null;
-                          return (
-                            <tr key={s.key} className={`${isTop ? 'bg-amber-50/40' : 'hover:bg-slate-50/60'}`}>
-                              <td className="px-3 py-2.5 text-center font-bold text-slate-700">
-                                {medal ?? <span className="text-slate-400 font-normal">{s.overallRank}</span>}
-                              </td>
-                              <td className="px-2 py-2.5 text-center text-xs font-semibold text-blue-700">
-                                {s.schoolRank != null ? `#${s.schoolRank}` : <span className="text-slate-200">—</span>}
-                              </td>
-                              <td className="px-2 py-2.5 text-center text-xs font-semibold text-purple-700">
-                                {s.clubRank != null ? `#${s.clubRank}` : <span className="text-slate-200">—</span>}
-                              </td>
-                              <td className="px-3 py-2.5 font-semibold text-slate-800">{s.teamName}</td>
-                              <td className="px-3 py-2.5 text-xs text-slate-600">{s.clubName || '—'}</td>
-                              <td className="px-2 py-2.5 text-center">
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                  s.type === 'School' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                                }`}>{s.type === 'School' ? '🏫' : '🏢'}</span>
-                              </td>
-                              <RoundCell res={s.r1} highlight={s.r1 === s.best} />
-                              <TimeCell res={s.r1} highlight={s.r1 === s.best} />
-                              <RoundCell res={s.r2} highlight={s.r2 === s.best} />
-                              <TimeCell res={s.r2} highlight={s.r2 === s.best} />
-                              <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700">
-                                {s.best.score != null ? s.best.score : <span className="text-slate-300">—</span>}
-                              </td>
-                              <td className="px-3 py-2.5 text-right font-mono text-xs text-emerald-600">
-                                {s.best.time != null ? `${s.best.time}s` : <span className="text-slate-300">—</span>}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                  {/* Schools ranking */}
+                  {(rankType === 'all' || rankType === 'school') && schools.length > 0 && (
+                    <RankingTable
+                      rows={schools}
+                      label="🏫 School Rankings"
+                      labelClass="text-blue-700 bg-blue-50 border-blue-200"
+                      catTitle={catTitle}
+                    />
+                  )}
+
+                  {/* Clubs ranking */}
+                  {(rankType === 'all' || rankType === 'club') && clubs.length > 0 && (
+                    <RankingTable
+                      rows={clubs}
+                      label="🏢 Club Rankings"
+                      labelClass="text-purple-700 bg-purple-50 border-purple-200"
+                      catTitle={catTitle}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -609,6 +547,65 @@ export default function ResultsTab() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Ranking table component ───────────────────────────────────────────────────
+function RankingTable({ rows, label, labelClass, catTitle: _catTitle }: {
+  rows: RankedStudent[];
+  label: string;
+  labelClass: string;
+  catTitle: string;
+}) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div className={`px-5 py-2.5 border-b flex items-center justify-between ${labelClass}`}>
+        <span className="font-bold text-sm">{label}</span>
+        <span className="text-xs opacity-70">{rows.length} participant{rows.length !== 1 ? 's' : ''} · {rows.filter(s => s.best.score != null).length} scored</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50/60 border-b border-slate-100">
+            <tr>
+              <th className="text-center px-3 py-2 text-xs font-bold text-slate-500 uppercase w-12">Rank</th>
+              <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 uppercase">Student</th>
+              <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 uppercase">Academy / Club</th>
+              <th className="text-right px-3 py-2 text-xs font-bold text-slate-500 uppercase">R1 pts</th>
+              <th className="text-right px-3 py-2 text-xs font-bold text-slate-400 uppercase">R1 time</th>
+              <th className="text-right px-3 py-2 text-xs font-bold text-slate-500 uppercase">R2 pts</th>
+              <th className="text-right px-3 py-2 text-xs font-bold text-slate-400 uppercase">R2 time</th>
+              <th className="text-right px-3 py-2 text-xs font-bold text-emerald-700 uppercase">Best pts</th>
+              <th className="text-right px-3 py-2 text-xs font-bold text-emerald-600 uppercase">Best time</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {rows.map((s, idx) => {
+              const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
+              const isTop = idx < 3 && s.best.score != null;
+              return (
+                <tr key={s.key} className={isTop ? 'bg-amber-50/40' : 'hover:bg-slate-50/60'}>
+                  <td className="px-3 py-2.5 text-center font-bold text-slate-700 text-base">
+                    {medal ?? <span className="text-slate-400 font-normal text-sm">{s.rank}</span>}
+                  </td>
+                  <td className="px-3 py-2.5 font-semibold text-slate-800">{s.teamName}</td>
+                  <td className="px-3 py-2.5 text-xs text-slate-600">{s.clubName || '—'}</td>
+                  <RoundCell res={s.r1} highlight={s.r1 === s.best} />
+                  <TimeCell  res={s.r1} highlight={s.r1 === s.best} />
+                  <RoundCell res={s.r2} highlight={s.r2 === s.best} />
+                  <TimeCell  res={s.r2} highlight={s.r2 === s.best} />
+                  <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700">
+                    {s.best.score != null ? s.best.score : <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-mono text-xs text-emerald-600">
+                    {s.best.time != null ? `${s.best.time}s` : <span className="text-slate-300">—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

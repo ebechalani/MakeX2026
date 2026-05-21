@@ -103,7 +103,10 @@
       "Bash(node -e \"require\\('pdf-lib'\\); console.log\\('ok'\\)\")",
       "Bash(node scripts/generate_certificates.mjs)",
       "Bash(dir scripts\\\\certificates /B)",
-      "Bash(node scripts/fix_schedule.mjs)"
+      "Bash(node scripts/fix_schedule.mjs)",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\public\\\\certificates\" -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\scripts\\\\certificates\" -ErrorAction SilentlyContinue)",
+      "Bash(Write-Host \"Cleared\")"
     ]
   }
 }
