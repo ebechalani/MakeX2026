@@ -53,17 +53,22 @@ const POS = {
   mentorSig: { x: 380, y: 181.5, size: 11 },
 };
 
-// White cover boxes — cover original YYYYY / xxxxx placeholders entirely
-// Each box is oversized with ≥8pt padding on every side
+// White cover boxes — fit tightly around the actual placeholder text only
+// (measured: page 595.5×842.25, placeholders centered for name/category)
+//   YYYYY name     (bold 17.9): x ≈ 267.9–327.6, y ≈ 385.6–403.6  → 59.7w × 18h
+//   YYYYY category (11.6):      x ≈ 278.4–317.1, y ≈ 372.0–383.6  → 38.7w × 11.6h
+//   xxxxx member   (11):        x ≈ 208–235.5,   y ≈ 181.6–192.7  → 27.5w × 11h
+//   xxxxx mentor   (11):        x ≈ 388–415.5,   y ≈ 182.2–193.2  → 27.5w × 11h
+// Pad ~2pt on every side to fully erase the glyphs without bleeding into the design.
 const COVERS = [
-  // YYYYY name main  (text: y 385–403, extra padding → cover 375–415)
-  { x: 0,   y: 375, w: PAGE_W, h: 42 },
-  // YYYYY category   (text: y 372–383, cover 362–393)
-  { x: 0,   y: 362, w: PAGE_W, h: 33 },
-  // xxxxx member     (text: y 181–192, cover 173–203)
-  { x: 120, y: 173, w: 200,    h: 30 },
-  // xxxxx mentor     (text: y 182–193, cover 173–203)
-  { x: 365, y: 173, w: 215,    h: 30 },
+  // YYYYY name main
+  { x: 264, y: 383, w: 68, h: 22 },
+  // YYYYY category
+  { x: 274, y: 370, w: 48, h: 16 },
+  // xxxxx member
+  { x: 205, y: 179, w: 34, h: 16 },
+  // xxxxx mentor
+  { x: 385, y: 180, w: 34, h: 16 },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
