@@ -14,7 +14,8 @@ function sanitize(str: string) {
 }
 
 function certUrl(club: string, student: string) {
-  return `/certificates/${encodeURIComponent(sanitize(club))}/${encodeURIComponent(sanitize(student))}.pdf`;
+  // Served by the dynamic route handler — always reflects the latest DB data.
+  return `/api/certificate/${encodeURIComponent(sanitize(club))}/${encodeURIComponent(sanitize(student))}`;
 }
 
 export default function CertificatesTab({ academyName, passations, categories }: Props) {

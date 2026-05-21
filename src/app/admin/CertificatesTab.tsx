@@ -14,7 +14,8 @@ function sanitize(str: string) {
 }
 
 function certUrl(club: string, student: string) {
-  return `/certificates/${encodeURIComponent(sanitize(club))}/${encodeURIComponent(sanitize(student))}.pdf`;
+  // Served by the dynamic route handler — always reflects the latest DB data.
+  return `/api/certificate/${encodeURIComponent(sanitize(club))}/${encodeURIComponent(sanitize(student))}`;
 }
 
 export default function CertificatesTab() {
@@ -130,8 +131,8 @@ export default function CertificatesTab() {
       </div>
 
       {/* Storage status */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800">
-        💡 To regenerate after data changes: run <code className="bg-blue-100 px-1 rounded font-mono">node scripts/generate_certificates.mjs</code> then restart the dev server (or redeploy).
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800">
+        ✅ Certificates are generated on-the-fly from the latest database — any name, coach or category change reflects immediately. No re-run needed.
       </div>
 
       {/* Search */}

@@ -26,7 +26,7 @@ import path from 'path';
 // ── Config ────────────────────────────────────────────────────────────────────
 const SUPABASE_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL  || 'https://kcdwxgziwaucaablarae.supabase.co';
 const SUPABASE_KEY  = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjZHd4Z3ppd2F1Y2FhYmxhcmFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODE1MjQsImV4cCI6MjA5MTg1NzUyNH0.B0NyXhzJ08YQZkACamaXhfZmzTcgR_bwlb3pqmG2Y6Q';
-const TEMPLATE_PATH = path.resolve('C:\\Users\\eddy.bachaalany\\Downloads\\Copy of ---Lycee Montaigne--.pdf (1).pdf');
+const TEMPLATE_PATH = path.resolve('scripts/cert-template.pdf');
 const OUT_DIR       = path.resolve('scripts/certificates');
 const PUBLIC_DIR    = path.resolve('public/certificates');
 
@@ -53,22 +53,17 @@ const POS = {
   mentorSig: { x: 380, y: 181.5, size: 11 },
 };
 
-// White cover boxes — fit tightly around the actual placeholder text only
-// (measured: page 595.5×842.25, placeholders centered for name/category)
-//   YYYYY name     (bold 17.9): x ≈ 267.9–327.6, y ≈ 385.6–403.6  → 59.7w × 18h
-//   YYYYY category (11.6):      x ≈ 278.4–317.1, y ≈ 372.0–383.6  → 38.7w × 11.6h
-//   xxxxx member   (11):        x ≈ 208–235.5,   y ≈ 181.6–192.7  → 27.5w × 11h
-//   xxxxx mentor   (11):        x ≈ 388–415.5,   y ≈ 182.2–193.2  → 27.5w × 11h
-// Pad ~2pt on every side to fully erase the glyphs without bleeding into the design.
+// White cover boxes — narrow width (just around text) but generous height
+// so ascenders/descenders are fully erased.
 const COVERS = [
-  // YYYYY name main
-  { x: 264, y: 383, w: 68, h: 22 },
-  // YYYYY category
-  { x: 274, y: 370, w: 48, h: 16 },
-  // xxxxx member
-  { x: 205, y: 179, w: 34, h: 16 },
-  // xxxxx mentor
-  { x: 385, y: 180, w: 34, h: 16 },
+  // YYYYY name (centered ~268-328)
+  { x: 260, y: 375, w: 80, h: 42 },
+  // YYYYY category (centered ~278-317)
+  { x: 268, y: 362, w: 62, h: 33 },
+  // xxxxx member (x ≈ 208-236)
+  { x: 200, y: 173, w: 44, h: 30 },
+  // xxxxx mentor (x ≈ 388-416)
+  { x: 380, y: 173, w: 44, h: 30 },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
     // ESLint warnings don't block production builds
     ignoreDuringBuilds: true,
   },
+  // Ensure the certificate template PDF is bundled with the serverless route handler
+  outputFileTracingIncludes: {
+    '/api/certificate/**': ['scripts/cert-template.pdf'],
+  },
 };
 
 export default nextConfig;

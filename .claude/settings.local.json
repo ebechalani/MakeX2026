@@ -107,7 +107,8 @@
       "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\public\\\\certificates\" -ErrorAction SilentlyContinue)",
       "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\scripts\\\\certificates\" -ErrorAction SilentlyContinue)",
       "Bash(Write-Host \"Cleared\")",
-      "Bash(node scripts/measure_placeholders.mjs)"
+      "Bash(node scripts/measure_placeholders.mjs)",
+      "Bash(cp \"C:\\\\Users\\\\eddy.bachaalany\\\\Downloads\\\\Copy of ---Lycee Montaigne--.pdf \\(1\\).pdf\" \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\scripts\\\\cert-template.pdf\" && ls -la \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\scripts\\\\cert-template.pdf\")"
     ]
   }
 }
