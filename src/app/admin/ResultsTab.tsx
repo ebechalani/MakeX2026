@@ -158,6 +158,12 @@ function isCapelliInspire(catName: string | null | undefined): boolean {
   return !!catName && /capelli\s*inspire/i.test(catName);
 }
 
+/** Categories that should not be split into school/club rankings — single unified ranking. */
+function isUnifiedRanking(catName: string | null | undefined): boolean {
+  if (!catName) return false;
+  return /capelli\s*soccer/i.test(catName) || /makex\s*starter/i.test(catName);
+}
+
 /** Split a ranking list into age bands. Bands re-rank from 1. */
 type AgeBand = { label: string; ageTag: string; rows: RankedStudent[] };
 function splitCapelliByAge(rows: RankedStudent[]): AgeBand[] {
@@ -385,7 +391,11 @@ export default function ResultsTab() {
       const catShort = cat.name.replace(/Sportswonderland/i, 'SW').replace(/Capelli/i, 'Cap').replace(/MakeX/i, 'MX');
       const ageTag   = cat.age_range_label ? ' ' + cat.age_range_label.replace(/[^0-9–-]/g, '') : '';
 
-      if (isCapelliInspire(cat.name)) {
+      if (isUnifiedRanking(cat.name)) {
+        // Single combined ranking — no school/club split
+        const combined = reRank([...schools, ...clubs]);
+        writeRankSheet(`${catShort}${ageTag} Ranking`, combined);
+      } else if (isCapelliInspire(cat.name)) {
         // Split Capelli Inspire into 8-9 and 10-12 age bands
         const schoolBands = splitCapelliByAge(schools);
         const clubBands   = splitCapelliByAge(clubs);
@@ -564,6 +574,30 @@ export default function ResultsTab() {
 
               const catTitle = cat.name + (cat.age_range_label ? ` (${cat.age_range_label})` : '');
               const splitByAge = isCapelliInspire(cat.name);
+              const unified = isUnifiedRanking(cat.name);
+
+              // Unified ranking → merge schools+clubs into a single re-ranked list
+              if (unified) {
+                const combined = reRank([...schools, ...clubs]);
+                if (combined.length === 0) return null;
+                return (
+                  <div key={cat.id} className="space-y-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h3 className="font-bold text-slate-800 text-base">{cat.name}
+                        {cat.age_range_label && <span className="ml-2 text-slate-400 font-normal text-sm">({cat.age_range_label})</span>}
+                      </h3>
+                      <span className="text-xs text-slate-400">Best of R1 &amp; R2 · points → time</span>
+                      <span className="text-xs text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">Single ranking</span>
+                    </div>
+                    <RankingTable
+                      rows={combined}
+                      label="🏆 Overall Rankings"
+                      labelClass="text-emerald-700 bg-emerald-50 border-emerald-200"
+                      catTitle={catTitle}
+                    />
+                  </div>
+                );
+              }
 
               // For Capelli Inspire: split into 8–9 and 10–12 age bands; otherwise one band.
               const schoolBands: AgeBand[] = splitByAge
