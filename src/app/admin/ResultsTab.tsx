@@ -259,6 +259,8 @@ export default function ResultsTab() {
 
     function writeRankSheet(label: string, rows: RankedStudent[]) {
       if (rows.length === 0) return;
+      const lastRow = rows.length + 1; // Excel row number of last data row (row 1 = header)
+
       const data: (string | number | null)[][] = [rankHeader];
       for (const s of rows) {
         data.push([
@@ -270,6 +272,63 @@ export default function ResultsTab() {
       }
       const ws = XLSX.utils.aoa_to_sheet(data);
       ws['!cols'] = rankCols;
+
+      // ── Inject Excel formulas so manual edits to R1/R2 recalculate automatically ──
+      // Columns: A=Rank B=Student C=Club D=R1pts E=R1time F=R1status
+      //          G=R2pts H=R2time I=R2status J=BestPts K=BestTime
+      for (let excelRow = 2; excelRow <= lastRow; excelRow++) {
+        const ri = excelRow - 1; // 0-based row index for SheetJS encode_cell
+        const r  = excelRow;     // 1-based Excel row number used inside formula strings
+
+        // Best Points (col J, c=9):
+        // Pick the score from whichever round wins (higher pts → winner; tie → lower time)
+        const bpf =
+          `IF(ISNUMBER(D${r}),` +
+            `IF(ISNUMBER(G${r}),` +
+              `IF(D${r}>G${r},D${r},` +
+              `IF(G${r}>D${r},G${r},` +
+              `IF(ISNUMBER(E${r}),` +
+                `IF(ISNUMBER(H${r}),IF(E${r}<=H${r},D${r},G${r}),D${r}),` +
+                `IF(ISNUMBER(H${r}),G${r},D${r})))),` +
+            `D${r}),` +
+          `IF(ISNUMBER(G${r}),G${r},""))`;
+
+        // Best Time (col K, c=10):
+        // Pick the time from the SAME winning round as Best Points
+        const btf =
+          `IF(ISNUMBER(D${r}),` +
+            `IF(ISNUMBER(G${r}),` +
+              `IF(D${r}>G${r},E${r},` +
+              `IF(G${r}>D${r},H${r},` +
+              `IF(ISNUMBER(E${r}),` +
+                `IF(ISNUMBER(H${r}),IF(E${r}<=H${r},E${r},H${r}),E${r}),` +
+                `IF(ISNUMBER(H${r}),H${r},"")))),` +
+            `E${r}),` +
+          `IF(ISNUMBER(H${r}),H${r},""))`;
+
+        // Rank (col A, c=0):
+        // Count students ranked above: higher best-pts, or same pts + lower best-time
+        const rf =
+          `IF(ISNUMBER(J${r}),` +
+            `SUMPRODUCT(` +
+              `(ISNUMBER($J$2:$J$${lastRow})*($J$2:$J$${lastRow}>J${r}))+` +
+              `(ISNUMBER($J$2:$J$${lastRow})*($J$2:$J$${lastRow}=J${r})*` +
+               `ISNUMBER(K${r})*ISNUMBER($K$2:$K$${lastRow})*($K$2:$K$${lastRow}<K${r}))` +
+            `)+1,"")`;
+
+        // Write formula cells (preserve static cached value for v so the file
+        // shows data even before Excel recalculates)
+        const setF = (c: number, f: string, v: number | string) => {
+          const addr = XLSX.utils.encode_cell({ r: ri, c });
+          ws[addr] = typeof v === 'number' ? { t: 'n', v, f } : { t: 's', v, f };
+        };
+
+        const s = rows[excelRow - 2];
+        setF(9,  bpf, s.best.score ?? '');
+        setF(10, btf, s.best.time  ?? '');
+        setF(0,  rf,  s.rank);
+      }
+
       XLSX.utils.book_append_sheet(wb2, ws, uniqueName(label));
     }
 
