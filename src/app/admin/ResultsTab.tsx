@@ -7,13 +7,12 @@ import type { Category, Table, Passation } from '@/lib/types';
 
 // ── School / Club classification ─────────────────────────────────────────────
 const SCHOOL_NAMES = new Set([
-  'Carmelites', 'CCJ', 'CND Steam Club', 'Coducators',
+  'Carmelites', 'CCJ', 'CND Steam Club',
   'College Maristes Notre Dame de Lourdes', 'Ecole De La Mission éDucative',
   'Ecole des Soeurs de la Croix - Hrajel', 'Ecole Saint Elie - SFM Zahle',
-  'ESJ Capucins Batroun', 'Futurebot Academy', 'IC Ain Aar', 'IDEA',
-  'IDEA Centre Saint Michel', 'Ingenious Coding And Robotics Academy',
-  'Kincobot', 'Lycée Charlemagne', 'Lycée Montaigne', 'Mindscape Academy',
-  'Mont La Salle', 'Robateks Academy', 'RoboHolic',
+  'ESJ Capucins Batroun', 'IC Ain Aar',
+  'Lycée Charlemagne', 'Lycée Montaigne',
+  'Mont La Salle',
   'Sainte Famille Francaise Jounieh', 'SJS Robotics Club', 'SSCC Kfardebian',
 ]);
 
