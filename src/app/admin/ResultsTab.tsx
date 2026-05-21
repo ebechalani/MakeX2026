@@ -75,16 +75,35 @@ type RankedStudent = {
   clubName: string;
   tableLabel: string;
   type: 'School' | 'Club';
+  age: number | null;       // age as of today, computed from DOB
   r1: RoundResult;
   r2: RoundResult;
   best: RoundResult;
-  rank: number; // rank within their own group (school or club)
+  rank: number; // rank within their own group (school or club, possibly within an age band)
 };
 
 type CategoryRankings = {
   schools: RankedStudent[];
   clubs: RankedStudent[];
 };
+
+function calcAge(dob: string | null | undefined): number | null {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  let a = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
+  return a;
+}
+
+/** Re-sort + reassign rank=1..N inside a sub-group (used for age-split sub-categories). */
+function reRank(students: RankedStudent[]): RankedStudent[] {
+  return students.slice()
+    .sort((a, b) => compareResults(a.best, b.best))
+    .map((s, i) => ({ ...s, rank: i + 1 }));
+}
 
 function buildRankings(r1rows: Passation[], r2rows: Passation[], tables: Table[]): CategoryRankings {
   const getTableLabel = (tableId: string | null | undefined) => {
@@ -117,6 +136,7 @@ function buildRankings(r1rows: Passation[], r2rows: Passation[], tables: Table[]
       clubName: ref.club_name || '',
       tableLabel: getTableLabel(r1p?.table_id || r2p?.table_id),
       type: orgType(ref.club_name),
+      age: calcAge(ref.date_of_birth),
       r1: r1res,
       r2: r2res,
       best,
@@ -131,6 +151,24 @@ function buildRankings(r1rows: Passation[], r2rows: Passation[], tables: Table[]
   };
 
   return { schools: rank(schools), clubs: rank(clubs) };
+}
+
+/** True if the category name matches Capelli Inspire (case-insensitive). */
+function isCapelliInspire(catName: string | null | undefined): boolean {
+  return !!catName && /capelli\s*inspire/i.test(catName);
+}
+
+/** Split a ranking list into age bands. Bands re-rank from 1. */
+type AgeBand = { label: string; ageTag: string; rows: RankedStudent[] };
+function splitCapelliByAge(rows: RankedStudent[]): AgeBand[] {
+  const young = reRank(rows.filter(s => s.age != null && s.age >= 8  && s.age <= 9));
+  const old   = reRank(rows.filter(s => s.age != null && s.age >= 10 && s.age <= 12));
+  const other = reRank(rows.filter(s => s.age == null || s.age < 8 || s.age > 12));
+  const bands: AgeBand[] = [];
+  if (young.length) bands.push({ label: '8–9 years',   ageTag: '8-9',   rows: young });
+  if (old.length)   bands.push({ label: '10–12 years', ageTag: '10-12', rows: old   });
+  if (other.length) bands.push({ label: 'Other / Unknown DOB', ageTag: 'other', rows: other });
+  return bands;
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -252,16 +290,16 @@ export default function ResultsTab() {
     XLSX.utils.book_append_sheet(wb2, summaryWs, 'Summary');
 
     // ── Ranking sheets per category (schools + clubs separately) ─────────
-    // Columns: A=Rank B=Student C=Club D=Table E=R1pts F=R1time G=R1status
-    //          H=R2pts I=R2time J=R2status K=BestPts L=BestTime
+    // Columns: A=Rank B=Student C=Club D=Table E=Age F=R1pts G=R1time H=R1status
+    //          I=R2pts J=R2time K=R2status L=BestPts M=BestTime
     const rankHeader = [
-      'Rank', 'Student', 'Club / Academy', 'Table',
+      'Rank', 'Student', 'Club / Academy', 'Table', 'Age',
       'R1 Points', 'R1 Time (s)', 'R1 Status',
       'R2 Points', 'R2 Time (s)', 'R2 Status',
       'Best Points', 'Best Time (s)',
     ];
     const rankCols = [
-      { wch: 6 }, { wch: 28 }, { wch: 28 }, { wch: 10 },
+      { wch: 6 }, { wch: 28 }, { wch: 28 }, { wch: 10 }, { wch: 5 },
       { wch: 10 }, { wch: 11 }, { wch: 12 },
       { wch: 10 }, { wch: 11 }, { wch: 12 },
       { wch: 11 }, { wch: 12 },
@@ -274,7 +312,7 @@ export default function ResultsTab() {
       const data: (string | number | null)[][] = [rankHeader];
       for (const s of rows) {
         data.push([
-          s.rank, s.teamName, s.clubName, s.tableLabel,
+          s.rank, s.teamName, s.clubName, s.tableLabel, s.age ?? '—',
           s.r1.score ?? '—', s.r1.time ?? '—', s.r1.status,
           s.r2.score ?? '—', s.r2.time ?? '—', s.r2.status,
           s.best.score ?? '—', s.best.time ?? '—',
@@ -284,46 +322,46 @@ export default function ResultsTab() {
       ws['!cols'] = rankCols;
 
       // ── Inject Excel formulas so manual edits to R1/R2 recalculate automatically ──
-      // Columns: A=Rank B=Student C=Club D=Table E=R1pts F=R1time G=R1status
-      //          H=R2pts I=R2time J=R2status K=BestPts L=BestTime
+      // Columns: A=Rank B=Student C=Club D=Table E=Age F=R1pts G=R1time H=R1status
+      //          I=R2pts J=R2time K=R2status L=BestPts M=BestTime
       for (let excelRow = 2; excelRow <= lastRow; excelRow++) {
         const ri = excelRow - 1; // 0-based row index for SheetJS encode_cell
         const r  = excelRow;     // 1-based Excel row number used inside formula strings
 
-        // Best Points (col K, c=10):
+        // Best Points (col L, c=11):
         // Pick the score from whichever round wins (higher pts → winner; tie → lower time)
         const bpf =
-          `IF(ISNUMBER(E${r}),` +
-            `IF(ISNUMBER(H${r}),` +
-              `IF(E${r}>H${r},E${r},` +
-              `IF(H${r}>E${r},H${r},` +
-              `IF(ISNUMBER(F${r}),` +
-                `IF(ISNUMBER(I${r}),IF(F${r}<=I${r},E${r},H${r}),E${r}),` +
-                `IF(ISNUMBER(I${r}),H${r},E${r})))),` +
-            `E${r}),` +
-          `IF(ISNUMBER(H${r}),H${r},""))`;
-
-        // Best Time (col L, c=11):
-        // Pick the time from the SAME winning round as Best Points
-        const btf =
-          `IF(ISNUMBER(E${r}),` +
-            `IF(ISNUMBER(H${r}),` +
-              `IF(E${r}>H${r},F${r},` +
-              `IF(H${r}>E${r},I${r},` +
-              `IF(ISNUMBER(F${r}),` +
-                `IF(ISNUMBER(I${r}),IF(F${r}<=I${r},F${r},I${r}),F${r}),` +
-                `IF(ISNUMBER(I${r}),I${r},""))))),` +
+          `IF(ISNUMBER(F${r}),` +
+            `IF(ISNUMBER(I${r}),` +
+              `IF(F${r}>I${r},F${r},` +
+              `IF(I${r}>F${r},I${r},` +
+              `IF(ISNUMBER(G${r}),` +
+                `IF(ISNUMBER(J${r}),IF(G${r}<=J${r},F${r},I${r}),F${r}),` +
+                `IF(ISNUMBER(J${r}),I${r},F${r})))),` +
             `F${r}),` +
           `IF(ISNUMBER(I${r}),I${r},""))`;
+
+        // Best Time (col M, c=12):
+        // Pick the time from the SAME winning round as Best Points
+        const btf =
+          `IF(ISNUMBER(F${r}),` +
+            `IF(ISNUMBER(I${r}),` +
+              `IF(F${r}>I${r},G${r},` +
+              `IF(I${r}>F${r},J${r},` +
+              `IF(ISNUMBER(G${r}),` +
+                `IF(ISNUMBER(J${r}),IF(G${r}<=J${r},G${r},J${r}),G${r}),` +
+                `IF(ISNUMBER(J${r}),J${r},""))))),` +
+            `G${r}),` +
+          `IF(ISNUMBER(J${r}),J${r},""))`;
 
         // Rank (col A, c=0):
         // Count students ranked above: higher best-pts, or same pts + lower best-time
         const rf =
-          `IF(ISNUMBER(K${r}),` +
+          `IF(ISNUMBER(L${r}),` +
             `SUMPRODUCT(` +
-              `(ISNUMBER($K$2:$K$${lastRow})*($K$2:$K$${lastRow}>K${r}))+` +
-              `(ISNUMBER($K$2:$K$${lastRow})*($K$2:$K$${lastRow}=K${r})*` +
-               `ISNUMBER(L${r})*ISNUMBER($L$2:$L$${lastRow})*($L$2:$L$${lastRow}<L${r}))` +
+              `(ISNUMBER($L$2:$L$${lastRow})*($L$2:$L$${lastRow}>L${r}))+` +
+              `(ISNUMBER($L$2:$L$${lastRow})*($L$2:$L$${lastRow}=L${r})*` +
+               `ISNUMBER(M${r})*ISNUMBER($M$2:$M$${lastRow})*($M$2:$M$${lastRow}<M${r}))` +
             `)+1,"")`;
 
         // Write formula cells (preserve static cached value so file shows data
@@ -334,8 +372,8 @@ export default function ResultsTab() {
         };
 
         const s = rows[excelRow - 2];
-        setF(10, bpf, s.best.score ?? '');
-        setF(11, btf, s.best.time  ?? '');
+        setF(11, bpf, s.best.score ?? '');
+        setF(12, btf, s.best.time  ?? '');
         setF(0,  rf,  s.rank);
       }
 
@@ -346,8 +384,17 @@ export default function ResultsTab() {
       const { schools, clubs } = rankingsByCat.get(cat.id) || { schools: [], clubs: [] };
       const catShort = cat.name.replace(/Sportswonderland/i, 'SW').replace(/Capelli/i, 'Cap').replace(/MakeX/i, 'MX');
       const ageTag   = cat.age_range_label ? ' ' + cat.age_range_label.replace(/[^0-9–-]/g, '') : '';
-      writeRankSheet(`${catShort}${ageTag} Schools`, schools);
-      writeRankSheet(`${catShort}${ageTag} Clubs`,   clubs);
+
+      if (isCapelliInspire(cat.name)) {
+        // Split Capelli Inspire into 8-9 and 10-12 age bands
+        const schoolBands = splitCapelliByAge(schools);
+        const clubBands   = splitCapelliByAge(clubs);
+        for (const b of schoolBands) writeRankSheet(`${catShort} ${b.ageTag} Schools`, b.rows);
+        for (const b of clubBands)   writeRankSheet(`${catShort} ${b.ageTag} Clubs`,   b.rows);
+      } else {
+        writeRankSheet(`${catShort}${ageTag} Schools`, schools);
+        writeRankSheet(`${catShort}${ageTag} Clubs`,   clubs);
+      }
     }
 
     // ── Raw results per table ─────────────────────────────────────────────
@@ -516,36 +563,48 @@ export default function ResultsTab() {
               if (schools.length === 0 && clubs.length === 0) return null;
 
               const catTitle = cat.name + (cat.age_range_label ? ` (${cat.age_range_label})` : '');
+              const splitByAge = isCapelliInspire(cat.name);
+
+              // For Capelli Inspire: split into 8–9 and 10–12 age bands; otherwise one band.
+              const schoolBands: AgeBand[] = splitByAge
+                ? splitCapelliByAge(schools)
+                : (schools.length ? [{ label: '', ageTag: '', rows: schools }] : []);
+              const clubBands: AgeBand[] = splitByAge
+                ? splitCapelliByAge(clubs)
+                : (clubs.length ? [{ label: '', ageTag: '', rows: clubs }] : []);
 
               return (
                 <div key={cat.id} className="space-y-3">
                   {/* Category header */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <h3 className="font-bold text-slate-800 text-base">{cat.name}
                       {cat.age_range_label && <span className="ml-2 text-slate-400 font-normal text-sm">({cat.age_range_label})</span>}
                     </h3>
                     <span className="text-xs text-slate-400">Best of R1 &amp; R2 · points → time</span>
+                    {splitByAge && <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">Split by age</span>}
                   </div>
 
                   {/* Schools ranking */}
-                  {(rankType === 'all' || rankType === 'school') && schools.length > 0 && (
+                  {(rankType === 'all' || rankType === 'school') && schoolBands.map(band => (
                     <RankingTable
-                      rows={schools}
-                      label="🏫 School Rankings"
+                      key={`sch-${band.ageTag || 'all'}`}
+                      rows={band.rows}
+                      label={`🏫 School Rankings${band.label ? ` — ${band.label}` : ''}`}
                       labelClass="text-blue-700 bg-blue-50 border-blue-200"
-                      catTitle={catTitle}
+                      catTitle={catTitle + (band.label ? ` · ${band.label}` : '')}
                     />
-                  )}
+                  ))}
 
                   {/* Clubs ranking */}
-                  {(rankType === 'all' || rankType === 'club') && clubs.length > 0 && (
+                  {(rankType === 'all' || rankType === 'club') && clubBands.map(band => (
                     <RankingTable
-                      rows={clubs}
-                      label="🏢 Club Rankings"
+                      key={`clb-${band.ageTag || 'all'}`}
+                      rows={band.rows}
+                      label={`🏢 Club Rankings${band.label ? ` — ${band.label}` : ''}`}
                       labelClass="text-purple-700 bg-purple-50 border-purple-200"
-                      catTitle={catTitle}
+                      catTitle={catTitle + (band.label ? ` · ${band.label}` : '')}
                     />
-                  )}
+                  ))}
                 </div>
               );
             })}
@@ -640,6 +699,7 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle }: {
               <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 uppercase">Student</th>
               <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 uppercase">Academy / Club</th>
               <th className="text-left px-2 py-2 text-xs font-bold text-slate-400 uppercase">Table</th>
+              <th className="text-center px-2 py-2 text-xs font-bold text-slate-400 uppercase w-10">Age</th>
               <th className="text-right px-3 py-2 text-xs font-bold text-slate-500 uppercase">R1 pts</th>
               <th className="text-right px-3 py-2 text-xs font-bold text-slate-400 uppercase">R1 time</th>
               <th className="text-right px-3 py-2 text-xs font-bold text-slate-500 uppercase">R2 pts</th>
@@ -660,6 +720,7 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle }: {
                   <td className="px-3 py-2.5 font-semibold text-slate-800">{s.teamName}</td>
                   <td className="px-3 py-2.5 text-xs text-slate-600">{s.clubName || '—'}</td>
                   <td className="px-2 py-2.5 text-xs text-slate-500 whitespace-nowrap">{s.tableLabel}</td>
+                  <td className="px-2 py-2.5 text-center text-xs text-slate-500">{s.age != null ? s.age : <span className="text-slate-300">—</span>}</td>
                   <RoundCell res={s.r1} highlight={s.r1 === s.best} />
                   <TimeCell  res={s.r1} highlight={s.r1 === s.best} />
                   <RoundCell res={s.r2} highlight={s.r2 === s.best} />
