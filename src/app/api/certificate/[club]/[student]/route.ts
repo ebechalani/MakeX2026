@@ -29,7 +29,15 @@ const COVERS = [
   { x: 370, y: 173, w: 60, h: 30 },
 ];
 
-const TEMPLATE_PATH = path.join(process.cwd(), 'scripts', 'cert-template.pdf');
+const TEMPLATE_PATH       = path.join(process.cwd(), 'scripts', 'cert-template.pdf');
+const NAT_ORG_SIG_PATH    = path.join(process.cwd(), 'scripts', 'national_organiser_signature.png');
+const NAT_ORG_LABEL       = 'National Organiser';
+
+// Bottom-right signature position
+const NAT_ORG = {
+  x: 440, y: 70, w: 100,   // image box; height computed from aspect ratio
+  labelY: 55, labelSize: 9,
+};
 
 function sanitize(str: string) {
   return (str || '').replace(/[<>:"/\\|?*]/g, '_').trim();
@@ -120,6 +128,21 @@ export async function GET(
     x: POS.mentorSig.x, y: POS.mentorSig.y,
     size: menSize, font: fontNormal, color: dark,
   });
+
+  // 6. National Organiser signature image (bottom-right)
+  if (fs.existsSync(NAT_ORG_SIG_PATH)) {
+    const sigBytes = fs.readFileSync(NAT_ORG_SIG_PATH);
+    const sigImg   = await doc.embedPng(sigBytes);
+    const h        = NAT_ORG.w * (sigImg.height / sigImg.width);
+    page.drawImage(sigImg, { x: NAT_ORG.x, y: NAT_ORG.y, width: NAT_ORG.w, height: h });
+    // Label below
+    const labelW = fontNormal.widthOfTextAtSize(NAT_ORG_LABEL, NAT_ORG.labelSize);
+    page.drawText(NAT_ORG_LABEL, {
+      x: NAT_ORG.x + (NAT_ORG.w - labelW) / 2,
+      y: NAT_ORG.labelY,
+      size: NAT_ORG.labelSize, font: fontNormal, color: dark,
+    });
+  }
 
   const pdfBytes = await doc.save();
   return new NextResponse(Buffer.from(pdfBytes), {

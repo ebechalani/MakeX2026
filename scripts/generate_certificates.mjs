@@ -26,7 +26,10 @@ import path from 'path';
 // ── Config ────────────────────────────────────────────────────────────────────
 const SUPABASE_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL  || 'https://kcdwxgziwaucaablarae.supabase.co';
 const SUPABASE_KEY  = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjZHd4Z3ppd2F1Y2FhYmxhcmFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODE1MjQsImV4cCI6MjA5MTg1NzUyNH0.B0NyXhzJ08YQZkACamaXhfZmzTcgR_bwlb3pqmG2Y6Q';
-const TEMPLATE_PATH = path.resolve('scripts/cert-template.pdf');
+const TEMPLATE_PATH    = path.resolve('scripts/cert-template.pdf');
+const NAT_ORG_SIG_PATH = path.resolve('scripts/national_organiser_signature.png');
+const NAT_ORG_LABEL    = 'National Organiser';
+const NAT_ORG          = { x: 440, y: 70, w: 100, labelY: 55, labelSize: 9 };
 const OUT_DIR       = path.resolve('scripts/certificates');
 const PUBLIC_DIR    = path.resolve('public/certificates');
 
@@ -166,6 +169,20 @@ for (const stu of students) {
     x: POS.mentorSig.x, y: POS.mentorSig.y,
     size: menSize, font: fontNormal, color: dark,
   });
+
+  // ── 5b. National Organiser signature image (bottom-right) ──────────────────
+  if (fs.existsSync(NAT_ORG_SIG_PATH)) {
+    const sigBytes = fs.readFileSync(NAT_ORG_SIG_PATH);
+    const sigImg   = await pdfDoc.embedPng(sigBytes);
+    const h        = NAT_ORG.w * (sigImg.height / sigImg.width);
+    page.drawImage(sigImg, { x: NAT_ORG.x, y: NAT_ORG.y, width: NAT_ORG.w, height: h });
+    const labelW = fontNormal.widthOfTextAtSize(NAT_ORG_LABEL, NAT_ORG.labelSize);
+    page.drawText(NAT_ORG_LABEL, {
+      x: NAT_ORG.x + (NAT_ORG.w - labelW) / 2,
+      y: NAT_ORG.labelY,
+      size: NAT_ORG.labelSize, font: fontNormal, color: dark,
+    });
+  }
 
   // ── 6. Save individual certificate ────────────────────────────────────────
   const clubDir   = path.join(OUT_DIR, clubName);
