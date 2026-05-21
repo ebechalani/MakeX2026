@@ -102,7 +102,8 @@
       "PowerShell(cmd /c \"python --version\" 2>&1)",
       "Bash(node -e \"require\\('pdf-lib'\\); console.log\\('ok'\\)\")",
       "Bash(node scripts/generate_certificates.mjs)",
-      "Bash(dir scripts\\\\certificates /B)"
+      "Bash(dir scripts\\\\certificates /B)",
+      "Bash(node scripts/fix_schedule.mjs)"
     ]
   }
 }
