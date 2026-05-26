@@ -119,16 +119,21 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   });
 
   const [round2Times, setRound2Times] = useState<Map<string, string>>(new Map());
+  const [competitionCoaches, setCompetitionCoaches] = useState<string[]>([]);
+  const [coachEditVal, setCoachEditVal] = useState<string | null>(null);
+  const [coachSaving, setCoachSaving] = useState(false);
 
   const load = useCallback(async () => {
-    const [pasRes, catRes, tabRes, pendRes] = await Promise.all([
+    const [pasRes, catRes, tabRes, pendRes, acRes] = await Promise.all([
       // ALL rounds for this academy — we filter to round 1 for display, but keep R2 times for the lookup
       supabase.from('passations').select('*, category:categories(*), table:tables(*)')
         .eq('club_name', session.name).order('queue_position'),
       supabase.from('categories').select('*').order('name'),
       supabase.from('tables').select('*').order('table_number'),
       supabase.from('pending_changes').select('*').eq('academy_id', session.id).order('created_at', { ascending: false }),
+      supabase.from('academies').select('competition_coaches').eq('id', session.id).single(),
     ]);
+    if (acRes.data) setCompetitionCoaches((acRes.data as { competition_coaches: string[] | null }).competition_coaches || []);
     if (pasRes.data) {
       const all = pasRes.data as unknown as Passation[];
       // Round-1 rows = canonical student list (one per student)
@@ -484,6 +489,92 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           <Stat label="Approved" value={pending.filter(p => p.status === 'approved').length} color="text-emerald-600" bg="bg-emerald-50" />
           <Stat label="Rejected" value={pending.filter(p => p.status === 'rejected').length} color="text-red-600" bg="bg-red-50" />
         </div>
+
+        {/* ── Coaches — Competition Day ── */}
+        {(() => {
+          const maxCoaches = Math.max(1, Math.floor(passations.length / 5));
+          const isEditing = coachEditVal !== null;
+          const editNames = (coachEditVal ?? '').split('\n').map(s => s.trim()).filter(Boolean);
+          const overLimit = editNames.length > maxCoaches;
+          return (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Coaches — Competition Day</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {passations.length} student{passations.length !== 1 ? 's' : ''} ÷ 5 = <span className="font-semibold text-slate-600">{maxCoaches}</span> coach{maxCoaches !== 1 ? 'es' : ''} allowed
+                  </p>
+                </div>
+                {!isEditing && (
+                  <button
+                    onClick={() => setCoachEditVal(competitionCoaches.join('\n'))}
+                    className="text-xs text-slate-600 hover:text-slate-800 font-semibold px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
+                  >
+                    {competitionCoaches.length === 0 ? '+ Add Coaches' : 'Edit'}
+                  </button>
+                )}
+              </div>
+
+              {!isEditing ? (
+                competitionCoaches.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">No coaches registered yet. Click "Add Coaches" to enter names.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {competitionCoaches.map((name, i) => (
+                      <span key={i} className="text-sm bg-blue-50 text-blue-700 border border-blue-100 px-3 py-1.5 rounded-full font-medium">
+                        {name}
+                      </span>
+                    ))}
+                    {competitionCoaches.length > maxCoaches && (
+                      <span className="text-xs text-red-600 font-bold self-center">⚠ Exceeds limit ({competitionCoaches.length}/{maxCoaches})</span>
+                    )}
+                  </div>
+                )
+              ) : (
+                <div>
+                  <p className="text-xs text-slate-500 mb-2">Enter one coach name per line — max {maxCoaches}</p>
+                  <textarea
+                    rows={Math.max(3, maxCoaches + 1)}
+                    value={coachEditVal}
+                    onChange={e => setCoachEditVal(e.target.value)}
+                    className={`w-full text-sm border rounded-xl px-3.5 py-2.5 bg-white focus:outline-none focus:ring-2 resize-none font-sans ${
+                      overLimit ? 'border-red-400 focus:ring-red-400/30' : 'border-slate-200 focus:ring-blue-500/30 focus:border-blue-400'
+                    }`}
+                    placeholder={'Coach Alice\nCoach Bob'}
+                    autoFocus
+                  />
+                  <div className="flex items-center justify-between mt-3">
+                    <span className={`text-xs font-semibold ${overLimit ? 'text-red-600' : 'text-slate-500'}`}>
+                      {editNames.length} / {maxCoaches}{overLimit ? ' — exceeds limit' : ''}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setCoachEditVal(null)}
+                        className="text-xs text-slate-500 hover:text-slate-700 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 transition"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        disabled={overLimit || coachSaving}
+                        onClick={async () => {
+                          setCoachSaving(true);
+                          const names = (coachEditVal ?? '').split('\n').map(s => s.trim()).filter(Boolean);
+                          await supabase.from('academies').update({ competition_coaches: names }).eq('id', session.id);
+                          setCompetitionCoaches(names);
+                          setCoachEditVal(null);
+                          setCoachSaving(false);
+                        }}
+                        className="text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white px-4 py-2 rounded-xl transition"
+                      >
+                        {coachSaving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
           <strong>Note:</strong> All edits, deletions, and additions require admin approval before taking effect.
