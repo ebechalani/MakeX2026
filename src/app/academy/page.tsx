@@ -489,41 +489,48 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           <Stat label="Rejected" value={pending.filter(p => p.status === 'rejected').length} color="text-red-600" bg="bg-red-50" />
         </div>
 
-        {/* ── Coaches — Competition Day (per category) ── */}
+        {/* ── Coaches — Competition Day (2 groups) ── */}
         {(() => {
-          const catGroups = new Map<string, { cat: Category; students: Passation[] }>();
+          const isSW = (name: string) => /sports\s*wonderland/i.test(name);
+          const swStudents: Passation[] = [];
+          const otherStudents: Passation[] = [];
+          const otherLabels = new Set<string>();
           for (const p of passations) {
             const cat = categories.find(c => c.id === p.category_id);
             if (!cat) continue;
-            if (!catGroups.has(cat.id)) catGroups.set(cat.id, { cat, students: [] });
-            catGroups.get(cat.id)!.students.push(p);
+            if (isSW(cat.name)) { swStudents.push(p); }
+            else { otherStudents.push(p); otherLabels.add(cat.name + (cat.age_range_label ? ` (${cat.age_range_label})` : '')); }
           }
-          if (catGroups.size === 0) return null;
+          const groups = [
+            { key: 'sportswonderland', label: 'Sportswonderland', sub: '', students: swStudents },
+            { key: 'other', label: 'Other categories', sub: Array.from(otherLabels).join(' · '), students: otherStudents },
+          ].filter(gr => gr.students.length > 0);
+          if (groups.length === 0) return null;
           return (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
               <h3 className="text-sm font-bold text-slate-800 mb-1">Coaches — Competition Day</h3>
-              <p className="text-xs text-slate-400 mb-4">Coach quota is calculated per category (1 coach per 5 students, rounded up, minimum 1).</p>
+              <p className="text-xs text-slate-400 mb-4">Enter the names of coaches attending on competition day (ceil(students ÷ 5), min 1).</p>
               <div className="space-y-3">
-                {Array.from(catGroups.entries()).map(([catId, { cat, students }]) => {
+                {groups.map(({ key, label, sub, students }) => {
                   const maxC = Math.max(1, Math.ceil(students.length / 5));
-                  const current = coachesMap[catId] || [];
-                  const isEd = catId in coachEdits;
-                  const val = isEd ? coachEdits[catId] : current.join('\n');
+                  const current = coachesMap[key] || [];
+                  const isEd = key in coachEdits;
+                  const val = isEd ? coachEdits[key] : current.join('\n');
                   const names = val.split('\n').map(s => s.trim()).filter(Boolean);
                   const over = names.length > maxC;
-                  const catName = cat.name + (cat.age_range_label ? ` (${cat.age_range_label})` : '');
                   return (
-                    <div key={catId} className="border border-slate-200 rounded-xl p-4">
+                    <div key={key} className="border border-slate-200 rounded-xl p-4">
                       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                         <div>
-                          <p className="text-sm font-semibold text-slate-800">{catName}</p>
+                          <p className="text-sm font-semibold text-slate-800">{label}</p>
+                          {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
                           <p className="text-xs text-slate-400 mt-0.5">
                             {students.length} student{students.length !== 1 ? 's' : ''} → <span className="font-semibold text-slate-600">{maxC}</span> coach{maxC !== 1 ? 'es' : ''} allowed
                           </p>
                         </div>
                         {!isEd && (
                           <button
-                            onClick={() => setCoachEdits(prev => ({ ...prev, [catId]: current.join('\n') }))}
+                            onClick={() => setCoachEdits(prev => ({ ...prev, [key]: current.join('\n') }))}
                             className="text-xs text-slate-600 hover:text-slate-800 font-semibold px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
                           >
                             {current.length === 0 ? '+ Add' : 'Edit'}
@@ -548,7 +555,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                           <textarea
                             rows={Math.max(3, maxC + 1)}
                             value={val}
-                            onChange={e => setCoachEdits(prev => ({ ...prev, [catId]: e.target.value }))}
+                            onChange={e => setCoachEdits(prev => ({ ...prev, [key]: e.target.value }))}
                             className={`w-full text-sm border rounded-xl px-3.5 py-2.5 bg-white focus:outline-none focus:ring-2 resize-none font-sans ${over ? 'border-red-400 focus:ring-red-400/30' : 'border-slate-200 focus:ring-blue-500/30 focus:border-blue-400'}`}
                             placeholder={'Coach Alice\nCoach Bob'}
                             autoFocus
@@ -559,17 +566,17 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                             </span>
                             <div className="flex gap-2">
                               <button
-                                onClick={() => setCoachEdits(prev => { const n = { ...prev }; delete n[catId]; return n; })}
+                                onClick={() => setCoachEdits(prev => { const n = { ...prev }; delete n[key]; return n; })}
                                 className="text-xs text-slate-500 hover:text-slate-700 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 transition"
                               >Cancel</button>
                               <button
                                 disabled={over}
                                 onClick={async () => {
                                   const saved = val.split('\n').map(s => s.trim()).filter(Boolean);
-                                  const newMap = { ...coachesMap, [catId]: saved };
+                                  const newMap = { ...coachesMap, [key]: saved };
                                   await supabase.from('academies').update({ competition_coaches: newMap }).eq('id', session.id);
                                   setCoachesMap(newMap);
-                                  setCoachEdits(prev => { const n = { ...prev }; delete n[catId]; return n; });
+                                  setCoachEdits(prev => { const n = { ...prev }; delete n[key]; return n; });
                                 }}
                                 className="text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white px-4 py-2 rounded-xl transition"
                               >Save</button>

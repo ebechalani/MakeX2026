@@ -1511,44 +1511,49 @@ function AdminDashboard() {
                                     </table>
                                   </div>
                                 )}
-                              {/* ── Coaches — Competition Day (per category) ── */}
+                              {/* ── Coaches — Competition Day (2 groups) ── */}
                               {(() => {
                                 const coachesMap: Record<string, string[]> = (acc?.competition_coaches as Record<string, string[]>) || {};
-                                // Group students by category
-                                const catGroups = new Map<string, { cat: Category; students: Passation[] }>();
+                                const isSW = (name: string) => /sports\s*wonderland/i.test(name);
+                                const swStudents: Passation[] = [];
+                                const otherStudents: Passation[] = [];
+                                const otherLabels = new Set<string>();
                                 for (const p of g.list) {
                                   const cat = categories.find(c => c.id === p.category_id);
                                   if (!cat) continue;
-                                  if (!catGroups.has(cat.id)) catGroups.set(cat.id, { cat, students: [] });
-                                  catGroups.get(cat.id)!.students.push(p);
+                                  if (isSW(cat.name)) { swStudents.push(p); }
+                                  else { otherStudents.push(p); otherLabels.add(cat.name + (cat.age_range_label ? ` (${cat.age_range_label})` : '')); }
                                 }
-                                if (catGroups.size === 0) return null;
+                                const groups = [
+                                  { key: 'sportswonderland', label: 'Sportswonderland', sub: '', students: swStudents },
+                                  { key: 'other', label: 'Other categories', sub: Array.from(otherLabels).join(' · '), students: otherStudents },
+                                ].filter(gr => gr.students.length > 0);
+                                if (groups.length === 0) return null;
                                 return (
                                   <div className="mt-4 pt-4 border-t border-slate-200">
                                     <div className="flex items-center gap-2 mb-3">
                                       <span className="text-xs font-bold text-slate-700">Coaches — Competition Day</span>
-                                      <span className="text-xs text-slate-400">(per category)</span>
                                     </div>
                                     <div className="space-y-2">
-                                      {Array.from(catGroups.entries()).map(([catId, { cat, students }]) => {
+                                      {groups.map(({ key, label, sub, students }) => {
                                         const maxC = Math.max(1, Math.ceil(students.length / 5));
-                                        const current = coachesMap[catId] || [];
-                                        const ek = `${acc?.id || k}:${catId}`;
+                                        const current = coachesMap[key] || [];
+                                        const ek = `${acc?.id || k}:${key}`;
                                         const isEd = ek in coachEdits;
                                         const val = isEd ? coachEdits[ek] : current.join('\n');
                                         const names = val.split('\n').map((s: string) => s.trim()).filter(Boolean);
                                         const over = names.length > maxC;
-                                        const catLabel = cat.name + (cat.age_range_label ? ` (${cat.age_range_label})` : '');
                                         return (
-                                          <div key={catId} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                                          <div key={key} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
                                             <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
-                                              <div className="flex items-center gap-2">
-                                                <span className="text-xs font-semibold text-slate-700">{catLabel}</span>
-                                                <span className="text-xs text-slate-400 bg-white border border-slate-200 px-1.5 py-0.5 rounded">
+                                              <div>
+                                                <span className="text-xs font-semibold text-slate-700">{label}</span>
+                                                {sub && <span className="text-[10px] text-slate-400 ml-1.5">{sub}</span>}
+                                                <span className="text-xs text-slate-400 bg-white border border-slate-200 px-1.5 py-0.5 rounded ml-2">
                                                   {students.length} students → <span className="font-bold text-slate-600">{maxC}</span> coach{maxC !== 1 ? 'es' : ''} max
                                                 </span>
                                                 {current.length > 0 && !isEd && (
-                                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${current.length <= maxC ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                  <span className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${current.length <= maxC ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                                                     {current.length}/{maxC}
                                                   </span>
                                                 )}
@@ -1591,7 +1596,7 @@ function AdminDashboard() {
                                                       onClick={async () => {
                                                         if (!acc) return;
                                                         const saved = val.split('\n').map((s: string) => s.trim()).filter(Boolean);
-                                                        const newMap = { ...coachesMap, [catId]: saved };
+                                                        const newMap = { ...coachesMap, [key]: saved };
                                                         await supabase.from('academies').update({ competition_coaches: newMap }).eq('id', acc.id);
                                                         setCoachEdits(prev => { const n = { ...prev }; delete n[ek]; return n; });
                                                         load();
