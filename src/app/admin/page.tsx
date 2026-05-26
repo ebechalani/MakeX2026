@@ -1513,7 +1513,7 @@ function AdminDashboard() {
                                 )}
                               {/* ── Coaches — Competition Day ── */}
                               {(() => {
-                                const maxCoaches = Math.floor(g.list.length / 5);
+                                const maxCoaches = Math.max(1, Math.floor(g.list.length / 5));
                                 const currentCoaches: string[] = acc?.competition_coaches || [];
                                 const editKey = acc?.id || k;
                                 const isEditing = editKey in coachEdits;
@@ -1548,16 +1548,13 @@ function AdminDashboard() {
                                             </div>
                                           )}
                                         </div>
-                                        {acc && maxCoaches > 0 && (
+                                        {acc && (
                                           <button
                                             onClick={() => setCoachEdits(prev => ({ ...prev, [editKey]: currentCoaches.join('\n') }))}
                                             className="text-xs text-slate-600 hover:text-slate-800 font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition shrink-0"
                                           >
                                             Edit
                                           </button>
-                                        )}
-                                        {maxCoaches === 0 && (
-                                          <span className="text-xs text-amber-600 italic">Need at least 5 students to allow coaches.</span>
                                         )}
                                       </div>
                                     ) : (
