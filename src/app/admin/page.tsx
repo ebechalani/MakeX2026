@@ -1513,7 +1513,7 @@ function AdminDashboard() {
                                 )}
                               {/* ── Coaches — Competition Day ── */}
                               {(() => {
-                                const maxCoaches = Math.max(1, Math.floor(g.list.length / 5));
+                                const maxCoaches = Math.max(1, Math.ceil(g.list.length / 5));
                                 const currentCoaches: string[] = acc?.competition_coaches || [];
                                 const editKey = acc?.id || k;
                                 const isEditing = editKey in coachEdits;

@@ -492,7 +492,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
 
         {/* ── Coaches — Competition Day ── */}
         {(() => {
-          const maxCoaches = Math.max(1, Math.floor(passations.length / 5));
+          const maxCoaches = Math.max(1, Math.ceil(passations.length / 5));
           const isEditing = coachEditVal !== null;
           const editNames = (coachEditVal ?? '').split('\n').map(s => s.trim()).filter(Boolean);
           const overLimit = editNames.length > maxCoaches;
