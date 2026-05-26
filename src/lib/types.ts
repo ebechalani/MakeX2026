@@ -80,6 +80,7 @@ export interface Academy {
   password: string;
   coach_name: string | null;
   whatsapp_number: string | null;
+  competition_coaches: string[] | null;
   created_at: string;
 }
 

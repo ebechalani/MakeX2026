@@ -175,6 +175,7 @@ function AdminDashboard() {
   const [filteredTables, setFilteredTables] = useState<Table[]>([]);
   const [syncingAll, setSyncingAll] = useState(false);
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+  const [coachEdits, setCoachEdits] = useState<Record<string, string>>({});
 
   const toggleCat = (id: string) => {
     setExpandedCats(prev => {
@@ -403,7 +404,7 @@ function AdminDashboard() {
       supabase.from('tables').select('*').order('table_number'),
       supabase.from('passations').select('*, category:categories(*), table:tables(*)').order('scheduled_time').order('queue_position'),
       supabase.from('pending_changes').select('*, academy:academies(id, name, username, coach_name, whatsapp_number), passation:passations(*)').order('created_at', { ascending: false }),
-      supabase.from('academies').select('id, name, username, coach_name, whatsapp_number, created_at').order('name'),
+      supabase.from('academies').select('id, name, username, coach_name, whatsapp_number, competition_coaches, created_at').order('name'),
       supabase.from('rules_acceptances').select('*, academy:academies(id, name, username), category:categories(*)').order('signed_at', { ascending: false }),
       supabase.from('questionnaire_responses').select('*, academy:academies(id, name, username)').order('submitted_at', { ascending: false }),
     ]);
@@ -1510,6 +1511,96 @@ function AdminDashboard() {
                                     </table>
                                   </div>
                                 )}
+                              {/* ── Coaches — Competition Day ── */}
+                              {(() => {
+                                const maxCoaches = Math.floor(g.list.length / 5);
+                                const currentCoaches: string[] = acc?.competition_coaches || [];
+                                const editKey = acc?.id || k;
+                                const isEditing = editKey in coachEdits;
+                                const editVal = isEditing ? coachEdits[editKey] : currentCoaches.join('\n');
+                                const editNames = editVal.split('\n').map((s: string) => s.trim()).filter(Boolean);
+                                const overLimit = editNames.length > maxCoaches;
+                                return (
+                                  <div className="mt-4 pt-4 border-t border-slate-200">
+                                    <div className="flex items-center gap-3 mb-3">
+                                      <span className="text-xs font-bold text-slate-700">Coaches — Competition Day</span>
+                                      <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                                        {g.list.length} student{g.list.length !== 1 ? 's' : ''} ÷ 5 = <span className="font-bold">{maxCoaches}</span> coach{maxCoaches !== 1 ? 'es' : ''} max
+                                      </span>
+                                      {currentCoaches.length > 0 && !isEditing && (
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${currentCoaches.length <= maxCoaches ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                          {currentCoaches.length}/{maxCoaches}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {!isEditing ? (
+                                      <div className="flex items-start gap-3">
+                                        <div className="flex-1">
+                                          {currentCoaches.length === 0 ? (
+                                            <p className="text-xs text-slate-400 italic">No coaches registered yet.</p>
+                                          ) : (
+                                            <div className="flex flex-wrap gap-1.5">
+                                              {currentCoaches.map((name: string, i: number) => (
+                                                <span key={i} className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-full font-medium">
+                                                  {name}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                        {acc && maxCoaches > 0 && (
+                                          <button
+                                            onClick={() => setCoachEdits(prev => ({ ...prev, [editKey]: currentCoaches.join('\n') }))}
+                                            className="text-xs text-slate-600 hover:text-slate-800 font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition shrink-0"
+                                          >
+                                            Edit
+                                          </button>
+                                        )}
+                                        {maxCoaches === 0 && (
+                                          <span className="text-xs text-amber-600 italic">Need at least 5 students to allow coaches.</span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div>
+                                        <p className="text-xs text-slate-400 mb-1.5">One name per line — max {maxCoaches}</p>
+                                        <textarea
+                                          rows={Math.max(3, maxCoaches + 1)}
+                                          value={editVal}
+                                          onChange={e => setCoachEdits(prev => ({ ...prev, [editKey]: e.target.value }))}
+                                          className={`w-full text-xs border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 resize-none font-sans ${overLimit ? 'border-red-400 focus:ring-red-400/30' : 'border-slate-300 focus:ring-blue-500/30 focus:border-blue-400'}`}
+                                          placeholder={'Coach Alice\nCoach Bob'}
+                                        />
+                                        <div className="flex items-center justify-between mt-2">
+                                          <span className={`text-xs font-semibold ${overLimit ? 'text-red-600' : 'text-slate-500'}`}>
+                                            {editNames.length} / {maxCoaches} coach{maxCoaches !== 1 ? 'es' : ''}
+                                            {overLimit && ' — exceeds limit'}
+                                          </span>
+                                          <div className="flex gap-2">
+                                            <button
+                                              onClick={() => setCoachEdits(prev => { const n = { ...prev }; delete n[editKey]; return n; })}
+                                              className="text-xs text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
+                                            >
+                                              Cancel
+                                            </button>
+                                            <button
+                                              disabled={overLimit}
+                                              onClick={async () => {
+                                                const names = editVal.split('\n').map((s: string) => s.trim()).filter(Boolean);
+                                                await supabase.from('academies').update({ competition_coaches: names }).eq('id', acc!.id);
+                                                setCoachEdits(prev => { const n = { ...prev }; delete n[editKey]; return n; });
+                                                load();
+                                              }}
+                                              className="text-xs font-semibold bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg transition"
+                                            >
+                                              Save
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                               </td>
                             </tr>
                           )}
