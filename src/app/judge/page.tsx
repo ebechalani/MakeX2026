@@ -684,6 +684,32 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
                   value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observations…" />
               </div>
 
+              {/* Score + Time summary before signature */}
+              {(computedScore != null || score || elapsedSec > 0 || timeVal) && (
+                <div className="bg-slate-900 rounded-xl p-4 flex items-center justify-between gap-4">
+                  <div className="flex gap-6">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Total Score</p>
+                      <p className="text-3xl font-black tabular-nums text-emerald-400">
+                        {computedScore != null ? (isVoid ? 'VOID' : computedScore) : (score || '—')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Time</p>
+                      <p className="text-3xl font-black tabular-nums text-white">
+                        {elapsedSec > 0 ? `${elapsedSec}s` : (timeVal ? `${timeVal}s` : '—')}
+                      </p>
+                    </div>
+                  </div>
+                  {currentSheet && running && (
+                    <button onClick={() => setRunning(false)}
+                      className="bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-2 shrink-0">
+                      ⏹ Stop Timer
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Signature pad */}
               <div>
                 <div className="flex items-center justify-between mb-2">
