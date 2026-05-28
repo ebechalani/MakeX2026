@@ -168,9 +168,10 @@ function isUnifiedRanking(catName: string | null | undefined): boolean {
 type AgeBand = { label: string; ageTag: string; rows: RankedStudent[] };
 function splitCapelliByAge(rows: RankedStudent[]): AgeBand[] {
   // Age ≤ 9 counts in the 8–9 band (includes 7-year-olds)
+  // Upper bound is 13 (not 12) to include students who were 12 in the school year but turned 13 by competition day
   const young = reRank(rows.filter(s => s.age != null && s.age <= 9));
-  const old   = reRank(rows.filter(s => s.age != null && s.age >= 10 && s.age <= 12));
-  const other = reRank(rows.filter(s => s.age == null || s.age > 12));
+  const old   = reRank(rows.filter(s => s.age != null && s.age >= 10 && s.age <= 13));
+  const other = reRank(rows.filter(s => s.age == null || s.age > 13));
   const bands: AgeBand[] = [];
   if (young.length) bands.push({ label: '8–9 years',   ageTag: '8-9',   rows: young });
   if (old.length)   bands.push({ label: '10–12 years', ageTag: '10-12', rows: old   });
