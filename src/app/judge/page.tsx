@@ -585,6 +585,12 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
                           Reset
                         </button>
                       </div>
+                      {running && !isVoid && (
+                        <button onClick={() => setRunning(false)}
+                          className="mt-2 w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded-lg text-sm transition flex items-center justify-center gap-2">
+                          ⏹ Stop
+                        </button>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className={`text-[10px] font-bold uppercase tracking-widest ${isVoid ? 'text-red-700' : 'text-slate-400'}`}>{isVoid ? 'Run Voided' : 'Live Score'}</p>
@@ -686,27 +692,19 @@ function JudgeWorkspace({ session, onLogout }: { session: JudgeSession; onLogout
 
               {/* Score + Time summary before signature */}
               {(computedScore != null || score || elapsedSec > 0 || timeVal) && (
-                <div className="bg-slate-900 rounded-xl p-4 flex items-center justify-between gap-4">
-                  <div className="flex gap-6">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Total Score</p>
-                      <p className="text-3xl font-black tabular-nums text-emerald-400">
-                        {computedScore != null ? (isVoid ? 'VOID' : computedScore) : (score || '—')}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Time</p>
-                      <p className="text-3xl font-black tabular-nums text-white">
-                        {elapsedSec > 0 ? `${elapsedSec}s` : (timeVal ? `${timeVal}s` : '—')}
-                      </p>
-                    </div>
+                <div className="bg-slate-900 rounded-xl p-4 flex items-center gap-6">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Total Score</p>
+                    <p className="text-3xl font-black tabular-nums text-emerald-400">
+                      {computedScore != null ? (isVoid ? 'VOID' : computedScore) : (score || '—')}
+                    </p>
                   </div>
-                  {currentSheet && running && (
-                    <button onClick={() => setRunning(false)}
-                      className="bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-2 shrink-0">
-                      ⏹ Stop Timer
-                    </button>
-                  )}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Time</p>
+                    <p className="text-3xl font-black tabular-nums text-white">
+                      {elapsedSec > 0 ? `${elapsedSec}s` : (timeVal ? `${timeVal}s` : '—')}
+                    </p>
+                  </div>
                 </div>
               )}
 
