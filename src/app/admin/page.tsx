@@ -1493,7 +1493,11 @@ function AdminDashboard() {
                                                   <span className="text-slate-400 font-normal ml-1">· {p.student_names}</span>
                                                 )}
                                               </td>
-                                              <td className="py-1.5 px-2 text-slate-600">{cat ? `${cat.name}${cat.age_range_label ? ` (${cat.age_range_label})` : ''}` : '—'}</td>
+                                              <td className="py-1.5 px-2 text-slate-600">
+                                                {cat
+                                                  ? `${cat.name}${cat.age_range_label ? ` (${cat.age_range_label})` : ''}`
+                                                  : <span className="text-amber-600 font-semibold">⚠ No category</span>}
+                                              </td>
                                               <td className="py-1.5 px-2 text-slate-500">{tbl ? (tbl.display_label || `Table ${tbl.table_number}`) : '—'}</td>
                                               <td className="py-1.5 px-2 text-slate-500">
                                                 {p.date_of_birth ? `${new Date(p.date_of_birth).toLocaleDateString()} (${age} yrs)` : '—'}
@@ -1518,9 +1522,10 @@ function AdminDashboard() {
                                 const swStudents: Passation[] = [];
                                 const otherStudents: Passation[] = [];
                                 const otherLabels = new Set<string>();
+                                let unassignedCount = 0;
                                 for (const p of g.list) {
                                   const cat = categories.find(c => c.id === p.category_id);
-                                  if (!cat) continue;
+                                  if (!cat) { unassignedCount++; otherStudents.push(p); continue; }
                                   if (isSW(cat.name)) { swStudents.push(p); }
                                   else { otherStudents.push(p); otherLabels.add(cat.name + (cat.age_range_label ? ` (${cat.age_range_label})` : '')); }
                                 }
@@ -1531,8 +1536,13 @@ function AdminDashboard() {
                                 if (groups.length === 0) return null;
                                 return (
                                   <div className="mt-4 pt-4 border-t border-slate-200">
-                                    <div className="flex items-center gap-2 mb-3">
+                                    <div className="flex items-center gap-2 mb-3 flex-wrap">
                                       <span className="text-xs font-bold text-slate-700">Coaches — Competition Day</span>
+                                      {unassignedCount > 0 && (
+                                        <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                                          ⚠ {unassignedCount} student{unassignedCount > 1 ? 's' : ''} with no category assigned
+                                        </span>
+                                      )}
                                     </div>
                                     <div className="space-y-2">
                                       {groups.map(({ key, label, sub, students }) => {

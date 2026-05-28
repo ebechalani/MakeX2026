@@ -495,9 +495,10 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           const swStudents: Passation[] = [];
           const otherStudents: Passation[] = [];
           const otherLabels = new Set<string>();
+          let unassignedCount = 0;
           for (const p of passations) {
             const cat = categories.find(c => c.id === p.category_id);
-            if (!cat) continue;
+            if (!cat) { unassignedCount++; otherStudents.push(p); continue; }
             if (isSW(cat.name)) { swStudents.push(p); }
             else { otherStudents.push(p); otherLabels.add(cat.name + (cat.age_range_label ? ` (${cat.age_range_label})` : '')); }
           }
@@ -508,7 +509,14 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           if (groups.length === 0) return null;
           return (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-              <h3 className="text-sm font-bold text-slate-800 mb-1">Coaches — Competition Day</h3>
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <h3 className="text-sm font-bold text-slate-800">Coaches — Competition Day</h3>
+                {unassignedCount > 0 && (
+                  <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                    ⚠ {unassignedCount} student{unassignedCount > 1 ? 's' : ''} without category — counted in Other
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-400 mb-4">Enter the names of coaches attending on competition day (ceil(students ÷ 5), min 1).</p>
               <div className="space-y-3">
                 {groups.map(({ key, label, sub, students }) => {
