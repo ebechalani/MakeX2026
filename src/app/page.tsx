@@ -33,13 +33,13 @@ const pages = [
     ),
   },
   {
-    href: '/scoresheet',
-    label: 'Printable Scoresheets',
-    description: 'Open and print the official match scoresheet for each category.',
-    gradient: 'from-violet-700 to-violet-900',
-    border: 'border-violet-600',
-    badge: 'Scoresheets',
-    badgeColor: 'bg-violet-500',
+    href: '/schedule',
+    label: 'Table Schedule Sheets',
+    description: 'Printable roster per table — all students, appointment times, scores and status.',
+    gradient: 'from-teal-700 to-teal-900',
+    border: 'border-teal-600',
+    badge: 'Print',
+    badgeColor: 'bg-teal-500',
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
