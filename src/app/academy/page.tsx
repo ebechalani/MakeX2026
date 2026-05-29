@@ -121,6 +121,8 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   const [round2Times, setRound2Times] = useState<Map<string, string>>(new Map());
   const [coachesMap, setCoachesMap] = useState<Record<string, string[]>>({});
   const [coachEdits, setCoachEdits] = useState<Record<string, string>>({});
+  const [coachSaving, setCoachSaving] = useState<Record<string, boolean>>({});
+  const [coachSaveMsg, setCoachSaveMsg] = useState<Record<string, { ok: boolean; msg: string }>>({});
 
   const load = useCallback(async () => {
     const [pasRes, catRes, tabRes, pendRes, acRes] = await Promise.all([
@@ -578,33 +580,56 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                                 className="text-xs text-slate-500 hover:text-slate-700 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 transition"
                               >Cancel</button>
                               <button
-                                disabled={over}
+                                disabled={over || coachSaving[key]}
                                 onClick={async () => {
                                   const saved = val.split('\n').map(s => s.trim()).filter(Boolean);
                                   const newMap = { ...coachesMap, [key]: saved };
+                                  setCoachSaving(prev => ({ ...prev, [key]: true }));
+                                  setCoachSaveMsg(prev => { const n = { ...prev }; delete n[key]; return n; });
+
                                   // 1. Save to academies table
                                   const { error: acErr } = await supabase
                                     .from('academies')
                                     .update({ competition_coaches: newMap })
                                     .eq('id', session.id);
-                                  if (acErr) { alert('Failed to save coaches: ' + acErr.message); return; }
-                                  // 2. Also update coach_name on the relevant passations so they appear in admin & /coach
+
+                                  if (acErr) {
+                                    setCoachSaving(prev => ({ ...prev, [key]: false }));
+                                    setCoachSaveMsg(prev => ({ ...prev, [key]: { ok: false, msg: 'Academy save failed: ' + acErr.message } }));
+                                    return;
+                                  }
+
+                                  // 2. Update coach_name on the relevant passations
                                   const pasIds = students.map((p: Passation) => p.id);
                                   const coachNameVal = saved.join(', ');
+                                  let pasErrMsg = '';
                                   if (pasIds.length > 0) {
-                                    await supabase
+                                    const { error: pasErr } = await supabase
                                       .from('passations')
                                       .update({ coach_name: coachNameVal })
                                       .in('id', pasIds);
+                                    if (pasErr) pasErrMsg = ' (passation update failed: ' + pasErr.message + ')';
                                   }
+
                                   setCoachesMap(newMap);
                                   setCoachEdits(prev => { const n = { ...prev }; delete n[key]; return n; });
-                                  alert(`✓ Coaches saved! ${saved.length} coach${saved.length !== 1 ? 'es' : ''} assigned to ${students.length} student${students.length !== 1 ? 's' : ''}.`);
+                                  setCoachSaving(prev => ({ ...prev, [key]: false }));
+                                  setCoachSaveMsg(prev => ({
+                                    ...prev,
+                                    [key]: pasErrMsg
+                                      ? { ok: false, msg: `Coaches saved to portal but${pasErrMsg}` }
+                                      : { ok: true, msg: `✓ ${saved.length} coach${saved.length !== 1 ? 'es' : ''} saved and linked to ${pasIds.length} student${pasIds.length !== 1 ? 's' : ''}.` }
+                                  }));
                                 }}
                                 className="text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white px-4 py-2 rounded-xl transition"
-                              >Save</button>
+                              >{coachSaving[key] ? 'Saving…' : 'Save'}</button>
                             </div>
                           </div>
+                          {coachSaveMsg[key] && (
+                            <p className={`text-xs mt-2 font-semibold ${coachSaveMsg[key].ok ? 'text-green-600' : 'text-red-600'}`}>
+                              {coachSaveMsg[key].msg}
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
