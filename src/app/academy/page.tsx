@@ -582,9 +582,24 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                                 onClick={async () => {
                                   const saved = val.split('\n').map(s => s.trim()).filter(Boolean);
                                   const newMap = { ...coachesMap, [key]: saved };
-                                  await supabase.from('academies').update({ competition_coaches: newMap }).eq('id', session.id);
+                                  // 1. Save to academies table
+                                  const { error: acErr } = await supabase
+                                    .from('academies')
+                                    .update({ competition_coaches: newMap })
+                                    .eq('id', session.id);
+                                  if (acErr) { alert('Failed to save coaches: ' + acErr.message); return; }
+                                  // 2. Also update coach_name on the relevant passations so they appear in admin & /coach
+                                  const pasIds = students.map((p: Passation) => p.id);
+                                  const coachNameVal = saved.join(', ');
+                                  if (pasIds.length > 0) {
+                                    await supabase
+                                      .from('passations')
+                                      .update({ coach_name: coachNameVal })
+                                      .in('id', pasIds);
+                                  }
                                   setCoachesMap(newMap);
                                   setCoachEdits(prev => { const n = { ...prev }; delete n[key]; return n; });
+                                  alert(`✓ Coaches saved! ${saved.length} coach${saved.length !== 1 ? 'es' : ''} assigned to ${students.length} student${students.length !== 1 ? 's' : ''}.`);
                                 }}
                                 className="text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white px-4 py-2 rounded-xl transition"
                               >Save</button>
