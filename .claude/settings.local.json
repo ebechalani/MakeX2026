@@ -113,7 +113,9 @@
       "Bash(eddy)",
       "Bash(png)",
       "Bash(jpg)",
-      "Bash(jpeg\" 2>&1)"
+      "Bash(jpeg\" 2>&1)",
+      "Bash(git pull *)",
+      "Bash(git stash *)"
     ]
   }
 }
