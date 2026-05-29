@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Category, Table, Passation } from '@/lib/types';
 import Link from 'next/link';
+import * as XLSX from 'xlsx';
 
 interface Sheet {
   category: Category;
@@ -69,6 +70,61 @@ export default function SchedulePage() {
 
   const totalStudents = filtered.reduce((n, s) => n + s.students.length, 0);
 
+  const exportExcel = useCallback(() => {
+    const wb = XLSX.utils.book_new();
+
+    for (const sheet of filtered) {
+      const catName = sheet.category.name;
+      const ageLabel = sheet.category.age_range_label;
+      const tableLabel = sheet.table.display_label || `Table ${sheet.table.table_number}`;
+
+      // Sheet name: max 31 chars, no special chars
+      const rawName = `${catName}${ageLabel ? ` ${ageLabel}` : ''} - ${tableLabel}`;
+      const sheetName = rawName.replace(/[\\/*?[\]:]/g, '').slice(0, 31);
+
+      const rows: (string | number | null)[][] = [];
+
+      // Title rows
+      rows.push([`MakeX 2026 Lebanon — ${catName}${ageLabel ? ` (${ageLabel})` : ''}`]);
+      rows.push([tableLabel]);
+      rows.push([`Printed: ${printedAt}`]);
+      rows.push([]); // blank
+      // Header
+      rows.push(['#', 'Student Name', 'Coach', 'Appt. Time', 'Status', 'Score', 'Mission Time (s)']);
+
+      // Data rows sorted by queue_position
+      const sorted = [...sheet.students].sort((a, b) => a.queue_position - b.queue_position);
+      sorted.forEach((p, idx) => {
+        rows.push([
+          idx + 1,
+          getName(p),
+          p.coach_name || '',
+          fmt(p.scheduled_time),
+          p.live_status,
+          p.live_status === 'Finished' && p.score != null ? p.score : '',
+          p.live_status === 'Finished' && p.time_seconds != null ? p.time_seconds : '',
+        ]);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+
+      // Column widths
+      ws['!cols'] = [
+        { wch: 4 },   // #
+        { wch: 30 },  // Name
+        { wch: 22 },  // Coach
+        { wch: 12 },  // Time
+        { wch: 13 },  // Status
+        { wch: 8 },   // Score
+        { wch: 16 },  // Mission time
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+
+    XLSX.writeFile(wb, `MakeX2026_Schedule_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }, [filtered, printedAt]);
+
   return (
     <>
       {/* ── Print styles injected inline ── */}
@@ -110,6 +166,15 @@ export default function SchedulePage() {
                 </option>
               ))}
             </select>
+            <button
+              onClick={exportExcel}
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export Excel
+            </button>
             <button
               onClick={() => window.print()}
               className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition">
