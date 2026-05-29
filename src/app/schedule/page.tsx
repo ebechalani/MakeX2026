@@ -76,54 +76,35 @@ export default function SchedulePage() {
     for (const sheet of filtered) {
       const catName = sheet.category.name;
       const ageLabel = sheet.category.age_range_label;
-      const tableLabel = sheet.table.display_label || `Table ${sheet.table.table_number}`;
+      const tableNum = sheet.table.table_number;
+      const tableLabel = sheet.table.display_label || `Table ${tableNum}`;
 
-      // Sheet name: max 31 chars, no special chars
-      const rawName = `${catName}${ageLabel ? ` ${ageLabel}` : ''} - ${tableLabel}`;
-      const sheetName = rawName.replace(/[\\/*?[\]:]/g, '').slice(0, 31);
+      // Sheet tab name: e.g. "Sportswonderland - Table 1"
+      const sheetName = `${catName}${ageLabel ? ` ${ageLabel}` : ''} - ${tableLabel}`
+        .replace(/[\\/*?[\]:]/g, '').slice(0, 31);
 
-      const rows: (string | number | null)[][] = [];
+      const rows: (string | number)[][] = [];
 
-      // Title rows
-      rows.push([`MakeX 2026 Lebanon — ${catName}${ageLabel ? ` (${ageLabel})` : ''}`]);
+      // Header block
+      rows.push([`MakeX 2026 Lebanon`]);
+      rows.push([`${catName}${ageLabel ? ` (${ageLabel})` : ''}`]);
       rows.push([tableLabel]);
-      rows.push([`Printed: ${printedAt}`]);
-      rows.push([]); // blank
-      // Header
-      rows.push(['#', 'Student Name', 'Coach', 'Appt. Time', 'Status', 'Score', 'Mission Time (s)']);
+      rows.push([]); // blank spacer
+      rows.push(['#', 'Participant Name']);
 
-      // Data rows sorted by queue_position
+      // One row per student — name only
       const sorted = [...sheet.students].sort((a, b) => a.queue_position - b.queue_position);
       sorted.forEach((p, idx) => {
-        rows.push([
-          idx + 1,
-          getName(p),
-          p.coach_name || '',
-          fmt(p.scheduled_time),
-          p.live_status,
-          p.live_status === 'Finished' && p.score != null ? p.score : '',
-          p.live_status === 'Finished' && p.time_seconds != null ? p.time_seconds : '',
-        ]);
+        rows.push([idx + 1, getName(p)]);
       });
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
-
-      // Column widths
-      ws['!cols'] = [
-        { wch: 4 },   // #
-        { wch: 30 },  // Name
-        { wch: 22 },  // Coach
-        { wch: 12 },  // Time
-        { wch: 13 },  // Status
-        { wch: 8 },   // Score
-        { wch: 16 },  // Mission time
-      ];
-
+      ws['!cols'] = [{ wch: 4 }, { wch: 35 }];
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
 
-    XLSX.writeFile(wb, `MakeX2026_Schedule_${new Date().toISOString().slice(0, 10)}.xlsx`);
-  }, [filtered, printedAt]);
+    XLSX.writeFile(wb, `MakeX2026_Tables_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }, [filtered]);
 
   return (
     <>
