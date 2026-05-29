@@ -103,7 +103,17 @@ export default function SchedulePage() {
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
 
-    XLSX.writeFile(wb, `MakeX2026_Tables_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    // Use blob URL — more reliable than XLSX.writeFile in Next.js
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MakeX2026_Tables_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }, [filtered]);
 
   return (
