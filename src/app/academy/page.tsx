@@ -134,7 +134,6 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
       supabase.from('pending_changes').select('*').eq('academy_id', session.id).order('created_at', { ascending: false }),
       supabase.from('academies').select('competition_coaches').eq('id', session.id).single(),
     ]);
-    if (acRes.data) setCoachesMap((acRes.data as { competition_coaches: Record<string, string[]> | null }).competition_coaches || {});
     if (pasRes.data) {
       const all = pasRes.data as unknown as Passation[];
       // Round-1 rows = canonical student list (one per student)
@@ -146,6 +145,29 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
       for (const p of r2) if (p.scheduled_time) m.set(keyFor(p), p.scheduled_time);
       setPassations(r1);
       setRound2Times(m);
+
+      // Rebuild coaches map from coach_name on passations (source of truth)
+      // Split stored "Coach A, Coach B" back into array per group
+      const isSWCat = (name: string) => /sports\s*wonderland/i.test(name);
+      const cats = (catRes.data || []) as Category[];
+      const swCoaches = new Set<string>();
+      const otherCoaches = new Set<string>();
+      for (const p of r1) {
+        if (!p.coach_name) continue;
+        const cat = cats.find(c => c.id === p.category_id);
+        const names = p.coach_name.split(',').map((n: string) => n.trim()).filter(Boolean);
+        if (cat && isSWCat(cat.name)) names.forEach((n: string) => swCoaches.add(n));
+        else names.forEach((n: string) => otherCoaches.add(n));
+      }
+      const rebuilt: Record<string, string[]> = {};
+      if (swCoaches.size > 0) rebuilt['sportswonderland'] = Array.from(swCoaches);
+      if (otherCoaches.size > 0) rebuilt['other'] = Array.from(otherCoaches);
+
+      // Merge: passation-derived data is base, competition_coaches overrides if present
+      const acCoaches = acRes.data
+        ? ((acRes.data as { competition_coaches: Record<string, string[]> | null }).competition_coaches || {})
+        : {};
+      setCoachesMap({ ...rebuilt, ...acCoaches });
     }
     if (catRes.data) setCategories(catRes.data);
     if (tabRes.data) setTables(tabRes.data);
@@ -587,19 +609,7 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                                   setCoachSaving(prev => ({ ...prev, [key]: true }));
                                   setCoachSaveMsg(prev => { const n = { ...prev }; delete n[key]; return n; });
 
-                                  // 1. Save to academies table
-                                  const { error: acErr } = await supabase
-                                    .from('academies')
-                                    .update({ competition_coaches: newMap })
-                                    .eq('id', session.id);
-
-                                  if (acErr) {
-                                    setCoachSaving(prev => ({ ...prev, [key]: false }));
-                                    setCoachSaveMsg(prev => ({ ...prev, [key]: { ok: false, msg: 'Academy save failed: ' + acErr.message } }));
-                                    return;
-                                  }
-
-                                  // 2. Update coach_name on the relevant passations
+                                  // Save coach_name on every passation in this group
                                   const pasIds = students.map((p: Passation) => p.id);
                                   const coachNameVal = saved.join(', ');
                                   let pasErrMsg = '';
@@ -608,8 +618,13 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                                       .from('passations')
                                       .update({ coach_name: coachNameVal })
                                       .in('id', pasIds);
-                                    if (pasErr) pasErrMsg = ' (passation update failed: ' + pasErr.message + ')';
+                                    if (pasErr) pasErrMsg = 'Save failed: ' + pasErr.message;
                                   }
+
+                                  // Also try to persist to academies (best-effort, not critical)
+                                  await supabase.from('academies')
+                                    .update({ competition_coaches: newMap })
+                                    .eq('id', session.id);
 
                                   setCoachesMap(newMap);
                                   setCoachEdits(prev => { const n = { ...prev }; delete n[key]; return n; });
@@ -617,8 +632,8 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                                   setCoachSaveMsg(prev => ({
                                     ...prev,
                                     [key]: pasErrMsg
-                                      ? { ok: false, msg: `Coaches saved to portal but${pasErrMsg}` }
-                                      : { ok: true, msg: `✓ ${saved.length} coach${saved.length !== 1 ? 'es' : ''} saved and linked to ${pasIds.length} student${pasIds.length !== 1 ? 's' : ''}.` }
+                                      ? { ok: false, msg: pasErrMsg }
+                                      : { ok: true, msg: `✓ ${saved.length} coach${saved.length !== 1 ? 'es' : ''} saved to ${pasIds.length} student${pasIds.length !== 1 ? 's' : ''}.` }
                                   }));
                                 }}
                                 className="text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white px-4 py-2 rounded-xl transition"
