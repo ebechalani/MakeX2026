@@ -83,6 +83,16 @@ export default function SchedulePage() {
       if (!cats || !tabs || !pas) { alert('Failed to load data'); return; }
 
       const wb = XLSX.utils.book_new();
+      const usedNames = new Set<string>();
+
+      const uniqueName = (raw: string) => {
+        const base = raw.replace(/[\\/*?[\]:]/g, '').slice(0, 28);
+        let name = base;
+        let i = 2;
+        while (usedNames.has(name)) name = `${base} ${i++}`;
+        usedNames.add(name);
+        return name;
+      };
 
       for (const cat of cats as Category[]) {
         if (filterCatId && cat.id !== filterCatId) continue;
@@ -96,8 +106,7 @@ export default function SchedulePage() {
           const catName = cat.name;
           const ageLabel = cat.age_range_label;
           const tableLabel = table.display_label || `Table ${table.table_number}`;
-          const sheetName = `${catName}${ageLabel ? ` ${ageLabel}` : ''} - ${tableLabel}`
-            .replace(/[\\/*?[\]:]/g, '').slice(0, 31);
+          const sheetName = uniqueName(`${catName}${ageLabel ? ` ${ageLabel}` : ''} - ${tableLabel}`);
 
           const rows: (string | number)[][] = [
             [`MakeX 2026 Lebanon`],
