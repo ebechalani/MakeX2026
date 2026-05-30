@@ -141,29 +141,75 @@ export default function RankingPage() {
     ? rankings.filter(r => r.category.id === filterCatId)
     : rankings;
 
-  const exportExcel = useCallback(() => {
+  const [exporting, setExporting] = useState(false);
+
+  const exportExcel = useCallback(async () => {
+    // Always re-fetch fresh data at export time so manual admin edits are included
+    setExporting(true);
+    const [{ data: cats }, { data: pas }] = await Promise.all([
+      supabase.from('categories').select('*').eq('active', true).order('name'),
+      supabase.from('passations').select('*').not('score', 'is', null),
+    ]);
+    setExporting(false);
+    if (!cats || !pas) { alert('Failed to load data for export'); return; }
+
+    const allCats = cats as Category[];
+    const allPas = pas as Passation[];
+
     const wb = XLSX.utils.book_new();
-    for (const { category: cat, rows } of filtered) {
+
+    for (const cat of allCats) {
+      if (isExcluded(cat)) continue;
+      if (filterCatId && cat.id !== filterCatId) continue;
+
+      const catPas = allPas.filter(p => p.category_id === cat.id);
+      if (catPas.length === 0) continue;
+
+      // Group by student
+      const studentMap = new Map<string, Passation[]>();
+      for (const p of catPas) {
+        const key = `${(p.team_name || '').trim().toLowerCase()}||${(p.club_name || '').trim().toLowerCase()}`;
+        if (!studentMap.has(key)) studentMap.set(key, []);
+        studentMap.get(key)!.push(p);
+      }
+
+      // Best result per student
+      const students = Array.from(studentMap.values()).map(rounds => {
+        const best = getBest(rounds);
+        const rep = rounds[0];
+        return { name: rep.student_names || rep.team_name || '—', club: rep.club_name || '—', ...best };
+      });
+
+      // Sort: score DESC, time ASC (null last)
+      students.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (a.time === null && b.time === null) return 0;
+        if (a.time === null) return 1;
+        if (b.time === null) return -1;
+        return a.time - b.time;
+      });
+
       const catLabel = `${cat.name}${cat.age_range_label ? ` (${cat.age_range_label})` : ''}`;
       const sheetName = catLabel.replace(/[\\/*?[\]:]/g, '').slice(0, 31);
 
       const data: (string | number)[][] = [
         ['MakeX 2026 Lebanon — Rankings'],
         [catLabel],
+        [`Exported: ${new Date().toLocaleString()}`],
         [],
-        ['Rank', 'Participant Name', 'Academy / Club', 'Best Score', 'Best Time', 'Round'],
-        ...rows.map(r => [
-          r.rank,
-          r.name,
-          r.club,
-          r.score,
-          r.time != null ? `${r.time}s` : '—',
-          `Round ${r.round}`,
+        ['Rank', 'Participant Name', 'Academy / Club', 'Best Score', 'Best Time (s)', 'Round'],
+        ...students.map((s, i) => [
+          i + 1,
+          s.name,
+          s.club,
+          s.score,
+          s.time != null ? s.time : '',   // raw number so Excel can sort/filter
+          `Round ${s.round}`,
         ]),
       ];
 
       const ws = XLSX.utils.aoa_to_sheet(data);
-      ws['!cols'] = [{ wch: 6 }, { wch: 32 }, { wch: 24 }, { wch: 12 }, { wch: 12 }, { wch: 9 }];
+      ws['!cols'] = [{ wch: 6 }, { wch: 32 }, { wch: 24 }, { wch: 13 }, { wch: 14 }, { wch: 9 }];
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
 
@@ -177,7 +223,7 @@ export default function RankingPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [filtered]);
+  }, [supabase, filterCatId]);
 
   const rankBg = (rank: number) => {
     if (rank === 1) return 'rgba(250,204,21,0.15)';
@@ -223,13 +269,16 @@ export default function RankingPage() {
           </select>
           <button
             onClick={exportExcel}
-            disabled={filtered.length === 0}
+            disabled={exporting}
             className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export Excel
+            {exporting
+              ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+            }
+            {exporting ? 'Fetching…' : 'Export Excel'}
           </button>
           <button onClick={load}
             className="text-sm text-slate-500 hover:text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl transition">
