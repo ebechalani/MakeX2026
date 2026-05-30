@@ -20,7 +20,7 @@ interface BestResult {
 
 /** Pick the round with the highest score; on tie, lowest time wins. */
 function getBest(rounds: Passation[]): BestResult {
-  const finished = rounds.filter(r => r.live_status === 'Finished' && r.score != null);
+  const finished = rounds.filter(r => r.score != null);
   if (finished.length === 0) return { score: 0, time: null, round: 0 };
   let best = finished[0];
   for (const r of finished.slice(1)) {
@@ -71,7 +71,9 @@ export default function RankingPage() {
     setLoading(true);
     const [{ data: cats }, { data: pas }] = await Promise.all([
       supabase.from('categories').select('*').eq('active', true).order('name'),
-      supabase.from('passations').select('*').eq('live_status', 'Finished'),
+      // Include any passation that has a score — covers manual edits by admin
+      // regardless of live_status
+      supabase.from('passations').select('*').not('score', 'is', null),
     ]);
     if (!cats || !pas) { setLoading(false); return; }
 
