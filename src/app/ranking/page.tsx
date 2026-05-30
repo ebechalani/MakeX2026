@@ -210,30 +210,35 @@ export default function RankingPage() {
           i + 1,
           s.name,
           s.club,
-          s.r1score,
-          s.r1time,
-          s.r2score,
-          s.r2time,
-          s.bestScore || null,  // placeholder — replaced by formula below
-          s.bestTime,           // placeholder — replaced by formula below
+          s.r1score ?? '',
+          s.r1time  ?? '',
+          s.r2score ?? '',
+          s.r2time  ?? '',
+          s.bestScore ?? 0,   // placeholder — overwritten with formula below
+          s.bestTime  ?? 0,   // placeholder — overwritten with formula below
         ]),
       ];
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
 
-      // Replace Best Score (col H) and Best Time (col I) with live Excel formulas
-      // Data starts at row 5 (1-based). Columns: D=R1Score E=R1Time F=R2Score G=R2Time
-      students.forEach((_, i) => {
+      // Overwrite H and I columns with formula cells
+      // Columns: D=R1Score  E=R1Time  F=R2Score  G=R2Time
+      // Formulas always return a number (0 when no data)
+      students.forEach((s, i) => {
         const r = 5 + i;
+
+        // Best Score = MAX(R1,R2); if one round missing use the other; 0 if both missing
         ws[`H${r}`] = {
           t: 'n',
-          v: students[i].bestScore ?? 0,
-          f: `IF(AND(D${r}="",F${r}=""),"",IF(D${r}="",F${r},IF(F${r}="",D${r},MAX(D${r},F${r}))))`,
+          v: s.bestScore ?? 0,
+          f: `IF(AND(D${r}="",F${r}=""),0,IF(D${r}="",F${r},IF(F${r}="",D${r},MAX(D${r},F${r}))))`,
         };
+
+        // Best Time = time from the round with best score; on tie take MIN; 0 if no time
         ws[`I${r}`] = {
           t: 'n',
-          v: students[i].bestTime ?? 0,
-          f: `IF(AND(D${r}="",F${r}=""),"",IF(D${r}="",G${r},IF(F${r}="",E${r},IF(D${r}>F${r},E${r},IF(F${r}>D${r},G${r},MIN(E${r},G${r}))))))`,
+          v: s.bestTime ?? 0,
+          f: `IF(AND(D${r}="",F${r}=""),0,IF(F${r}="",E${r},IF(D${r}="",G${r},IF(D${r}>F${r},E${r},IF(F${r}>D${r},G${r},MIN(E${r},G${r}))))))`,
         };
       });
 
