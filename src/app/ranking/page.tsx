@@ -142,6 +142,7 @@ export default function RankingPage() {
     : rankings;
 
   const [exporting, setExporting] = useState(false);
+  const [templating, setTemplating] = useState(false);
 
   const exportExcel = useCallback(async () => {
     setExporting(true);
@@ -250,7 +251,8 @@ export default function RankingPage() {
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
 
-    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx', cellFormula: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx', cellFormula: true } as any);
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -262,9 +264,7 @@ export default function RankingPage() {
     URL.revokeObjectURL(url);
   }, [supabase, filterCatId]);
 
-  // ── Template download: names pre-filled, formulas for Best Score & Best Time ──
-  const [templating, setTemplating] = useState(false);
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const downloadTemplate = useCallback(async () => {
     setTemplating(true);
     const [{ data: cats }, { data: pas }] = await Promise.all([
@@ -365,7 +365,8 @@ export default function RankingPage() {
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
 
-    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx', cellFormula: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx', cellFormula: true } as any);
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -431,19 +432,6 @@ export default function RankingPage() {
                 </svg>
             }
             {exporting ? 'Fetching…' : 'Export Excel'}
-          </button>
-          <button
-            onClick={downloadTemplate}
-            disabled={templating}
-            className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition">
-            {templating
-              ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-            }
-            {templating ? 'Preparing…' : 'Score Template'}
           </button>
           <button onClick={load}
             className="text-sm text-slate-500 hover:text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl transition">
