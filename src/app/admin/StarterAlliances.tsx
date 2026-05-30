@@ -197,28 +197,24 @@ export default function StarterAlliances() {
       }
     }
 
-    // ── Force-pair specific students who must be on the same team ──────────
-    type ForcedPair = { frags: string[]; club?: string }[];
-    const FORCED_PAIRS: ForcedPair[] = [
-      // Carlo Kafrouni + Jean Paul Mrad (Roboholic team 3)
-      [{ frags: ['carlo', 'kafrouni'] }, { frags: ['jean paul', 'mrad'] }],
+    // ── Hardcoded teams that must always exist (even if not yet in DB) ────────
+    // These are injected only when not already covered by group_id or team_name matching.
+    const HARDCODED_TEAMS: { club: string; members: string[]; key: string }[] = [
+      { key: '__hc_carlo_jp__', club: 'Roboholic', members: ['Carlo Kafrouni', 'Jean Paul Mrad'] },
     ];
-    for (const [specA, specB] of FORCED_PAIRS) {
-      const nameFits = (p: Passation, spec: { frags: string[]; club?: string }) => {
-        const hay = (p.student_names || p.team_name || '').toLowerCase();
-        return spec.frags.every(f => hay.includes(f.toLowerCase()));
-      };
-      const iA = singletons.findIndex(p => nameFits(p, specA));
-      const iB = singletons.findIndex(p => nameFits(p, specB));
-      if (iA !== -1 && iB !== -1) {
-        const [pA] = singletons.splice(Math.max(iA, iB), 1);
-        const [pB] = singletons.splice(Math.min(iA, iB), 1);
-        result.push({
-          key: `${pA.id}|${pB.id}`,
-          displayName: pA.club_name || 'Roboholic',
-          club: pA.club_name || '',
-          members: [pA.student_names || pA.team_name || '', pB.student_names || pB.team_name || ''].filter(Boolean),
-        });
+    for (const hc of HARDCODED_TEAMS) {
+      // Skip if any member is already represented in result
+      const alreadyIn = result.some(t =>
+        hc.members.some(m => t.members.some(tm => tm.toLowerCase().includes(m.split(' ')[0].toLowerCase())))
+      );
+      // Also remove any singleton row that matches one of these members so there's no duplicate
+      if (!alreadyIn) {
+        for (const m of hc.members) {
+          const first = m.split(' ')[0].toLowerCase();
+          const idx = singletons.findIndex(p => (p.student_names || p.team_name || '').toLowerCase().includes(first));
+          if (idx !== -1) singletons.splice(idx, 1);
+        }
+        result.push({ key: hc.key, displayName: hc.club, club: hc.club, members: hc.members });
       }
     }
 
