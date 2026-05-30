@@ -51,25 +51,30 @@ function hasConflict(a: Team, b: Team): boolean {
   // No two Mindscape teams in the same alliance
   if (isMindscape(a) && isMindscape(b)) return true;
 
-  // Roboholic team identities
+  // Roboholic team identities (matched by actual DB names)
   const isR1 = (t: Team) => isRobo(t) && anyMember(t, 'elio') && anyMember(t, 'alexander');
-  const isR2 = (t: Team) => isRobo(t) && anyMember(t, 'jean') && anyMember(t, 'peter');
-  const isR3 = (t: Team) => isRobo(t) && anyMember(t, 'carlo');
-  // R4 = any remaining Roboholic team not matching R1/R2/R3
+  // R2 = Jean Karam + Peter Derderian
+  const isR2 = (t: Team) => isRobo(t) && anyMember(t, 'karam') && anyMember(t, 'peter');
+  // R3 = Carlo Kafrouni + Jean Paul Mrad
+  const isR3 = (t: Team) => isRobo(t) && anyMember(t, 'carlo') && anyMember(t, 'kafrouni');
+  // R4 = any remaining Roboholic not R1/R2/R3
   const isR4 = (t: Team) => isRobo(t) && !isR1(t) && !isR2(t) && !isR3(t);
 
   if ((isR1(a) && isR2(b)) || (isR1(b) && isR2(a))) return true; // R1 ↔ R2
   if ((isR3(a) && isR4(b)) || (isR3(b) && isR4(a))) return true; // R3 ↔ R4
 
-  // Angelina+Yara cannot be with Jason+Jean Paul
+  // Angelina Chalouhy+Yara Dagher cannot be with Jason Bou Abboud+Jean Paul Semaan
   const isAY  = (t: Team) => anyMember(t, 'angelina') && anyMember(t, 'yara');
   const isJJP = (t: Team) => anyMember(t, 'jason') && anyMember(t, 'jean paul');
   if ((isAY(a) && isJJP(b)) || (isAY(b) && isJJP(a))) return true;
 
-  // Elia+Yasmina cannot be with Anthony+Marcelina or Elie+Kepriyano
-  const isElYas = (t: Team) => anyMember(t, 'elia') && anyMember(t, 'yasmina');
-  const isAntMar = (t: Team) => anyMember(t, 'anthony') && anyMember(t, 'marcelina');
-  const isElKep  = (t: Team) => anyMember(t, 'elie') && anyMember(t, 'kepriyano');
+  // Elie Harb+Yasmina Khoury cannot be with Anthony Faddoul+Marcelino Bitar or Elie Bou Abboud+Kepriyano
+  // NOTE: student name is "Elie Harb" (not "Elia") — identify by 'yasmina' which is unique
+  const isElYas  = (t: Team) => anyMember(t, 'yasmina');
+  // NOTE: student name is "Marcelino Bitar" (not "Marcelina") — use 'marcelin' to match both spellings
+  const isAntMar = (t: Team) => anyMember(t, 'faddoul') || anyMember(t, 'marcelin');
+  // Kepriyano youssef — 'kepriyano' is unique
+  const isElKep  = (t: Team) => anyMember(t, 'kepriyano');
   if (isElYas(a) && (isAntMar(b) || isElKep(b))) return true;
   if (isElYas(b) && (isAntMar(a) || isElKep(a))) return true;
 
@@ -251,35 +256,37 @@ export default function StarterAlliances() {
     const freeRed: Team[] = [];
     const freeBlue: Team[] = [];
 
-    // ── Fixed alliance 1: Roboholic (Elio+Alexander) RED ↔ Mindscape (Joe Khoury+Anthony Matar) BLUE ──
+    // ── Fixed alliance 1: Elio Azar+Alexander Rabbat (RoboHolic) RED ↔ Mindscape team BLUE ──
+    // Joe Hicham Khoury and Anthony Matar are on SEPARATE Mindscape teams in the DB.
+    // Using OR so whichever team has either surname becomes the fixed Blue partner.
     const rA = pull(pool, t =>
       t.club.toLowerCase().includes('roboholic') &&
       anyMember(t, 'elio') && anyMember(t, 'alexander')
     );
     const bA = pull(pool, t =>
       t.club.toLowerCase().includes('mindscape') &&
-      anyMember(t, 'khoury') && anyMember(t, 'matar')
+      (anyMember(t, 'khoury') || anyMember(t, 'matar'))
     );
     if (rA && bA) fixed.push({ red: rA, blue: bA });
     else { if (rA) pool.push(rA); if (bA) pool.push(bA); }
 
-    // ── Fixed role: Roboholic (Jean+Peter) → RED ──
+    // ── Fixed role: Jean Karam + Peter Derderian (RoboHolic) → RED ──
     const rB = pull(pool, t =>
       t.club.toLowerCase().includes('roboholic') &&
-      anyMember(t, 'jean') && anyMember(t, 'peter')
+      anyMember(t, 'karam') && anyMember(t, 'peter')
     );
     if (rB) freeRed.push(rB);
 
-    // ── Fixed role: Roboholic (Carlo+Jean Paul) → BLUE ──
+    // ── Fixed role: Carlo Kafrouni + Jean Paul Mrad (RoboHolic) → BLUE ──
     const bB = pull(pool, t =>
       t.club.toLowerCase().includes('roboholic') &&
-      anyMember(t, 'carlo') && (anyMember(t, 'jean') || anyMember(t, 'jean paul'))
+      anyMember(t, 'carlo') && anyMember(t, 'kafrouni')
     );
     if (bB) freeBlue.push(bB);
 
-    // ── Fixed role: (Johny/Johnny + Christopher) → BLUE ──
+    // ── Fixed role: Johnny Boutros + Christopher Sader → BLUE ──
     const bC = pull(pool, t =>
-      (anyMember(t, 'johny') || anyMember(t, 'johnny')) && anyMember(t, 'christopher')
+      anyMember(t, 'johnny') && anyMember(t, 'christopher')
     );
     if (bC) freeBlue.push(bC);
 
