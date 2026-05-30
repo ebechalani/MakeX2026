@@ -87,13 +87,69 @@ export default function JudgesTab() {
   const swCat = categories.find(c => /sportswonderland/i.test(c.name));
   const swTables = swCat ? (tablesByCat.get(swCat.id) || []) : [];
 
+  // ── Print credentials ────────────────────────────────────────────────────────
+  function printCredentials() {
+    const rows = judges.map(j => {
+      const myTables = [...(byJudge.get(j.id) || new Set<string>())];
+      const tableLabels = myTables.map(tid => {
+        const t = tables.find(x => x.id === tid);
+        if (!t) return '';
+        const cat = categories.find(c => c.id === t.category_id);
+        return `${cat?.name ?? ''}${cat?.age_range_label ? ` (${cat.age_range_label})` : ''} — ${t.display_label || `Table ${t.table_number}`}`;
+      }).filter(Boolean).join('\n');
+      return { name: j.name, username: j.username, password: j.password_plain || '—', tables: tableLabels || '— none assigned —' };
+    });
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>Judge Credentials — MakeX 2026</title>
+<style>
+  body { font-family: Arial, sans-serif; background:#f1f5f9; margin:0; padding:24px; }
+  h1 { text-align:center; font-size:20px; margin-bottom:24px; color:#1e293b; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+  .card { background:white; border:2px solid #e2e8f0; border-radius:12px; padding:20px; page-break-inside:avoid; }
+  .card-header { font-size:13px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px; }
+  .name { font-size:18px; font-weight:900; color:#0f172a; margin-bottom:12px; }
+  .row { display:flex; gap:8px; align-items:baseline; margin-bottom:6px; }
+  .label { font-size:11px; color:#94a3b8; font-weight:700; text-transform:uppercase; width:68px; flex-shrink:0; }
+  .value { font-size:14px; font-family:monospace; color:#1e293b; font-weight:700; }
+  .tables { font-size:12px; color:#475569; white-space:pre-line; line-height:1.6; }
+  @media print { body{background:white;padding:0;} h1{margin-top:16px;} }
+</style></head><body>
+<h1>MakeX 2026 Lebanon — Judge Credentials</h1>
+<div class="grid">
+${rows.map(r => `<div class="card">
+  <div class="card-header">Judge Access Card</div>
+  <div class="name">${r.name}</div>
+  <div class="row"><span class="label">Username</span><span class="value">${r.username}</span></div>
+  <div class="row"><span class="label">Password</span><span class="value">${r.password}</span></div>
+  <div class="row" style="align-items:flex-start"><span class="label">Tables</span><span class="tables">${r.tables}</span></div>
+</div>`).join('')}
+</div>
+<script>window.onload=function(){window.print();}</script>
+</body></html>`);
+    win.document.close();
+  }
+
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-base font-bold text-slate-800">Judges</h2>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {judges.length} judges · {assignments.length} table assignment{assignments.length === 1 ? '' : 's'} · click a chip to toggle
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-bold text-slate-800">Judges</h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {judges.length} judges · {assignments.length} table assignment{assignments.length === 1 ? '' : 's'} · click a chip to toggle
+          </p>
+        </div>
+        <button
+          onClick={printCredentials}
+          disabled={judges.length === 0}
+          className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white px-4 py-2 rounded-xl text-sm font-semibold transition">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          Print Credentials
+        </button>
       </div>
 
       {judges.length === 0 && (
