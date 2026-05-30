@@ -144,11 +144,11 @@ export default function RankingPage() {
   const [exporting, setExporting] = useState(false);
 
   const exportExcel = useCallback(async () => {
-    // Always re-fetch fresh data at export time so manual admin edits are included
     setExporting(true);
     const [{ data: cats }, { data: pas }] = await Promise.all([
       supabase.from('categories').select('*').eq('active', true).order('name'),
-      supabase.from('passations').select('*').not('score', 'is', null),
+      // Fetch all passations (with or without score) so all rounds are present
+      supabase.from('passations').select('*').order('queue_position'),
     ]);
     setExporting(false);
     if (!cats || !pas) { alert('Failed to load data for export'); return; }
@@ -165,7 +165,7 @@ export default function RankingPage() {
       const catPas = allPas.filter(p => p.category_id === cat.id);
       if (catPas.length === 0) continue;
 
-      // Group by student
+      // Group rounds by student identity
       const studentMap = new Map<string, Passation[]>();
       for (const p of catPas) {
         const key = `${(p.team_name || '').trim().toLowerCase()}||${(p.club_name || '').trim().toLowerCase()}`;
@@ -173,43 +173,77 @@ export default function RankingPage() {
         studentMap.get(key)!.push(p);
       }
 
-      // Best result per student
+      // Build one row per student with R1 and R2 data
       const students = Array.from(studentMap.values()).map(rounds => {
-        const best = getBest(rounds);
         const rep = rounds[0];
-        return { name: rep.student_names || rep.team_name || '—', club: rep.club_name || '—', ...best };
+        const r1 = rounds.find(r => (r.round_number ?? 1) === 1);
+        const r2 = rounds.find(r => r.round_number === 2);
+        // For initial sort use getBest from whatever has a score
+        const scored = rounds.filter(r => r.score != null);
+        const best = scored.length > 0 ? getBest(scored) : { score: 0, time: null };
+        return {
+          name: rep.student_names || rep.team_name || '—',
+          club: rep.club_name || '—',
+          r1score: r1?.score ?? null,
+          r1time: r1?.time_seconds ?? null,
+          r2score: r2?.score ?? null,
+          r2time: r2?.time_seconds ?? null,
+          bestScore: best.score,
+          bestTime: best.time,
+        };
       });
 
-      // Sort: score DESC, time ASC (null last)
+      // Sort by current best score DESC, best time ASC
       students.sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        if (a.time === null && b.time === null) return 0;
-        if (a.time === null) return 1;
-        if (b.time === null) return -1;
-        return a.time - b.time;
+        if (b.bestScore !== a.bestScore) return b.bestScore - a.bestScore;
+        if (a.bestTime === null && b.bestTime === null) return 0;
+        if (a.bestTime === null) return 1;
+        if (b.bestTime === null) return -1;
+        return a.bestTime - b.bestTime;
       });
 
       const catLabel = `${cat.name}${cat.age_range_label ? ` (${cat.age_range_label})` : ''}`;
       const sheetName = catLabel.replace(/[\\/*?[\]:]/g, '').slice(0, 31);
 
-      const data: (string | number)[][] = [
-        ['MakeX 2026 Lebanon — Rankings'],
-        [catLabel],
-        [`Exported: ${new Date().toLocaleString()}`],
+      // Write header rows
+      const headerRows = [
+        [`MakeX 2026 Lebanon — ${catLabel}`],
+        [`Exported: ${new Date().toLocaleString()} — Edit any score/time and Best Score & Best Time recalculate automatically`],
         [],
-        ['Rank', 'Participant Name', 'Academy / Club', 'Best Score', 'Best Time (s)', 'Round'],
-        ...students.map((s, i) => [
-          i + 1,
-          s.name,
-          s.club,
-          s.score,
-          s.time != null ? s.time : '',   // raw number so Excel can sort/filter
-          `Round ${s.round}`,
-        ]),
+        ['#', 'Participant Name', 'Club / Academy', 'R1 Score', 'R1 Time (s)', 'R2 Score', 'R2 Time (s)', 'Best Score', 'Best Time (s)'],
       ];
+      const ws = XLSX.utils.aoa_to_sheet(headerRows);
 
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      ws['!cols'] = [{ wch: 6 }, { wch: 32 }, { wch: 24 }, { wch: 13 }, { wch: 14 }, { wch: 9 }];
+      // Write student rows with pre-filled data + formulas in H and I
+      // Columns: A=#, B=Name, C=Club, D=R1Score, E=R1Time, F=R2Score, G=R2Time, H=BestScore(formula), I=BestTime(formula)
+      students.forEach((s, i) => {
+        const row = 5 + i; // 1-based, header occupies rows 1-4
+        const r = row.toString();
+
+        ws[`A${r}`] = { t: 'n', v: i + 1 };
+        ws[`B${r}`] = { t: 's', v: s.name };
+        ws[`C${r}`] = { t: 's', v: s.club };
+
+        if (s.r1score != null) ws[`D${r}`] = { t: 'n', v: s.r1score };
+        if (s.r1time  != null) ws[`E${r}`] = { t: 'n', v: s.r1time };
+        if (s.r2score != null) ws[`F${r}`] = { t: 'n', v: s.r2score };
+        if (s.r2time  != null) ws[`G${r}`] = { t: 'n', v: s.r2time };
+
+        // Best Score: MAX of R1/R2, handles empty cells
+        ws[`H${r}`] = { t: 'n', f:
+          `IF(AND(D${r}="",F${r}=""),"",IF(D${r}="",F${r},IF(F${r}="",D${r},MAX(D${r},F${r}))))` };
+
+        // Best Time: time from the round with the best score; on tie → MIN(times)
+        ws[`I${r}`] = { t: 'n', f:
+          `IF(AND(D${r}="",F${r}=""),"",IF(D${r}="",G${r},IF(F${r}="",E${r},IF(D${r}>F${r},E${r},IF(F${r}>D${r},G${r},MIN(E${r},G${r}))))))` };
+      });
+
+      ws['!ref'] = `A1:I${4 + students.length}`;
+      ws['!cols'] = [
+        { wch: 4 },  { wch: 30 }, { wch: 22 },
+        { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 12 },
+        { wch: 12 }, { wch: 13 },
+      ];
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
 
