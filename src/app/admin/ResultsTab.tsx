@@ -11,13 +11,23 @@ const SCHOOL_NAMES = new Set([
   'College Maristes Notre Dame de Lourdes', 'Ecole De La Mission éDucative',
   'Ecole des Soeurs de la Croix - Hrajel', 'Ecole Saint Elie - SFM Zahle',
   'ESJ Capucins Batroun', 'IC Ain Aar',
-  'Lycée Charlemagne', 'Lycée Montaigne',
+  'Lycée Charlemagne', 'Lycee Charlemagne',
+  'Lycée Montaigne', 'Lycee Montaigne',
   'Mont La Salle',
   'Sainte Famille Francaise Jounieh', 'SJS Robotics Club', 'SSCC Kfardebian',
 ]);
 
+// Case-insensitive + accent-insensitive match
 function orgType(clubName: string | null): 'School' | 'Club' {
-  return SCHOOL_NAMES.has(clubName ?? '') ? 'School' : 'Club';
+  if (!clubName) return 'Club';
+  // Exact match first
+  if (SCHOOL_NAMES.has(clubName)) return 'School';
+  // Normalise: lowercase + strip accents
+  const norm = clubName.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  for (const s of SCHOOL_NAMES) {
+    if (s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase() === norm) return 'School';
+  }
+  return 'Club';
 }
 
 // ── Score breakdown helpers ───────────────────────────────────────────────────
