@@ -225,6 +225,121 @@ export default function RankingPage() {
     URL.revokeObjectURL(url);
   }, [supabase, filterCatId]);
 
+  // ── Template download: names pre-filled, formulas for Best Score & Best Time ──
+  const [templating, setTemplating] = useState(false);
+
+  const downloadTemplate = useCallback(async () => {
+    setTemplating(true);
+    const [{ data: cats }, { data: pas }] = await Promise.all([
+      supabase.from('categories').select('*').eq('active', true).order('name'),
+      supabase.from('passations').select('id,team_name,student_names,club_name,category_id,round_number,queue_position').order('queue_position'),
+    ]);
+    setTemplating(false);
+    if (!cats || !pas) { alert('Failed to load data'); return; }
+
+    const allCats = cats as Category[];
+    const allPas = pas as Passation[];
+
+    const wb = XLSX.utils.book_new();
+
+    for (const cat of allCats) {
+      if (isExcluded(cat)) continue;
+      if (filterCatId && cat.id !== filterCatId) continue;
+
+      const catPas = allPas.filter(p => p.category_id === cat.id);
+      if (catPas.length === 0) continue;
+
+      // Unique students (by team_name + club) — keep round_number for reference
+      const seen = new Set<string>();
+      const students: { name: string; club: string }[] = [];
+      for (const p of catPas) {
+        const key = `${(p.team_name || '').trim().toLowerCase()}||${(p.club_name || '').trim().toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        students.push({
+          name: p.student_names || p.team_name || '—',
+          club: p.club_name || '—',
+        });
+      }
+
+      const catLabel = `${cat.name}${cat.age_range_label ? ` (${cat.age_range_label})` : ''}`;
+      const sheetName = catLabel.replace(/[\\/*?[\]:]/g, '').slice(0, 31);
+
+      // Build header rows as plain array
+      const headerRows = [
+        [`MakeX 2026 Lebanon — ${catLabel}`],
+        ['Fill in R1 Score, R1 Time, R2 Score, R2 Time. Best Score & Best Time are calculated automatically.'],
+        [],
+        ['#', 'Participant Name', 'Club / Academy', 'R1 Score', 'R1 Time (s)', 'R2 Score', 'R2 Time (s)', 'Best Score', 'Best Time (s)'],
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet(headerRows);
+
+      // Add student rows with Excel formulas starting at row 5 (index 4, 1-based = row 5)
+      students.forEach((s, i) => {
+        const row = 5 + i; // 1-based Excel row
+        const r = row.toString();
+
+        // A: index
+        ws[`A${r}`] = { t: 'n', v: i + 1 };
+        // B: name
+        ws[`B${r}`] = { t: 's', v: s.name };
+        // C: club
+        ws[`C${r}`] = { t: 's', v: s.club };
+        // D: R1 Score (empty, to be filled)
+        ws[`D${r}`] = { t: 'z', v: undefined };
+        // E: R1 Time (empty)
+        ws[`E${r}`] = { t: 'z', v: undefined };
+        // F: R2 Score (empty)
+        ws[`F${r}`] = { t: 'z', v: undefined };
+        // G: R2 Time (empty)
+        ws[`G${r}`] = { t: 'z', v: undefined };
+
+        // H: Best Score formula
+        // → IF both empty → "", IF only R1 → R1, IF only R2 → R2, ELSE MAX
+        ws[`H${r}`] = { t: 'n', f: `IF(AND(D${r}="",F${r}=""),"",IF(D${r}="",F${r},IF(F${r}="",D${r},MAX(D${r},F${r}))))` };
+
+        // I: Best Time formula
+        // → IF both empty → ""
+        // → IF only R1 → E (R1 time)
+        // → IF only R2 → G (R2 time)
+        // → IF R1 score > R2 score → E (R1 time)
+        // → IF R2 score > R1 score → G (R2 time)
+        // → Tie in score → MIN(E,G)
+        ws[`I${r}`] = { t: 'n', f: `IF(AND(D${r}="",F${r}=""),"",IF(D${r}="",G${r},IF(F${r}="",E${r},IF(D${r}>F${r},E${r},IF(F${r}>D${r},G${r},MIN(E${r},G${r}))))))` };
+      });
+
+      // Set worksheet range
+      const lastRow = 4 + students.length;
+      ws['!ref'] = `A1:I${lastRow}`;
+
+      ws['!cols'] = [
+        { wch: 4 },   // #
+        { wch: 30 },  // Name
+        { wch: 22 },  // Club
+        { wch: 10 },  // R1 Score
+        { wch: 12 },  // R1 Time
+        { wch: 10 },  // R2 Score
+        { wch: 12 },  // R2 Time
+        { wch: 12 },  // Best Score
+        { wch: 13 },  // Best Time
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MakeX2026_ScoreTemplate_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [supabase, filterCatId]);
+
   const rankBg = (rank: number) => {
     if (rank === 1) return 'rgba(250,204,21,0.15)';
     if (rank === 2) return 'rgba(203,213,225,0.2)';
@@ -279,6 +394,19 @@ export default function RankingPage() {
                 </svg>
             }
             {exporting ? 'Fetching…' : 'Export Excel'}
+          </button>
+          <button
+            onClick={downloadTemplate}
+            disabled={templating}
+            className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition">
+            {templating
+              ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            }
+            {templating ? 'Preparing…' : 'Score Template'}
           </button>
           <button onClick={load}
             className="text-sm text-slate-500 hover:text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl transition">
