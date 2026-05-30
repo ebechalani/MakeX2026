@@ -43,6 +43,85 @@ function pull(pool: Team[], pred: (t: Team) => boolean): Team | null {
   return pool.splice(i, 1)[0];
 }
 
+/** Returns true if two teams must NOT be paired in the same alliance */
+function hasConflict(a: Team, b: Team): boolean {
+  const isRobo      = (t: Team) => t.club.toLowerCase().includes('roboholic');
+  const isMindscape = (t: Team) => t.club.toLowerCase().includes('mindscape');
+
+  // No two Mindscape teams in the same alliance
+  if (isMindscape(a) && isMindscape(b)) return true;
+
+  // Roboholic team identities
+  const isR1 = (t: Team) => isRobo(t) && anyMember(t, 'elio') && anyMember(t, 'alexander');
+  const isR2 = (t: Team) => isRobo(t) && anyMember(t, 'jean') && anyMember(t, 'peter');
+  const isR3 = (t: Team) => isRobo(t) && anyMember(t, 'carlo');
+  // R4 = any remaining Roboholic team not matching R1/R2/R3
+  const isR4 = (t: Team) => isRobo(t) && !isR1(t) && !isR2(t) && !isR3(t);
+
+  if ((isR1(a) && isR2(b)) || (isR1(b) && isR2(a))) return true; // R1 ↔ R2
+  if ((isR3(a) && isR4(b)) || (isR3(b) && isR4(a))) return true; // R3 ↔ R4
+
+  // Angelina+Yara cannot be with Jason+Jean Paul
+  const isAY  = (t: Team) => anyMember(t, 'angelina') && anyMember(t, 'yara');
+  const isJJP = (t: Team) => anyMember(t, 'jason') && anyMember(t, 'jean paul');
+  if ((isAY(a) && isJJP(b)) || (isAY(b) && isJJP(a))) return true;
+
+  // Elia+Yasmina cannot be with Anthony+Marcelina or Elie+Kepriyano
+  const isElYas = (t: Team) => anyMember(t, 'elia') && anyMember(t, 'yasmina');
+  const isAntMar = (t: Team) => anyMember(t, 'anthony') && anyMember(t, 'marcelina');
+  const isElKep  = (t: Team) => anyMember(t, 'elie') && anyMember(t, 'kepriyano');
+  if (isElYas(a) && (isAntMar(b) || isElKep(b))) return true;
+  if (isElYas(b) && (isAntMar(a) || isElKep(a))) return true;
+
+  return false;
+}
+
+/**
+ * Pair reds with blues respecting hasConflict constraints.
+ * Tries up to `attempts` random pairings, then falls back to greedy.
+ */
+function pairConstrained(
+  reds: Team[],
+  blues: Team[],
+  attempts = 600,
+): { red: Team; blue: Team }[] {
+  const len = Math.min(reds.length, blues.length);
+
+  // Random retry
+  for (let i = 0; i < attempts; i++) {
+    const rs = shuffleArr(reds);
+    const bs = shuffleArr(blues);
+    let ok = true;
+    for (let j = 0; j < len; j++) {
+      if (hasConflict(rs[j], bs[j])) { ok = false; break; }
+    }
+    if (ok) {
+      const pairs = rs.slice(0, len).map((r, j) => ({ red: r, blue: bs[j] }));
+      // Odd leftover on one side → pair same-colour teams together
+      const leftRed  = rs.slice(len);
+      const leftBlue = bs.slice(len);
+      for (let j = 0; j + 1 < leftRed.length;  j += 2) pairs.push({ red: leftRed[j],  blue: leftRed[j + 1] });
+      for (let j = 0; j + 1 < leftBlue.length; j += 2) pairs.push({ red: leftBlue[j], blue: leftBlue[j + 1] });
+      return pairs;
+    }
+  }
+
+  // Greedy fallback (guarantees a result even when solution space is tight)
+  const rs = shuffleArr(reds);
+  const bs = shuffleArr(blues);
+  const usedB = new Set<number>();
+  const pairs: { red: Team; blue: Team }[] = [];
+  for (const r of rs) {
+    let idx = -1;
+    for (let j = 0; j < bs.length; j++) {
+      if (!usedB.has(j) && !hasConflict(r, bs[j])) { idx = j; break; }
+    }
+    if (idx === -1) for (let j = 0; j < bs.length; j++) { if (!usedB.has(j)) { idx = j; break; } }
+    if (idx !== -1) { pairs.push({ red: r, blue: bs[idx] }); usedB.add(idx); }
+  }
+  return pairs;
+}
+
 export default function StarterAlliances() {
   const supabase = useMemo(() => createClient(), []);
   const [passations, setPassations] = useState<Passation[]>([]);
@@ -178,24 +257,44 @@ export default function StarterAlliances() {
     );
     if (bC) freeBlue.push(bC);
 
-    // Remaining pool → shuffle, split into red/blue randomly
-    const shuffled = shuffleArr(pool);
-    for (let i = 0; i < shuffled.length; i++) {
-      if (i % 2 === 0) freeRed.push(shuffled[i]);
-      else freeBlue.push(shuffled[i]);
-    }
+    // Try multiple red/blue splits of the remaining pool, pick one that allows
+    // a fully constraint-free pairing (up to 80 outer attempts × 600 inner).
+    let freeAlliances: { red: Team; blue: Team }[] = [];
+    let solved = false;
 
-    // Pair free reds with free blues
-    const freeAlliances: { red: Team; blue: Team }[] = [];
-    const redQ = shuffleArr(freeRed);
-    const blueQ = shuffleArr(freeBlue);
-    while (redQ.length > 0 && blueQ.length > 0) {
-      freeAlliances.push({ red: redQ.pop()!, blue: blueQ.pop()! });
-    }
-    // Leftovers (odd numbers) — pair red+red or blue+blue
-    const leftovers = [...redQ, ...blueQ];
-    while (leftovers.length >= 2) {
-      freeAlliances.push({ red: leftovers.pop()!, blue: leftovers.pop()! });
+    for (let outer = 0; outer < 80 && !solved; outer++) {
+      const shuffled = shuffleArr(pool);
+      const tryRed  = [...freeRed];
+      const tryBlue = [...freeBlue];
+      for (let i = 0; i < shuffled.length; i++) {
+        if (i % 2 === 0) tryRed.push(shuffled[i]);
+        else tryBlue.push(shuffled[i]);
+      }
+
+      // Quick check: can we find a zero-conflict pairing?
+      const len = Math.min(tryRed.length, tryBlue.length);
+      let found = false;
+      for (let inner = 0; inner < 600 && !found; inner++) {
+        const rs = shuffleArr(tryRed);
+        const bs = shuffleArr(tryBlue);
+        let ok = true;
+        for (let j = 0; j < len; j++) {
+          if (hasConflict(rs[j], bs[j])) { ok = false; break; }
+        }
+        if (ok) {
+          freeAlliances = rs.slice(0, len).map((r, j) => ({ red: r, blue: bs[j] }));
+          const leftRed  = rs.slice(len);
+          const leftBlue = bs.slice(len);
+          for (let j = 0; j + 1 < leftRed.length;  j += 2) freeAlliances.push({ red: leftRed[j],  blue: leftRed[j + 1] });
+          for (let j = 0; j + 1 < leftBlue.length; j += 2) freeAlliances.push({ red: leftBlue[j], blue: leftBlue[j + 1] });
+          found = true;
+          solved = true;
+        }
+      }
+      if (!found && outer === 79) {
+        // Last-resort greedy so we always produce a result
+        freeAlliances = pairConstrained(tryRed, tryBlue, 0);
+      }
     }
 
     // Merge and shuffle so fixed alliances look random
