@@ -147,7 +147,6 @@ export default function RankingPage() {
     setExporting(true);
     const [{ data: cats }, { data: pas }] = await Promise.all([
       supabase.from('categories').select('*').eq('active', true).order('name'),
-      // Fetch all passations (with or without score) so all rounds are present
       supabase.from('passations').select('*').order('queue_position'),
     ]);
     setExporting(false);
@@ -155,7 +154,6 @@ export default function RankingPage() {
 
     const allCats = cats as Category[];
     const allPas = pas as Passation[];
-
     const wb = XLSX.utils.book_new();
 
     for (const cat of allCats) {
@@ -165,7 +163,7 @@ export default function RankingPage() {
       const catPas = allPas.filter(p => p.category_id === cat.id);
       if (catPas.length === 0) continue;
 
-      // Group rounds by student identity
+      // Group rounds by student
       const studentMap = new Map<string, Passation[]>();
       for (const p of catPas) {
         const key = `${(p.team_name || '').trim().toLowerCase()}||${(p.club_name || '').trim().toLowerCase()}`;
@@ -173,30 +171,26 @@ export default function RankingPage() {
         studentMap.get(key)!.push(p);
       }
 
-      // Build one row per student with R1 and R2 data
       const students = Array.from(studentMap.values()).map(rounds => {
         const rep = rounds[0];
         const r1 = rounds.find(r => (r.round_number ?? 1) === 1);
         const r2 = rounds.find(r => r.round_number === 2);
-        // For initial sort use getBest from whatever has a score
         const scored = rounds.filter(r => r.score != null);
         const best = scored.length > 0 ? getBest(scored) : { score: 0, time: null };
         return {
           name: rep.student_names || rep.team_name || '—',
           club: rep.club_name || '—',
           r1score: r1?.score ?? null,
-          r1time: r1?.time_seconds ?? null,
+          r1time:  r1?.time_seconds ?? null,
           r2score: r2?.score ?? null,
-          r2time: r2?.time_seconds ?? null,
+          r2time:  r2?.time_seconds ?? null,
           bestScore: best.score,
-          bestTime: best.time,
+          bestTime:  best.time,
         };
       });
 
-      // Sort by current best score DESC, best time ASC
       students.sort((a, b) => {
         if (b.bestScore !== a.bestScore) return b.bestScore - a.bestScore;
-        if (a.bestTime === null && b.bestTime === null) return 0;
         if (a.bestTime === null) return 1;
         if (b.bestTime === null) return -1;
         return a.bestTime - b.bestTime;
@@ -205,42 +199,46 @@ export default function RankingPage() {
       const catLabel = `${cat.name}${cat.age_range_label ? ` (${cat.age_range_label})` : ''}`;
       const sheetName = catLabel.replace(/[\\/*?[\]:]/g, '').slice(0, 31);
 
-      // Write header rows
-      const headerRows = [
-        [`MakeX 2026 Lebanon — ${catLabel}`],
-        [`Exported: ${new Date().toLocaleString()} — Edit any score/time and Best Score & Best Time recalculate automatically`],
-        [],
+      // Build all rows as a flat array (static values) — formulas added below
+      // Row 1: title, Row 2: note, Row 3: blank, Row 4: headers, Row 5+: data
+      const rows: (string | number | null)[][] = [
+        [`MakeX 2026 Lebanon — ${catLabel}`, '', '', '', '', '', '', '', ''],
+        ['Edit R1/R2 Score & Time — Best Score and Best Time recalculate automatically', '', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', '', ''],
         ['#', 'Participant Name', 'Club / Academy', 'R1 Score', 'R1 Time (s)', 'R2 Score', 'R2 Time (s)', 'Best Score', 'Best Time (s)'],
+        ...students.map((s, i) => [
+          i + 1,
+          s.name,
+          s.club,
+          s.r1score,
+          s.r1time,
+          s.r2score,
+          s.r2time,
+          s.bestScore || null,  // placeholder — replaced by formula below
+          s.bestTime,           // placeholder — replaced by formula below
+        ]),
       ];
-      const ws = XLSX.utils.aoa_to_sheet(headerRows);
 
-      // Write student rows with pre-filled data + formulas in H and I
-      // Columns: A=#, B=Name, C=Club, D=R1Score, E=R1Time, F=R2Score, G=R2Time, H=BestScore(formula), I=BestTime(formula)
-      students.forEach((s, i) => {
-        const row = 5 + i; // 1-based, header occupies rows 1-4
-        const r = row.toString();
+      const ws = XLSX.utils.aoa_to_sheet(rows);
 
-        ws[`A${r}`] = { t: 'n', v: i + 1 };
-        ws[`B${r}`] = { t: 's', v: s.name };
-        ws[`C${r}`] = { t: 's', v: s.club };
-
-        if (s.r1score != null) ws[`D${r}`] = { t: 'n', v: s.r1score };
-        if (s.r1time  != null) ws[`E${r}`] = { t: 'n', v: s.r1time };
-        if (s.r2score != null) ws[`F${r}`] = { t: 'n', v: s.r2score };
-        if (s.r2time  != null) ws[`G${r}`] = { t: 'n', v: s.r2time };
-
-        // Best Score: MAX of R1/R2, handles empty cells
-        ws[`H${r}`] = { t: 'n', f:
-          `IF(AND(D${r}="",F${r}=""),"",IF(D${r}="",F${r},IF(F${r}="",D${r},MAX(D${r},F${r}))))` };
-
-        // Best Time: time from the round with the best score; on tie → MIN(times)
-        ws[`I${r}`] = { t: 'n', f:
-          `IF(AND(D${r}="",F${r}=""),"",IF(D${r}="",G${r},IF(F${r}="",E${r},IF(D${r}>F${r},E${r},IF(F${r}>D${r},G${r},MIN(E${r},G${r}))))))` };
+      // Replace Best Score (col H) and Best Time (col I) with live Excel formulas
+      // Data starts at row 5 (1-based). Columns: D=R1Score E=R1Time F=R2Score G=R2Time
+      students.forEach((_, i) => {
+        const r = 5 + i;
+        ws[`H${r}`] = {
+          t: 'n',
+          v: students[i].bestScore ?? 0,
+          f: `IF(AND(D${r}="",F${r}=""),"",IF(D${r}="",F${r},IF(F${r}="",D${r},MAX(D${r},F${r}))))`,
+        };
+        ws[`I${r}`] = {
+          t: 'n',
+          v: students[i].bestTime ?? 0,
+          f: `IF(AND(D${r}="",F${r}=""),"",IF(D${r}="",G${r},IF(F${r}="",E${r},IF(D${r}>F${r},E${r},IF(F${r}>D${r},G${r},MIN(E${r},G${r}))))))`,
+        };
       });
 
-      ws['!ref'] = `A1:I${4 + students.length}`;
       ws['!cols'] = [
-        { wch: 4 },  { wch: 30 }, { wch: 22 },
+        { wch: 4 }, { wch: 30 }, { wch: 22 },
         { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 12 },
         { wch: 12 }, { wch: 13 },
       ];
