@@ -197,7 +197,32 @@ export default function StarterAlliances() {
       }
     }
 
-    // Pair singletons by club (first 2, next 2, …)
+    // ── Force-pair specific students who must be on the same team ──────────
+    type ForcedPair = { frags: string[]; club?: string }[];
+    const FORCED_PAIRS: ForcedPair[] = [
+      // Carlo Kafrouni + Jean Paul Mrad (Roboholic team 3)
+      [{ frags: ['carlo', 'kafrouni'] }, { frags: ['jean paul', 'mrad'] }],
+    ];
+    for (const [specA, specB] of FORCED_PAIRS) {
+      const nameFits = (p: Passation, spec: { frags: string[]; club?: string }) => {
+        const hay = (p.student_names || p.team_name || '').toLowerCase();
+        return spec.frags.every(f => hay.includes(f.toLowerCase()));
+      };
+      const iA = singletons.findIndex(p => nameFits(p, specA));
+      const iB = singletons.findIndex(p => nameFits(p, specB));
+      if (iA !== -1 && iB !== -1) {
+        const [pA] = singletons.splice(Math.max(iA, iB), 1);
+        const [pB] = singletons.splice(Math.min(iA, iB), 1);
+        result.push({
+          key: `${pA.id}|${pB.id}`,
+          displayName: pA.club_name || 'Roboholic',
+          club: pA.club_name || '',
+          members: [pA.student_names || pA.team_name || '', pB.student_names || pB.team_name || ''].filter(Boolean),
+        });
+      }
+    }
+
+    // Pair remaining singletons by club (first 2, next 2, …)
     const byClub = new Map<string, Passation[]>();
     for (const p of singletons) {
       const c = p.club_name || 'unknown';
