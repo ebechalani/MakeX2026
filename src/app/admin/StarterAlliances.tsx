@@ -250,14 +250,14 @@ export default function StarterAlliances() {
     const freeRed: Team[] = [];
     const freeBlue: Team[] = [];
 
-    // ── Fixed alliance 1: Roboholic (Elio+Alexander) RED ↔ Mindscape (Khoury+Matar) BLUE ──
+    // ── Fixed alliance 1: Roboholic (Elio+Alexander) RED ↔ Mindscape (Joe Khoury+Anthony Matar) BLUE ──
     const rA = pull(pool, t =>
       t.club.toLowerCase().includes('roboholic') &&
       anyMember(t, 'elio') && anyMember(t, 'alexander')
     );
     const bA = pull(pool, t =>
       t.club.toLowerCase().includes('mindscape') &&
-      (anyMember(t, 'khoury') || anyMember(t, 'matar'))
+      anyMember(t, 'khoury') && anyMember(t, 'matar')
     );
     if (rA && bA) fixed.push({ red: rA, blue: bA });
     else { if (rA) pool.push(rA); if (bA) pool.push(bA); }
