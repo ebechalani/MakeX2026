@@ -265,7 +265,7 @@ export default function StarterAlliances() {
     );
     const bA = pull(pool, t =>
       t.club.toLowerCase().includes('mindscape') &&
-      (anyMember(t, 'khoury') || anyMember(t, 'matar'))
+      anyMember(t, 'matar') && anyMember(t, 'saliba')
     );
     if (rA && bA) fixed.push({ red: rA, blue: bA });
     else { if (rA) pool.push(rA); if (bA) pool.push(bA); }
