@@ -203,15 +203,19 @@ export default function StarterAlliances() {
       { key: '__hc_carlo_jp__', club: 'Roboholic', members: ['Carlo Kafrouni', 'Jean Paul Mrad'] },
     ];
     for (const hc of HARDCODED_TEAMS) {
-      // Skip if any member is already represented in result
+      // Skip only if the FULL name (all words) of a member already appears in result
+      const fullMatch = (needle: string, hay: string) => {
+        const parts = needle.toLowerCase().split(' ').filter(Boolean);
+        const h = hay.toLowerCase();
+        return parts.every(p => h.includes(p));
+      };
       const alreadyIn = result.some(t =>
-        hc.members.some(m => t.members.some(tm => tm.toLowerCase().includes(m.split(' ')[0].toLowerCase())))
+        hc.members.some(m => t.members.some(tm => fullMatch(m, tm)))
       );
-      // Also remove any singleton row that matches one of these members so there's no duplicate
+      // Remove any singleton that is one of these members (avoid duplicates if they later appear in DB)
       if (!alreadyIn) {
         for (const m of hc.members) {
-          const first = m.split(' ')[0].toLowerCase();
-          const idx = singletons.findIndex(p => (p.student_names || p.team_name || '').toLowerCase().includes(first));
+          const idx = singletons.findIndex(p => fullMatch(m, p.student_names || p.team_name || ''));
           if (idx !== -1) singletons.splice(idx, 1);
         }
         result.push({ key: hc.key, displayName: hc.club, club: hc.club, members: hc.members });
