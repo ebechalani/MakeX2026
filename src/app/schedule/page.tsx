@@ -70,52 +70,68 @@ export default function SchedulePage() {
 
   const totalStudents = filtered.reduce((n, s) => n + s.students.length, 0);
 
-  const exportExcel = useCallback(() => {
-    const wb = XLSX.utils.book_new();
+  const [exportLoading, setExportLoading] = useState(false);
 
-    for (const sheet of filtered) {
-      const catName = sheet.category.name;
-      const ageLabel = sheet.category.age_range_label;
-      const tableNum = sheet.table.table_number;
-      const tableLabel = sheet.table.display_label || `Table ${tableNum}`;
+  const exportExcel = useCallback(async () => {
+    setExportLoading(true);
+    try {
+      const [{ data: cats }, { data: tabs }, { data: pas }] = await Promise.all([
+        supabase.from('categories').select('*').eq('active', true).order('name'),
+        supabase.from('tables').select('*').eq('active', true).order('table_number'),
+        supabase.from('passations').select('*').order('queue_position'),
+      ]);
+      if (!cats || !tabs || !pas) { alert('Failed to load data'); return; }
 
-      // Sheet tab name: e.g. "Sportswonderland - Table 1"
-      const sheetName = `${catName}${ageLabel ? ` ${ageLabel}` : ''} - ${tableLabel}`
-        .replace(/[\\/*?[\]:]/g, '').slice(0, 31);
+      const wb = XLSX.utils.book_new();
 
-      const rows: (string | number)[][] = [];
+      for (const cat of cats as Category[]) {
+        if (filterCatId && cat.id !== filterCatId) continue;
+        const catTables = (tabs as Table[]).filter(t => t.category_id === cat.id);
+        for (const table of catTables) {
+          const students = (pas as Passation[])
+            .filter(p => p.table_id === table.id)
+            .sort((a, b) => a.queue_position - b.queue_position);
+          if (students.length === 0) continue;
 
-      // Header block
-      rows.push([`MakeX 2026 Lebanon`]);
-      rows.push([`${catName}${ageLabel ? ` (${ageLabel})` : ''}`]);
-      rows.push([tableLabel]);
-      rows.push([]); // blank spacer
-      rows.push(['#', 'Participant Name']);
+          const catName = cat.name;
+          const ageLabel = cat.age_range_label;
+          const tableLabel = table.display_label || `Table ${table.table_number}`;
+          const sheetName = `${catName}${ageLabel ? ` ${ageLabel}` : ''} - ${tableLabel}`
+            .replace(/[\\/*?[\]:]/g, '').slice(0, 31);
 
-      // One row per student — name only
-      const sorted = [...sheet.students].sort((a, b) => a.queue_position - b.queue_position);
-      sorted.forEach((p, idx) => {
-        rows.push([idx + 1, getName(p)]);
-      });
+          const rows: (string | number)[][] = [
+            [`MakeX 2026 Lebanon`],
+            [`${catName}${ageLabel ? ` (${ageLabel})` : ''}`],
+            [tableLabel],
+            [],
+            ['#', 'Participant Name'],
+            ...students.map((p, idx) => [idx + 1, getName(p)]),
+          ];
 
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      ws['!cols'] = [{ wch: 4 }, { wch: 35 }];
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+          const ws = XLSX.utils.aoa_to_sheet(rows);
+          ws['!cols'] = [{ wch: 4 }, { wch: 35 }];
+          XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        }
+      }
+
+      if (wb.SheetNames.length === 0) { alert('No students found to export'); return; }
+
+      const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `MakeX2026_Tables_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('Export failed: ' + String(e));
+    } finally {
+      setExportLoading(false);
     }
-
-    // Use blob URL — more reliable than XLSX.writeFile in Next.js
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx', cellFormula: true } as any);
-    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `MakeX2026_Tables_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [filtered]);
+  }, [supabase, filterCatId]);
 
   return (
     <>
@@ -160,12 +176,16 @@ export default function SchedulePage() {
             </select>
             <button
               onClick={exportExcel}
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Export Excel
+              disabled={exportLoading}
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition">
+              {exportLoading
+                ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+              }
+              {exportLoading ? 'Loading…' : 'Export Excel'}
             </button>
             <button
               onClick={() => window.print()}
