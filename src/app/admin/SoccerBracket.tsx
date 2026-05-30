@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import * as XLSX from 'xlsx';
 import { createClient } from '@/lib/supabase/client';
 import type { Category, Table, Passation, SoccerMatch } from '@/lib/types';
 
@@ -165,6 +166,75 @@ export default function SoccerBracket() {
   const lastFinished = lastRound > 0 && (matchesByRound.get(lastRound) || []).every(m => m.status === 'finished' && m.winner_id);
   const tournamentChampion = matches.find(m => m.round_number === 5 && m.status === 'finished');
 
+  function exportScoresheet() {
+    const wb = XLSX.utils.book_new();
+    const rows: (string | number)[][] = [
+      ['MakeX 2026 Lebanon — Capelli Soccer Scoresheet'],
+      [],
+      [
+        'Round', 'Match #', 'Table', 'Time',
+        'Team A', 'Team B',
+        'Score A', 'Score B',
+        'Penalty A', 'Penalty B',
+        'Winner', 'Notes', 'Referee',
+      ],
+    ];
+
+    // Sort matches by round then match number
+    const sorted = [...matches].sort((a, b) =>
+      a.round_number !== b.round_number ? a.round_number - b.round_number : a.match_number - b.match_number
+    );
+
+    for (const m of sorted) {
+      const teamA = (m.team_a as Passation | undefined);
+      const teamB = (m.team_b as Passation | undefined);
+      const winner = (m.winner as Passation | undefined);
+      const tableLabel = (m.table as Table | undefined)?.display_label
+        || (m.table as Table | undefined)?.table_number?.toString()
+        || '';
+      const time = m.scheduled_time
+        ? new Date(m.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : '';
+
+      rows.push([
+        ROUND_NAMES[m.round_number] || `Round ${m.round_number}`,
+        m.match_number,
+        tableLabel,
+        time,
+        teamA?.student_names || teamA?.team_name || '',
+        teamB?.student_names || teamB?.team_name || '',
+        m.score_a ?? '',
+        m.score_b ?? '',
+        '',  // penalty A — blank for manual fill
+        '',  // penalty B — blank for manual fill
+        winner?.student_names || winner?.team_name || '',
+        m.notes || '',
+        '',  // referee — blank
+      ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 16 }, { wch: 8 }, { wch: 8 }, { wch: 8 },
+      { wch: 28 }, { wch: 28 },
+      { wch: 9 }, { wch: 9 },
+      { wch: 10 }, { wch: 10 },
+      { wch: 28 }, { wch: 20 }, { wch: 16 },
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, 'Scoresheet');
+
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MakeX2026_Soccer_Scoresheet.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -175,6 +245,14 @@ export default function SoccerBracket() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button onClick={exportScoresheet} disabled={matches.length === 0}
+            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2 rounded-xl transition">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export Scoresheet
+          </button>
           {matches.length === 0 ? (
             <button onClick={generateRound1} disabled={busy || teams.length < 2}
               className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-xl disabled:opacity-50">
