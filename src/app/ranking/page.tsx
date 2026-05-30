@@ -250,7 +250,7 @@ export default function RankingPage() {
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
 
-    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx', cellFormula: true });
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -365,7 +365,7 @@ export default function RankingPage() {
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
 
-    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx', cellFormula: true });
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

@@ -104,7 +104,7 @@ export default function SchedulePage() {
     }
 
     // Use blob URL — more reliable than XLSX.writeFile in Next.js
-    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx', cellFormula: true });
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
