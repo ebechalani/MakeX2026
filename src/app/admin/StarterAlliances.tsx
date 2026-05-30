@@ -128,6 +128,7 @@ export default function StarterAlliances() {
   const [loading, setLoading] = useState(true);
   const [alliances, setAlliances] = useState<Alliance[]>([]);
   const [generated, setGenerated] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -358,8 +359,21 @@ export default function StarterAlliances() {
 
   if (loading) return <p className="text-slate-400 text-sm py-8 text-center">Loading teams…</p>;
   if (teams.length === 0) return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400 text-sm">
-      No MakeX Starter teams found. Add passations in the Passations tab first.
+    <div className="space-y-3">
+      <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400 text-sm">
+        No MakeX Starter teams found. Add passations in the Passations tab first.
+      </div>
+      <button onClick={() => setShowDebug(v => !v)} className="text-xs text-slate-400 underline">{showDebug ? 'Hide' : 'Show'} raw DB data</button>
+      {showDebug && (
+        <div className="bg-slate-900 text-green-300 text-xs font-mono rounded-xl p-4 overflow-auto max-h-96">
+          <p className="text-slate-400 mb-2">Passations loaded: {passations.length}</p>
+          {passations.map(p => (
+            <div key={p.id} className="mb-1 border-b border-slate-700 pb-1">
+              <span className="text-yellow-300">id:</span> {p.id} | <span className="text-yellow-300">club:</span> {p.club_name} | <span className="text-yellow-300">team_name:</span> {p.team_name} | <span className="text-yellow-300">student_names:</span> {p.student_names} | <span className="text-yellow-300">group_id:</span> {p.team_group_id ?? '–'}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -370,10 +384,13 @@ export default function StarterAlliances() {
         <div>
           <h2 className="text-base font-bold text-slate-800">MakeX Starter — Alliance Pairings</h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            {teams.length} teams · {Math.floor(teams.length / 2)} alliances
+            {teams.length} teams ({passations.length} passation rows) · {Math.floor(teams.length / 2)} alliances
           </p>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => setShowDebug(v => !v)} className="text-xs text-slate-400 border border-slate-200 px-2 py-1 rounded-lg hover:bg-slate-50">
+            🔍 Debug
+          </button>
           {generated && (
             <button onClick={exportExcel}
               className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition">
@@ -405,6 +422,24 @@ export default function StarterAlliances() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Debug panel */}
+      {showDebug && (
+        <div className="bg-slate-900 text-green-300 text-xs font-mono rounded-xl p-4 overflow-auto max-h-96 space-y-1">
+          <p className="text-slate-400 font-bold mb-2">RAW PASSATIONS ({passations.length} rows)</p>
+          {passations.map(p => (
+            <div key={p.id} className="border-b border-slate-700 pb-1">
+              <span className="text-yellow-300">club:</span> {p.club_name ?? '–'} | <span className="text-yellow-300">team_name:</span> {p.team_name ?? '–'} | <span className="text-yellow-300">student_names:</span> {p.student_names ?? '–'} | <span className="text-yellow-300">group_id:</span> {p.team_group_id ?? '–'}
+            </div>
+          ))}
+          <p className="text-slate-400 font-bold mt-3 mb-2">DERIVED TEAMS ({teams.length})</p>
+          {teams.map(t => (
+            <div key={t.key} className="border-b border-slate-700 pb-1">
+              <span className="text-cyan-300">{t.club}</span> → {t.members.join(' + ')} <span className="text-slate-500">[key:{t.key.slice(0, 20)}]</span>
+            </div>
+          ))}
         </div>
       )}
 
