@@ -204,6 +204,20 @@ export default function ResultsTab() {
   const [clearing, setClearing] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // ── Manual entry form state ───────────────────────────────────────────────
+  const [showManual, setShowManual] = useState(false);
+  const [mCatId,    setMCatId]    = useState('');
+  const [mTableId,  setMTableId]  = useState('');
+  const [mName,     setMName]     = useState('');
+  const [mClub,     setMClub]     = useState('');
+  const [mDob,      setMDob]      = useState('');
+  const [mR1Score,  setMR1Score]  = useState('');
+  const [mR1Time,   setMR1Time]   = useState('');
+  const [mR2Score,  setMR2Score]  = useState('');
+  const [mR2Time,   setMR2Time]   = useState('');
+  const [mSaving,   setMSaving]   = useState(false);
+  const [mMsg,      setMMsg]      = useState<{ ok: boolean; text: string } | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     const [p, c, t] = await Promise.all([
@@ -258,6 +272,52 @@ export default function ResultsTab() {
     const sched = r1.filter(p => p.live_status === 'Scheduled' && !p.finalized_at).length;
     return { fin, vd, abs, sched };
   }, [passations]);
+
+  // Tables filtered to selected manual-entry category
+  const mTables = useMemo(() => tables.filter(t => t.category_id === mCatId), [tables, mCatId]);
+
+  async function submitManual() {
+    if (!mName.trim()) { setMMsg({ ok: false, text: 'Student name is required.' }); return; }
+    if (!mCatId)        { setMMsg({ ok: false, text: 'Category is required.' }); return; }
+    if (!mTableId)      { setMMsg({ ok: false, text: 'Table is required.' }); return; }
+
+    const rows: Record<string, unknown>[] = [];
+    const base = {
+      team_name: mName.trim(),
+      student_names: mName.trim(),
+      club_name: mClub.trim() || null,
+      date_of_birth: mDob || null,
+      category_id: mCatId,
+      table_id: mTableId,
+      live_status: 'Finished',
+      final_result_status: 'Finished',
+      queue_position: 9999,
+      delay_count: 0,
+    };
+
+    const r1Score = mR1Score !== '' ? Number(mR1Score) : null;
+    const r1Time  = mR1Time  !== '' ? Number(mR1Time)  : null;
+    const r2Score = mR2Score !== '' ? Number(mR2Score) : null;
+    const r2Time  = mR2Time  !== '' ? Number(mR2Time)  : null;
+
+    if (r1Score !== null || r1Time !== null) {
+      rows.push({ ...base, round_number: 1, score: r1Score, time_seconds: r1Time });
+    }
+    if (r2Score !== null || r2Time !== null) {
+      rows.push({ ...base, round_number: 2, score: r2Score, time_seconds: r2Time });
+    }
+    if (rows.length === 0) { setMMsg({ ok: false, text: 'Enter at least one score or time.' }); return; }
+
+    setMSaving(true);
+    setMMsg(null);
+    const { error } = await supabase.from('passations').insert(rows);
+    setMSaving(false);
+    if (error) { setMMsg({ ok: false, text: error.message }); return; }
+    setMMsg({ ok: true, text: `Added ${rows.length} record${rows.length > 1 ? 's' : ''} for "${mName.trim()}".` });
+    setMName(''); setMClub(''); setMDob('');
+    setMR1Score(''); setMR1Time(''); setMR2Score(''); setMR2Time('');
+    load();
+  }
 
   function catLabel(id: string) {
     const c = categories.find(c => c.id === id);
@@ -541,6 +601,113 @@ export default function ResultsTab() {
             {clearing ? 'Clearing…' : '🗑 Clear test data'}
           </button>
         </div>
+      </div>
+
+      {/* ── Manual Entry Panel ── */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <button
+          onClick={() => { setShowManual(v => !v); setMMsg(null); }}
+          className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition">
+          <span className="text-sm font-bold text-slate-700">✏️ Add Manual Entry (absent from system)</span>
+          <span className="text-slate-400 text-sm">{showManual ? '▲' : '▼'}</span>
+        </button>
+
+        {showManual && (
+          <div className="px-5 pb-5 border-t border-slate-100 space-y-4">
+            <p className="text-xs text-slate-400 mt-3">Fill in the student's details and the results from paper. Leave rounds blank if not played.</p>
+
+            {/* Row 1 — category + table */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">Category *</label>
+                <select value={mCatId} onChange={e => { setMCatId(e.target.value); setMTableId(''); }}
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                  <option value="">— select —</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}{c.age_range_label ? ` (${c.age_range_label})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">Table *</label>
+                <select value={mTableId} onChange={e => setMTableId(e.target.value)}
+                  disabled={!mCatId}
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm disabled:opacity-40">
+                  <option value="">— select —</option>
+                  {mTables.map(t => (
+                    <option key={t.id} value={t.id}>{t.display_label || `Table ${t.table_number}`}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Row 2 — name + club + dob */}
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">Student / Team Name *</label>
+                <input value={mName} onChange={e => setMName(e.target.value)} placeholder="e.g. Elio Azar"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">Club / School</label>
+                <input value={mClub} onChange={e => setMClub(e.target.value)} placeholder="e.g. Roboholic"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">Date of Birth</label>
+                <input type="date" value={mDob} onChange={e => setMDob(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            </div>
+
+            {/* Row 3 — scores */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Round 1</p>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-xs text-slate-400 block mb-1">Score (pts)</label>
+                    <input type="number" value={mR1Score} onChange={e => setMR1Score(e.target.value)} placeholder="0"
+                      className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs text-slate-400 block mb-1">Time (seconds)</label>
+                    <input type="number" value={mR1Time} onChange={e => setMR1Time(e.target.value)} placeholder="0"
+                      className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Round 2</p>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-xs text-slate-400 block mb-1">Score (pts)</label>
+                    <input type="number" value={mR2Score} onChange={e => setMR2Score(e.target.value)} placeholder="0"
+                      className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs text-slate-400 block mb-1">Time (seconds)</label>
+                    <input type="number" value={mR2Time} onChange={e => setMR2Time(e.target.value)} placeholder="0"
+                      className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Submit */}
+            <div className="flex items-center gap-3">
+              <button onClick={submitManual} disabled={mSaving}
+                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-xl transition">
+                {mSaving ? 'Saving…' : '＋ Add to Results'}
+              </button>
+              {mMsg && (
+                <p className={`text-sm font-medium ${mMsg.ok ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {mMsg.ok ? '✓' : '✗'} {mMsg.text}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* View toggle */}
