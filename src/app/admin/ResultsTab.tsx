@@ -85,11 +85,13 @@ type RankedStudent = {
   clubName: string;
   tableLabel: string;
   type: 'School' | 'Club';
-  age: number | null;       // age as of today, computed from DOB
+  age: number | null;
   r1: RoundResult;
   r2: RoundResult;
   best: RoundResult;
-  rank: number; // rank within their own group (school or club, possibly within an age band)
+  rank: number;
+  r1Id: string | null;   // passation id for R1 row
+  r2Id: string | null;   // passation id for R2 row
 };
 
 type CategoryRankings = {
@@ -150,6 +152,8 @@ function buildRankings(r1rows: Passation[], r2rows: Passation[], tables: Table[]
       r1: r1res,
       r2: r2res,
       best,
+      r1Id: r1p?.id ?? null,
+      r2Id: r2p?.id ?? null,
     };
     if (entry.type === 'School') schools.push(entry);
     else clubs.push(entry);
@@ -316,6 +320,17 @@ export default function ResultsTab() {
     setMMsg({ ok: true, text: `Added ${rows.length} record${rows.length > 1 ? 's' : ''} for "${mName.trim()}".` });
     setMName(''); setMClub(''); setMDob('');
     setMR1Score(''); setMR1Time(''); setMR2Score(''); setMR2Time('');
+    load();
+  }
+
+  async function saveScore(id: string, score: number | null, time: number | null) {
+    const { error } = await supabase.from('passations').update({
+      score,
+      time_seconds: time,
+      final_result_status: 'Finished',
+      updated_at: new Date().toISOString(),
+    }).eq('id', id);
+    if (error) { alert('Save failed: ' + error.message); return; }
     load();
   }
 
@@ -805,6 +820,7 @@ export default function ResultsTab() {
                       label={`🏫 School Rankings${band.label ? ` — ${band.label}` : ''}`}
                       labelClass="text-blue-700 bg-blue-50 border-blue-200"
                       catTitle={catTitle + (band.label ? ` · ${band.label}` : '')}
+                      onSaveScore={saveScore}
                     />
                   ))}
 
@@ -816,6 +832,7 @@ export default function ResultsTab() {
                       label={`🏢 Club Rankings${band.label ? ` — ${band.label}` : ''}`}
                       labelClass="text-purple-700 bg-purple-50 border-purple-200"
                       catTitle={catTitle + (band.label ? ` · ${band.label}` : '')}
+                      onSaveScore={saveScore}
                     />
                   ))}
                 </div>
@@ -892,12 +909,44 @@ export default function ResultsTab() {
 }
 
 // ── Ranking table component ───────────────────────────────────────────────────
-function RankingTable({ rows, label, labelClass, catTitle: _catTitle }: {
+function RankingTable({ rows, label, labelClass, catTitle: _catTitle, onSaveScore }: {
   rows: RankedStudent[];
   label: string;
   labelClass: string;
   catTitle: string;
+  onSaveScore: (id: string, score: number | null, time: number | null) => Promise<void>;
 }) {
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editR1Score, setEditR1Score] = useState('');
+  const [editR1Time,  setEditR1Time]  = useState('');
+  const [editR2Score, setEditR2Score] = useState('');
+  const [editR2Time,  setEditR2Time]  = useState('');
+  const [saving, setSaving] = useState(false);
+
+  function openEdit(s: RankedStudent) {
+    setEditingKey(s.key);
+    setEditR1Score(s.r1.score != null ? String(s.r1.score) : '');
+    setEditR1Time(s.r1.time  != null ? String(s.r1.time)  : '');
+    setEditR2Score(s.r2.score != null ? String(s.r2.score) : '');
+    setEditR2Time(s.r2.time  != null ? String(s.r2.time)  : '');
+  }
+
+  async function commitEdit(s: RankedStudent) {
+    setSaving(true);
+    if (s.r1Id) {
+      const score = editR1Score !== '' ? Number(editR1Score) : null;
+      const time  = editR1Time  !== '' ? Number(editR1Time)  : null;
+      await onSaveScore(s.r1Id, score, time);
+    }
+    if (s.r2Id) {
+      const score = editR2Score !== '' ? Number(editR2Score) : null;
+      const time  = editR2Time  !== '' ? Number(editR2Time)  : null;
+      await onSaveScore(s.r2Id, score, time);
+    }
+    setSaving(false);
+    setEditingKey(null);
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
       <div className={`px-5 py-2.5 border-b flex items-center justify-between ${labelClass}`}>
@@ -908,6 +957,7 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle }: {
         <table className="w-full text-sm">
           <thead className="bg-slate-50/60 border-b border-slate-100">
             <tr>
+              <th className="w-8"></th>
               <th className="text-center px-3 py-2 text-xs font-bold text-slate-500 uppercase w-12">Rank</th>
               <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 uppercase">Student</th>
               <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 uppercase">Academy / Club</th>
@@ -925,26 +975,82 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle }: {
             {rows.map((s, idx) => {
               const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
               const isTop = idx < 3 && s.best.score != null;
+              const isEditing = editingKey === s.key;
               return (
-                <tr key={s.key} className={isTop ? 'bg-amber-50/40' : 'hover:bg-slate-50/60'}>
-                  <td className="px-3 py-2.5 text-center font-bold text-slate-700 text-base">
-                    {medal ?? <span className="text-slate-400 font-normal text-sm">{s.rank}</span>}
-                  </td>
-                  <td className="px-3 py-2.5 font-semibold text-slate-800">{s.teamName}</td>
-                  <td className="px-3 py-2.5 text-xs text-slate-600">{s.clubName || '—'}</td>
-                  <td className="px-2 py-2.5 text-xs text-slate-500 whitespace-nowrap">{s.tableLabel}</td>
-                  <td className="px-2 py-2.5 text-center text-xs text-slate-500">{s.age != null ? s.age : <span className="text-slate-300">—</span>}</td>
-                  <RoundCell res={s.r1} highlight={s.r1 === s.best} />
-                  <TimeCell  res={s.r1} highlight={s.r1 === s.best} />
-                  <RoundCell res={s.r2} highlight={s.r2 === s.best} />
-                  <TimeCell  res={s.r2} highlight={s.r2 === s.best} />
-                  <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700">
-                    {s.best.score != null ? s.best.score : <span className="text-slate-300">—</span>}
-                  </td>
-                  <td className="px-3 py-2.5 text-right font-mono text-xs text-emerald-600">
-                    {s.best.time != null ? `${s.best.time}s` : <span className="text-slate-300">—</span>}
-                  </td>
-                </tr>
+                <>
+                  <tr key={s.key} className={isEditing ? 'bg-blue-50' : isTop ? 'bg-amber-50/40' : 'hover:bg-slate-50/60'}>
+                    <td className="px-2 text-center">
+                      <button onClick={() => isEditing ? setEditingKey(null) : openEdit(s)}
+                        className="text-slate-400 hover:text-blue-600 transition text-xs px-1"
+                        title="Edit score">
+                        {isEditing ? '✕' : '✏️'}
+                      </button>
+                    </td>
+                    <td className="px-3 py-2.5 text-center font-bold text-slate-700 text-base">
+                      {medal ?? <span className="text-slate-400 font-normal text-sm">{s.rank}</span>}
+                    </td>
+                    <td className="px-3 py-2.5 font-semibold text-slate-800">{s.teamName}</td>
+                    <td className="px-3 py-2.5 text-xs text-slate-600">{s.clubName || '—'}</td>
+                    <td className="px-2 py-2.5 text-xs text-slate-500 whitespace-nowrap">{s.tableLabel}</td>
+                    <td className="px-2 py-2.5 text-center text-xs text-slate-500">{s.age != null ? s.age : <span className="text-slate-300">—</span>}</td>
+                    <RoundCell res={s.r1} highlight={s.r1 === s.best} />
+                    <TimeCell  res={s.r1} highlight={s.r1 === s.best} />
+                    <RoundCell res={s.r2} highlight={s.r2 === s.best} />
+                    <TimeCell  res={s.r2} highlight={s.r2 === s.best} />
+                    <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700">
+                      {s.best.score != null ? s.best.score : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono text-xs text-emerald-600">
+                      {s.best.time != null ? `${s.best.time}s` : <span className="text-slate-300">—</span>}
+                    </td>
+                  </tr>
+                  {isEditing && (
+                    <tr key={`${s.key}-edit`} className="bg-blue-50 border-b border-blue-100">
+                      <td colSpan={12} className="px-5 py-3">
+                        <div className="flex flex-wrap items-end gap-4">
+                          {s.r1Id && (
+                            <div className="flex items-end gap-2">
+                              <p className="text-xs font-bold text-slate-500 uppercase mr-1 mb-1.5">R1</p>
+                              <div>
+                                <label className="text-[10px] text-slate-400 block mb-1">Score (pts)</label>
+                                <input type="number" value={editR1Score} onChange={e => setEditR1Score(e.target.value)}
+                                  className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="—" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-slate-400 block mb-1">Time (s)</label>
+                                <input type="number" value={editR1Time} onChange={e => setEditR1Time(e.target.value)}
+                                  className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="—" />
+                              </div>
+                            </div>
+                          )}
+                          {s.r2Id && (
+                            <div className="flex items-end gap-2">
+                              <p className="text-xs font-bold text-slate-500 uppercase mr-1 mb-1.5">R2</p>
+                              <div>
+                                <label className="text-[10px] text-slate-400 block mb-1">Score (pts)</label>
+                                <input type="number" value={editR2Score} onChange={e => setEditR2Score(e.target.value)}
+                                  className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="—" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-slate-400 block mb-1">Time (s)</label>
+                                <input type="number" value={editR2Time} onChange={e => setEditR2Time(e.target.value)}
+                                  className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="—" />
+                              </div>
+                            </div>
+                          )}
+                          <button onClick={() => commitEdit(s)} disabled={saving}
+                            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-lg transition mb-0">
+                            {saving ? 'Saving…' : '✓ Save'}
+                          </button>
+                          <button onClick={() => setEditingKey(null)}
+                            className="text-xs text-slate-500 hover:text-slate-700 underline">
+                            Cancel
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               );
             })}
           </tbody>
