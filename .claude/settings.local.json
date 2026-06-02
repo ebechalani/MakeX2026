@@ -115,7 +115,9 @@
       "Bash(jpg)",
       "Bash(jpeg\" 2>&1)",
       "Bash(git pull *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(grep -n \"^  \\);$\\\\|^  }$\" src/app/academy/page.tsx)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\src\\\\app\\\\api\\\\rank-certificate\\\\[club]\\\\[student]\\\\[rank]\")"
     ]
   }
 }

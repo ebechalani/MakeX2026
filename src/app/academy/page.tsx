@@ -9,6 +9,7 @@ import RulesTab from './RulesTab';
 import QuizTab from './QuizTab';
 import TeamsTab from './TeamsTab';
 import CertificatesTab from './CertificatesTab';
+import RankCertificatesModal from '@/app/admin/RankCertificatesModal';
 
 const SESSION_KEY = 'academy_session';
 
@@ -118,6 +119,9 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
     category_id: '', table_id: '', notes: '', date_of_birth: '',
   });
 
+  const [showRankCerts, setShowRankCerts]       = useState(false);
+  const [allPassations, setAllPassations]       = useState<Passation[]>([]);
+  const [rankCertsLoading, setRankCertsLoading] = useState(false);
   const [round2Times, setRound2Times] = useState<Map<string, string>>(new Map());
   type R2Result = { score: number | null; time: number | null };
   const [round2Results, setRound2Results] = useState<Map<string, R2Result>>(new Map());
@@ -278,6 +282,14 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
     if (!confirm('Cancel this pending request?')) return;
     await supabase.from('pending_changes').delete().eq('id', id);
     load();
+  }
+
+  async function openRankCerts() {
+    setRankCertsLoading(true);
+    const { data } = await supabase.from('passations').select('*');
+    setAllPassations((data || []) as Passation[]);
+    setRankCertsLoading(false);
+    setShowRankCerts(true);
   }
 
   const catLabel = (id: string) => {
@@ -504,6 +516,13 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
             }`}
           >
             🎓 Certificates
+          </button>
+          <button
+            onClick={openRankCerts}
+            disabled={rankCertsLoading}
+            className="ml-2 px-4 py-2 text-sm font-semibold rounded-xl border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50 transition-colors flex items-center gap-1.5 self-center"
+          >
+            {rankCertsLoading ? '⏳ Loading…' : '🏆 Ranking Certificates'}
           </button>
         </div>
 
@@ -932,6 +951,17 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
         </>
         )}
       </div>
+
+      {/* ── Ranking Certificates Modal ── */}
+      {showRankCerts && (
+        <RankCertificatesModal
+          academyName={session.name}
+          passations={allPassations}
+          categories={categories}
+          tables={tables}
+          onClose={() => setShowRankCerts(false)}
+        />
+      )}
     </div>
   );
 }
