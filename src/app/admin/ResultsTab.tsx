@@ -6,29 +6,12 @@ import { SHEETS, type Sheet } from '@/lib/scoresheets';
 import type { Category, Table, Passation } from '@/lib/types';
 
 // ── School / Club classification ─────────────────────────────────────────────
-const SCHOOL_NAMES = new Set([
-  'Carmelites', 'CCJ', 'CND Steam Club',
-  'College Maristes Notre Dame de Lourdes', 'Ecole De La Mission éDucative',
-  'Ecole des Soeurs de la Croix - Hrajel', 'Ecole Saint Elie - SFM Zahle',
-  'ESJ Capucins Batroun', 'IC Ain Aar',
-  'Lycée Charlemagne', 'Lycee Charlemagne',
-  'Lycée Montaigne', 'Lycee Montaigne',
-  'Mont La Salle',
-  'Sainte Famille Francaise Jounieh', 'SJS Robotics Club', 'SSCC Kfardebian',
-]);
-
-// Case-insensitive + accent-insensitive match
-function orgType(clubName: string | null): 'School' | 'Club' {
-  if (!clubName) return 'Club';
-  // Exact match first
-  if (SCHOOL_NAMES.has(clubName)) return 'School';
-  // Normalise: lowercase + strip accents
-  const norm = clubName.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-  for (const s of SCHOOL_NAMES) {
-    if (s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase() === norm) return 'School';
-  }
-  return 'Club';
-}
+import {
+  orgType,
+  type RoundResult, type RankedStudent, type CategoryRankings,
+  calcAge, roundResult, betterResult, compareResults,
+  assignRanks, reRank, buildRankings,
+} from '@/lib/ranking';
 
 // ── Score breakdown helpers ───────────────────────────────────────────────────
 const BREAKDOWN_RE = /\[score-breakdown:\s*(\{[\s\S]*?\})\]/;
@@ -44,140 +27,6 @@ function stripBreakdown(notes: string | null | undefined): string | null {
   if (!notes) return null;
   const cleaned = notes.replace(BREAKDOWN_RE, '').trim();
   return cleaned || null;
-}
-
-// ── Ranking helpers ───────────────────────────────────────────────────────────
-type RoundResult = { score: number | null; time: number | null; status: string };
-
-function roundResult(p: Passation | undefined): RoundResult {
-  if (!p) return { score: null, time: null, status: '—' };
-  if (p.live_status === 'Absent') return { score: null, time: null, status: 'Absent' };
-  if (p.final_result_status === 'Void') return { score: null, time: null, status: 'Void' };
-  return { score: p.score ?? null, time: p.time_seconds ?? null, status: p.final_result_status || p.live_status || '—' };
-}
-
-// Compare two round results: higher score wins; equal score → lower time wins; null score = worst
-function betterResult(a: RoundResult, b: RoundResult): RoundResult {
-  const sa = a.score ?? -1;
-  const sb = b.score ?? -1;
-  if (sa !== sb) return sa > sb ? a : b;
-  // Tie on score — lower time is better (null time = worst)
-  if (a.time == null && b.time == null) return a;
-  if (a.time == null) return b;
-  if (b.time == null) return a;
-  return a.time <= b.time ? a : b;
-}
-
-// Compare two results for sorting: descending score, ascending time
-function compareResults(a: RoundResult, b: RoundResult): number {
-  const sa = a.score ?? -1;
-  const sb = b.score ?? -1;
-  if (sa !== sb) return sb - sa;              // higher score first
-  if (a.time == null && b.time == null) return 0;
-  if (a.time == null) return 1;              // no time → last
-  if (b.time == null) return -1;
-  return a.time - b.time;                    // lower time first
-}
-
-type RankedStudent = {
-  key: string;
-  teamName: string;
-  clubName: string;
-  tableLabel: string;
-  type: 'School' | 'Club';
-  age: number | null;
-  r1: RoundResult;
-  r2: RoundResult;
-  best: RoundResult;
-  rank: number;
-  r1Id: string | null;   // passation id for R1 row
-  r2Id: string | null;   // passation id for R2 row
-};
-
-type CategoryRankings = {
-  schools: RankedStudent[];
-  clubs: RankedStudent[];
-};
-
-function calcAge(dob: string | null | undefined): number | null {
-  if (!dob) return null;
-  const d = new Date(dob);
-  if (isNaN(d.getTime())) return null;
-  const now = new Date();
-  let a = now.getFullYear() - d.getFullYear();
-  const m = now.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
-  return a;
-}
-
-/** Assign competition-style ranks to a sorted array (same best score+time → same rank, next rank skips). */
-function assignRanks<T extends { best: RoundResult }>(sorted: T[]): (T & { rank: number })[] {
-  const result: (T & { rank: number })[] = [];
-  for (let i = 0; i < sorted.length; i++) {
-    if (i === 0) {
-      result.push({ ...sorted[i], rank: 1 });
-    } else {
-      const tied = compareResults(sorted[i].best, sorted[i - 1].best) === 0;
-      result.push({ ...sorted[i], rank: tied ? result[i - 1].rank : i + 1 });
-    }
-  }
-  return result;
-}
-
-/** Re-sort + reassign rank=1..N inside a sub-group (used for age-split sub-categories). */
-function reRank(students: RankedStudent[]): RankedStudent[] {
-  const sorted = students.slice().sort((a, b) => compareResults(a.best, b.best));
-  return assignRanks(sorted);
-}
-
-function buildRankings(r1rows: Passation[], r2rows: Passation[], tables: Table[]): CategoryRankings {
-  const getTableLabel = (tableId: string | null | undefined) => {
-    if (!tableId) return '—';
-    const t = tables.find(t => t.id === tableId);
-    return t ? (t.display_label || `Table ${t.table_number}`) : '—';
-  };
-
-  // Deduplicate by (team_name, club_name) — keep R1 and R2 per student
-  const r1map = new Map<string, Passation>();
-  const r2map = new Map<string, Passation>();
-  const key = (p: Passation) => `${p.team_name}|${p.club_name}`.toLowerCase();
-  for (const p of r1rows) r1map.set(key(p), p);
-  for (const p of r2rows) r2map.set(key(p), p);
-
-  const allKeys = new Set([...r1map.keys(), ...r2map.keys()]);
-  const schools: Omit<RankedStudent, 'rank'>[] = [];
-  const clubs:   Omit<RankedStudent, 'rank'>[] = [];
-
-  for (const k of allKeys) {
-    const r1p = r1map.get(k);
-    const r2p = r2map.get(k);
-    const ref  = r1p || r2p!;
-    const r1res = roundResult(r1p);
-    const r2res = roundResult(r2p);
-    const best  = betterResult(r1res, r2res);
-    const entry = {
-      key: k,
-      teamName: ref.team_name,
-      clubName: ref.club_name || '',
-      tableLabel: getTableLabel(r1p?.table_id || r2p?.table_id),
-      type: orgType(ref.club_name),
-      age: calcAge(ref.date_of_birth),
-      r1: r1res,
-      r2: r2res,
-      best,
-      r1Id: r1p?.id ?? null,
-      r2Id: r2p?.id ?? null,
-    };
-    if (entry.type === 'School') schools.push(entry);
-    else clubs.push(entry);
-  }
-
-  const rank = (arr: Omit<RankedStudent, 'rank'>[]): RankedStudent[] => {
-    arr.sort((a, b) => compareResults(a.best, b.best));
-    return assignRanks(arr);
-  };
-
-  return { schools: rank(schools), clubs: rank(clubs) };
 }
 
 /** True if the category name matches Capelli Inspire (case-insensitive). */

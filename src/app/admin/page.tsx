@@ -9,6 +9,7 @@ import JudgesTab from './JudgesTab';
 import ResultsTab from './ResultsTab';
 import RulesTab from './RulesTab';
 import CertificatesTab from './CertificatesTab';
+import RankCertificatesModal from './RankCertificatesModal';
 import Link from 'next/link';
 
 // Admin password is verified server-side via /api/admin-login. Never hardcoded here.
@@ -158,6 +159,7 @@ function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'passations' | 'categories' | 'academies' | 'schedule' | 'soccer' | 'starter' | 'judges' | 'results' | 'approvals' | 'rules' | 'certificates'>('passations');
   const [expandedAcademy, setExpandedAcademy] = useState<Set<string>>(new Set());
   const [academySearch, setAcademySearch] = useState('');
+  const [rankCertAcademy, setRankCertAcademy] = useState<string | null>(null);
   const [scheduleRound, setScheduleRound] = useState<1 | 2>(1);
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
   const [academies, setAcademies] = useState<Academy[]>([]);
@@ -1441,11 +1443,18 @@ function AdminDashboard() {
                               </div>
                             </td>
                             <td className="px-3 py-3 text-right" onClick={e => e.stopPropagation()}>
-                              <button
-                                disabled={g.list.length === 0}
-                                onClick={() => downloadAcademyCsv(g)}
-                                className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-30 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
-                              >⬇ CSV</button>
+                              <div className="flex gap-1.5 justify-end">
+                                <button
+                                  onClick={() => setRankCertAcademy(g.name)}
+                                  className="text-amber-700 bg-amber-50 hover:bg-amber-100 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
+                                  title="Generate ranking certificates (rank 1–5)"
+                                >🏆 Rank Certs</button>
+                                <button
+                                  disabled={g.list.length === 0}
+                                  onClick={() => downloadAcademyCsv(g)}
+                                  className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-30 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
+                                >⬇ CSV</button>
+                              </div>
                             </td>
                           </tr>
                           {isOpen && (
@@ -1954,6 +1963,17 @@ function AdminDashboard() {
           </div>
         )}
       </div>
+
+      {/* ── Ranking Certificates Modal ── */}
+      {rankCertAcademy && (
+        <RankCertificatesModal
+          academyName={rankCertAcademy}
+          passations={passations}
+          categories={categories}
+          tables={tables}
+          onClose={() => setRankCertAcademy(null)}
+        />
+      )}
     </div>
   );
 }
