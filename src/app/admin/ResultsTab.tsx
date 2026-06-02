@@ -110,11 +110,20 @@ function calcAge(dob: string | null | undefined): number | null {
   return a;
 }
 
+/** Assign competition-style ranks to a sorted array (same score+time → same rank, next rank skips). */
+function assignRanks<T extends { best: RoundResult }>(sorted: T[]): (T & { rank: number })[] {
+  return sorted.map((s, i, arr) => {
+    if (i === 0) return { ...s, rank: 1 };
+    const prev = arr[i - 1] as T & { rank: number };
+    const tied = compareResults(s.best, (arr[i - 1] as T).best) === 0;
+    return { ...s, rank: tied ? prev.rank : i + 1 };
+  }) as (T & { rank: number })[];
+}
+
 /** Re-sort + reassign rank=1..N inside a sub-group (used for age-split sub-categories). */
 function reRank(students: RankedStudent[]): RankedStudent[] {
-  return students.slice()
-    .sort((a, b) => compareResults(a.best, b.best))
-    .map((s, i) => ({ ...s, rank: i + 1 }));
+  const sorted = students.slice().sort((a, b) => compareResults(a.best, b.best));
+  return assignRanks(sorted);
 }
 
 function buildRankings(r1rows: Passation[], r2rows: Passation[], tables: Table[]): CategoryRankings {
@@ -161,7 +170,7 @@ function buildRankings(r1rows: Passation[], r2rows: Passation[], tables: Table[]
 
   const rank = (arr: Omit<RankedStudent, 'rank'>[]): RankedStudent[] => {
     arr.sort((a, b) => compareResults(a.best, b.best));
-    return arr.map((s, i) => ({ ...s, rank: i + 1 }));
+    return assignRanks(arr);
   };
 
   return { schools: rank(schools), clubs: rank(clubs) };
@@ -973,8 +982,9 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, onSaveScor
           </thead>
           <tbody className="divide-y divide-slate-50">
             {rows.map((s, idx) => {
-              const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
-              const isTop = idx < 3 && s.best.score != null;
+              const isTied = rows.filter(r => r.rank === s.rank).length > 1;
+              const medal = s.rank === 1 && !isTied ? '🥇' : s.rank === 2 && !isTied ? '🥈' : s.rank === 3 && !isTied ? '🥉' : null;
+              const isTop = s.rank <= 3 && s.best.score != null;
               const isEditing = editingKey === s.key;
               return (
                 <>
@@ -987,7 +997,11 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, onSaveScor
                       </button>
                     </td>
                     <td className="px-3 py-2.5 text-center font-bold text-slate-700 text-base">
-                      {medal ?? <span className="text-slate-400 font-normal text-sm">{s.rank}</span>}
+                      {medal ?? (
+                        <span className={`font-normal text-sm ${isTied ? 'text-orange-500' : 'text-slate-400'}`}>
+                          {isTied ? `=${s.rank}` : s.rank}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 font-semibold text-slate-800">{s.teamName}</td>
                     <td className="px-3 py-2.5 text-xs text-slate-600">{s.clubName || '—'}</td>
