@@ -207,7 +207,24 @@ function StarterTeamBuilder({ catId, rankings, groupId, onSaveScore }: {
   });
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const allStudents = useMemo(() => [...rankings.schools, ...rankings.clubs], [rankings]);
+  // Students not in the DB — injected manually
+  const STARTER_HARDCODED: RankedStudent[] = useMemo(() => {
+    const none: RoundResult = { score: null, time: null, status: '—' };
+    return [
+      { key: '__hc__carlo kafrouni|roboholic', teamName: 'Carlo Kafrouni', clubName: 'RoboHolic', tableLabel: '—', type: 'Club', age: null, r1: none, r2: none, best: none, rank: 999, r1Id: null, r2Id: null },
+      { key: '__hc__jean paul mrad|roboholic',  teamName: 'Jean Paul Mrad',  clubName: 'RoboHolic', tableLabel: '—', type: 'Club', age: null, r1: none, r2: none, best: none, rank: 999, r1Id: null, r2Id: null },
+    ];
+  }, []);
+
+  const allStudents = useMemo(() => {
+    const base = [...rankings.schools, ...rankings.clubs];
+    // Add hardcoded students only if not already present (match by first+last name, case-insensitive)
+    const nameIn = (name: string) => base.some(s =>
+      s.teamName.toLowerCase().includes(name.toLowerCase())
+    );
+    const extras = STARTER_HARDCODED.filter(hc => !nameIn(hc.teamName));
+    return [...base, ...extras];
+  }, [rankings, STARTER_HARDCODED]);
   const assignedKeys = useMemo(() => new Set(teams.flatMap(t => [t.s1Key, t.s2Key])), [teams]);
   const unassigned   = useMemo(() => allStudents.filter(s => !assignedKeys.has(s.key)), [allStudents, assignedKeys]);
 
