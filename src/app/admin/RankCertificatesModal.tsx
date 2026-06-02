@@ -99,11 +99,12 @@ export default function RankCertificatesModal({ academyName, passations, categor
         continue;
       }
 
-      // ── Soccer: override-only ─────────────────────────────────────────────
+      // ── Soccer: override-only — only emit rows the admin manually pinned ────
       if (isSoccer(catName)) {
         const combined = reRank([...schools, ...clubs]);
         const ranked   = applyOverrides(combined, `${cat.id}-unified`);
         for (const row of ranked) {
+          if (!row.isOverridden) continue;           // skip anyone not manually ranked
           if (row.displayRank > 5) continue;
           if (row.clubName.toLowerCase() !== acLow) continue;
           result.push({ studentName: row.teamName, clubName: row.clubName, categoryName: catName, ageGroupLabel: '', rank: row.displayRank, pdfUrl: rankCertUrl(row.clubName, row.teamName, row.displayRank) });

@@ -3,25 +3,38 @@ import { createClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
+import { SCHOOL_NAMES } from '@/lib/ranking';
 
 // ── Same layout constants as participation cert ────────────────────────────────
 const PAGE_W = 595.5;
 
 const POS = {
-  rankLine:  { y: 404.5, size: 13 },   // NEW — above name
+  rankLine:  { y: 404.5, size: 13 },   // above name
   nameMain:  { y: 386.5, size: 18, maxSize: 18, minSize: 7 },
   category:  { y: 372.0, size: 12 },
+  clubLine:  { y: 357.0, size: 11 },   // club / school name + type below category
   memberSig: { x: 140, y: 181.5, size: 11 },
   mentorSig: { x: 380, y: 181.5, size: 11 },
 };
 
-// White cover boxes — same as participation cert + extra for rank line
+// White cover boxes — same as participation cert + rank line + club line
 const COVERS_BASE = [
-  { x: 170, y: 375, w: 260, h: 53 },   // enlarged to cover rank line above name
+  { x: 170, y: 375, w: 260, h: 53 },   // name + rank line area
   { x: 210, y: 362, w: 180, h: 33 },   // category
+  { x: 170, y: 347, w: 260, h: 20 },   // club / school name line
   { x: 195, y: 173, w: 60,  h: 30 },   // member sig
   { x: 370, y: 173, w: 60,  h: 30 },   // mentor sig
 ];
+
+// ── School / Club type helper (mirrors src/lib/ranking.ts) ────────────────────
+function orgType(clubName: string): 'School' | 'Club' {
+  if (SCHOOL_NAMES.has(clubName)) return 'School';
+  const norm = clubName.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  for (const s of SCHOOL_NAMES) {
+    if (s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase() === norm) return 'School';
+  }
+  return 'Club';
+}
 
 const RANK_LABELS: Record<number, string> = {
   1: '1st Place',
@@ -78,10 +91,13 @@ export async function GET(
   });
   if (!target) return new NextResponse('Certificate not found', { status: 404 });
 
-  const memberName = (target.student_names?.trim()) || target.team_name || '—';
-  const mentorName = target.coach_name || '—';
-  const catName    = cats?.find(c => c.id === target.category_id)?.name || '—';
-  const rankLabel  = RANK_LABELS[rankNum] ?? `${rankNum}th Place`;
+  const memberName  = (target.student_names?.trim()) || target.team_name || '—';
+  const mentorName  = target.coach_name || '—';
+  const catName     = cats?.find(c => c.id === target.category_id)?.name || '—';
+  const rankLabel   = RANK_LABELS[rankNum] ?? `${rankNum}th Place`;
+  const clubDisplay = target.club_name || clubReq;
+  const typeLabel   = orgType(target.club_name || '');
+  const clubLine    = `${clubDisplay} · ${typeLabel}`;
 
   // Generate PDF
   const templateBytes = fs.readFileSync(TEMPLATE_PATH);
@@ -115,6 +131,13 @@ export async function GET(
   page.drawText(catName, {
     x: centerX(catName, fontNormal, POS.category.size),
     y: POS.category.y, size: POS.category.size, font: fontNormal, color: dark,
+  });
+
+  // 4b. Club / School name + type (e.g. "RoboHolic · Club")
+  const clubLineSize = fittingSize(clubLine, fontNormal, POS.clubLine.size, PAGE_W - 40);
+  page.drawText(clubLine, {
+    x: centerX(clubLine, fontNormal, clubLineSize),
+    y: POS.clubLine.y, size: clubLineSize, font: fontNormal, color: dark,
   });
 
   // 5. Member signature line
