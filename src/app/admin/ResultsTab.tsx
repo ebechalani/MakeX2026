@@ -964,21 +964,21 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
       });
   }, [rows, overrides]);
 
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editR1Score,      setEditR1Score]      = useState('');
-  const [editR1Time,       setEditR1Time]        = useState('');
-  const [editR2Score,      setEditR2Score]      = useState('');
-  const [editR2Time,       setEditR2Time]        = useState('');
-  const [editOverrideRank, setEditOverrideRank] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [editingKey,  setEditingKey]  = useState<string | null>(null);
+  const [rankEditKey, setRankEditKey] = useState<string | null>(null);
+  const [editR1Score, setEditR1Score] = useState('');
+  const [editR1Time,  setEditR1Time]  = useState('');
+  const [editR2Score, setEditR2Score] = useState('');
+  const [editR2Time,  setEditR2Time]  = useState('');
+  const [saving,      setSaving]      = useState(false);
 
   function openEdit(s: RankedStudent & { displayRank: number; isOverridden: boolean }) {
     setEditingKey(s.key);
+    setRankEditKey(null);
     setEditR1Score(s.r1.score != null ? String(s.r1.score) : '');
     setEditR1Time(s.r1.time  != null ? String(s.r1.time)  : '');
     setEditR2Score(s.r2.score != null ? String(s.r2.score) : '');
     setEditR2Time(s.r2.time  != null ? String(s.r2.time)  : '');
-    setEditOverrideRank(s.isOverridden ? String(s.displayRank) : '');
   }
 
   async function commitEdit(s: RankedStudent) {
@@ -993,11 +993,15 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
       const time  = editR2Time  !== '' ? Number(editR2Time)  : null;
       await onSaveScore(s.r2Id, score, time);
     }
-    // Save or clear override rank
-    const overrideVal = editOverrideRank !== '' ? Number(editOverrideRank) : null;
-    saveOverride(s.key, overrideVal);
     setSaving(false);
     setEditingKey(null);
+  }
+
+  function commitRankOverride(key: string, rawValue: string) {
+    const v = rawValue.trim();
+    const n = v !== '' ? Number(v) : null;
+    saveOverride(key, n != null && !isNaN(n) && n >= 1 ? n : null);
+    setRankEditKey(null);
   }
 
   return (
@@ -1052,13 +1056,31 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
                       </button>
                     </td>
                     <td className="px-3 py-2.5 text-center font-bold text-slate-700 text-base">
-                      {s.isOverridden ? (
-                        <span className="inline-flex items-center gap-1 font-bold text-orange-600 text-sm">
-                          📌{s.displayRank}
-                        </span>
-                      ) : medal ?? (
-                        <span className={`font-normal text-sm ${isTied ? 'text-orange-500' : 'text-slate-400'}`}>
-                          {isTied ? `=${s.displayRank}` : s.displayRank}
+                      {rankEditKey === s.key ? (
+                        <input
+                          type="number" min="1" autoFocus
+                          defaultValue={s.displayRank}
+                          className="w-12 text-center border border-orange-400 rounded px-1 py-0.5 text-sm font-mono bg-white outline-none"
+                          onBlur={e => commitRankOverride(s.key, e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') e.currentTarget.blur();
+                            if (e.key === 'Escape') setRankEditKey(null);
+                          }}
+                        />
+                      ) : (
+                        <span
+                          title="Click to override rank"
+                          onClick={() => setRankEditKey(s.key)}
+                          className={`cursor-pointer select-none rounded px-1 hover:bg-orange-50 ${s.isOverridden ? 'text-orange-600 font-bold' : ''}`}
+                        >
+                          {s.isOverridden
+                            ? <span className="inline-flex items-center gap-0.5">📌{s.displayRank}<span onClick={e => { e.stopPropagation(); saveOverride(s.key, null); }} className="ml-1 text-[10px] text-orange-300 hover:text-red-500 cursor-pointer" title="Clear override">✕</span></span>
+                            : medal ?? (
+                              <span className={`font-normal text-sm ${isTied ? 'text-orange-500' : 'text-slate-400'}`}>
+                                {isTied ? `=${s.displayRank}` : s.displayRank}
+                              </span>
+                            )
+                          }
                         </span>
                       )}
                     </td>
@@ -1111,20 +1133,6 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
                               </div>
                             </div>
                           )}
-                          {/* Manual rank override */}
-                          <div className="border-l border-slate-200 pl-4">
-                            <div>
-                              <label className="text-[10px] text-orange-500 font-bold block mb-1">📌 Override Rank</label>
-                              <input type="number" min="1" value={editOverrideRank} onChange={e => setEditOverrideRank(e.target.value)}
-                                className="w-20 border border-orange-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="auto" />
-                            </div>
-                            {s.isOverridden && (
-                              <button onClick={() => { saveOverride(s.key, null); setEditingKey(null); }}
-                                className="mt-1 text-[10px] text-orange-500 hover:text-orange-700 underline">
-                                clear override
-                              </button>
-                            )}
-                          </div>
                           <button onClick={() => commitEdit(s)} disabled={saving}
                             className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-lg transition mb-0">
                             {saving ? 'Saving…' : '✓ Save'}
