@@ -187,6 +187,11 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
     return round2Times.get(k) ?? null;
   };
 
+  const round2ResultFor = (p: Passation): R2Result | null => {
+    const k = `${p.category_id}|${(p.team_name || '').trim().toLowerCase()}|${(p.club_name || '').trim().toLowerCase()}`;
+    return round2Results.get(k) ?? null;
+  };
+
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
@@ -794,8 +799,15 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                         <span className={`text-xs font-semibold px-2 py-1 rounded-full ${liveBadge(p.live_status)}`}>{p.live_status}</span>
                       </td>
                       <td className="px-3 py-3 text-xs text-slate-700 font-semibold">
-                        {p.score != null ? p.score : '—'}
-                        {p.time_seconds != null && <span className="text-slate-400 font-normal ml-1">({p.time_seconds}s)</span>}
+                        <div className="space-y-0.5">
+                          <div><span className="text-slate-400 font-bold w-7 inline-block">R1</span>{p.score != null ? <span className="text-blue-700">{p.score}{p.time_seconds != null && <span className="text-slate-400 font-normal ml-1">({p.time_seconds}s)</span>}</span> : <span className="text-slate-300">—</span>}</div>
+                          {(() => {
+                            const r2 = round2ResultFor(p);
+                            return r2
+                              ? <div><span className="text-slate-400 font-bold w-7 inline-block">R2</span><span className="text-purple-700">{r2.score != null ? r2.score : '—'}{r2.time != null && <span className="text-slate-400 font-normal ml-1">({r2.time}s)</span>}</span></div>
+                              : <div className="text-slate-300 text-[10px]">R2 —</div>;
+                          })()}
+                        </div>
                       </td>
                       <td className="px-3 py-3">
                         {pend ? (
@@ -841,8 +853,10 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
                             <Detail label="Round 2 Time" v={fmtDate(round2TimeFor(p))} />
                             <Detail label="Live Status" v={p.live_status} />
                             <Detail label="Final Result" v={p.final_result_status} />
-                            <Detail label="Score" v={p.score != null ? String(p.score) : null} />
-                            <Detail label="Time (s)" v={p.time_seconds != null ? String(p.time_seconds) : null} />
+                            <Detail label="R1 Score" v={p.score != null ? String(p.score) : null} />
+                            <Detail label="R1 Time (s)" v={p.time_seconds != null ? String(p.time_seconds) : null} />
+                            <Detail label="R2 Score" v={round2ResultFor(p)?.score != null ? String(round2ResultFor(p)!.score) : null} />
+                            <Detail label="R2 Time (s)" v={round2ResultFor(p)?.time != null ? String(round2ResultFor(p)!.time) : null} />
                             <Detail label="Judge" v={p.judge_name} />
                             <Detail label="Finalized At" v={fmtDate(p.finalized_at)} />
                             <Detail label="Created" v={fmtDate(p.created_at)} />
