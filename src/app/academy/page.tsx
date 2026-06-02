@@ -119,6 +119,8 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
   });
 
   const [round2Times, setRound2Times] = useState<Map<string, string>>(new Map());
+  type R2Result = { score: number | null; time: number | null };
+  const [round2Results, setRound2Results] = useState<Map<string, R2Result>>(new Map());
   const [coachesMap, setCoachesMap] = useState<Record<string, string[]>>({});
   const [coachEdits, setCoachEdits] = useState<Record<string, string>>({});
   const [coachSaving, setCoachSaving] = useState<Record<string, boolean>>({});
@@ -140,11 +142,17 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
       const r1 = all.filter(p => (p.round_number ?? 1) === 1);
       // Build a key → round-2 scheduled_time map so we can show both times in one row
       const r2 = all.filter(p => p.round_number === 2);
-      const m = new Map<string, string>();
+      const m  = new Map<string, string>();
+      const m2 = new Map<string, R2Result>();
       const keyFor = (p: Passation) => `${p.category_id}|${(p.team_name || '').trim().toLowerCase()}|${(p.club_name || '').trim().toLowerCase()}`;
-      for (const p of r2) if (p.scheduled_time) m.set(keyFor(p), p.scheduled_time);
+      for (const p of r2) {
+        const k = keyFor(p);
+        if (p.scheduled_time) m.set(k, p.scheduled_time);
+        m2.set(k, { score: p.score ?? null, time: p.time_seconds ?? null });
+      }
       setPassations(r1);
       setRound2Times(m);
+      setRound2Results(m2);
 
       // Rebuild coaches map from coach_name on passations (source of truth)
       // Split stored "Coach A, Coach B" back into array per group
