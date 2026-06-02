@@ -801,6 +801,8 @@ export default function ResultsTab() {
                       label="🏆 Overall Rankings"
                       labelClass="text-emerald-700 bg-emerald-50 border-emerald-200"
                       catTitle={catTitle}
+                      groupId={`${cat.id}-unified`}
+                      onSaveScore={saveScore}
                     />
                   </div>
                 );
@@ -833,6 +835,7 @@ export default function ResultsTab() {
                       label={`🏫 School Rankings${band.label ? ` — ${band.label}` : ''}`}
                       labelClass="text-blue-700 bg-blue-50 border-blue-200"
                       catTitle={catTitle + (band.label ? ` · ${band.label}` : '')}
+                      groupId={`${cat.id}-school-${band.ageTag || 'all'}`}
                       onSaveScore={saveScore}
                     />
                   ))}
@@ -845,6 +848,7 @@ export default function ResultsTab() {
                       label={`🏢 Club Rankings${band.label ? ` — ${band.label}` : ''}`}
                       labelClass="text-purple-700 bg-purple-50 border-purple-200"
                       catTitle={catTitle + (band.label ? ` · ${band.label}` : '')}
+                      groupId={`${cat.id}-club-${band.ageTag || 'all'}`}
                       onSaveScore={saveScore}
                     />
                   ))}
@@ -922,26 +926,59 @@ export default function ResultsTab() {
 }
 
 // ── Ranking table component ───────────────────────────────────────────────────
-function RankingTable({ rows, label, labelClass, catTitle: _catTitle, onSaveScore }: {
+function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, onSaveScore }: {
   rows: RankedStudent[];
   label: string;
   labelClass: string;
   catTitle: string;
+  groupId: string;
   onSaveScore: (id: string, score: number | null, time: number | null) => Promise<void>;
 }) {
+  const storageKey = `makex2026:rankOverrides:${groupId}`;
+
+  const [overrides, setOverrides] = useState<Record<string, number>>(() => {
+    if (typeof window === 'undefined') return {};
+    try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; }
+  });
+
+  function saveOverride(key: string, rank: number | null) {
+    setOverrides(prev => {
+      const next = { ...prev };
+      if (rank == null || isNaN(rank)) { delete next[key]; } else { next[key] = rank; }
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  // Apply overrides: replace rank for overridden students, then re-sort by effective rank
+  const displayRows = useMemo(() => {
+    return rows
+      .map(s => ({
+        ...s,
+        displayRank: overrides[s.key] ?? s.rank,
+        isOverridden: s.key in overrides,
+      }))
+      .sort((a, b) => {
+        if (a.displayRank !== b.displayRank) return a.displayRank - b.displayRank;
+        return compareResults(a.best, b.best);
+      });
+  }, [rows, overrides]);
+
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editR1Score, setEditR1Score] = useState('');
-  const [editR1Time,  setEditR1Time]  = useState('');
-  const [editR2Score, setEditR2Score] = useState('');
-  const [editR2Time,  setEditR2Time]  = useState('');
+  const [editR1Score,      setEditR1Score]      = useState('');
+  const [editR1Time,       setEditR1Time]        = useState('');
+  const [editR2Score,      setEditR2Score]      = useState('');
+  const [editR2Time,       setEditR2Time]        = useState('');
+  const [editOverrideRank, setEditOverrideRank] = useState('');
   const [saving, setSaving] = useState(false);
 
-  function openEdit(s: RankedStudent) {
+  function openEdit(s: RankedStudent & { displayRank: number; isOverridden: boolean }) {
     setEditingKey(s.key);
     setEditR1Score(s.r1.score != null ? String(s.r1.score) : '');
     setEditR1Time(s.r1.time  != null ? String(s.r1.time)  : '');
     setEditR2Score(s.r2.score != null ? String(s.r2.score) : '');
     setEditR2Time(s.r2.time  != null ? String(s.r2.time)  : '');
+    setEditOverrideRank(s.isOverridden ? String(s.displayRank) : '');
   }
 
   async function commitEdit(s: RankedStudent) {
@@ -956,6 +993,9 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, onSaveScor
       const time  = editR2Time  !== '' ? Number(editR2Time)  : null;
       await onSaveScore(s.r2Id, score, time);
     }
+    // Save or clear override rank
+    const overrideVal = editOverrideRank !== '' ? Number(editOverrideRank) : null;
+    saveOverride(s.key, overrideVal);
     setSaving(false);
     setEditingKey(null);
   }
@@ -964,7 +1004,15 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, onSaveScor
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
       <div className={`px-5 py-2.5 border-b flex items-center justify-between ${labelClass}`}>
         <span className="font-bold text-sm">{label}</span>
-        <span className="text-xs opacity-70">{rows.length} participant{rows.length !== 1 ? 's' : ''} · {rows.filter(s => s.best.score != null).length} scored</span>
+        <div className="flex items-center gap-3">
+          {Object.keys(overrides).length > 0 && (
+            <button onClick={() => { setOverrides({}); localStorage.removeItem(storageKey); }}
+              className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded hover:bg-orange-100 transition">
+              📌 {Object.keys(overrides).length} override{Object.keys(overrides).length !== 1 ? 's' : ''} · clear all
+            </button>
+          )}
+          <span className="text-xs opacity-70">{rows.length} participant{rows.length !== 1 ? 's' : ''} · {rows.filter(s => s.best.score != null).length} scored</span>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -985,10 +1033,13 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, onSaveScor
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {rows.map((s, idx) => {
-              const isTied = rows.filter(r => r.rank === s.rank).length > 1;
-              const medal = s.rank === 1 && !isTied ? '🥇' : s.rank === 2 && !isTied ? '🥈' : s.rank === 3 && !isTied ? '🥉' : null;
-              const isTop = s.rank <= 3 && s.best.score != null;
+            {displayRows.map(s => {
+              const isTied = displayRows.filter(r => r.displayRank === s.displayRank).length > 1;
+              const medal = s.displayRank === 1 && !isTied && !s.isOverridden ? '🥇'
+                          : s.displayRank === 2 && !isTied && !s.isOverridden ? '🥈'
+                          : s.displayRank === 3 && !isTied && !s.isOverridden ? '🥉'
+                          : null;
+              const isTop = s.displayRank <= 3 && s.best.score != null;
               const isEditing = editingKey === s.key;
               return (
                 <>
@@ -996,14 +1047,18 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, onSaveScor
                     <td className="px-2 text-center">
                       <button onClick={() => isEditing ? setEditingKey(null) : openEdit(s)}
                         className="text-slate-400 hover:text-blue-600 transition text-xs px-1"
-                        title="Edit score">
+                        title="Edit score / rank">
                         {isEditing ? '✕' : '✏️'}
                       </button>
                     </td>
                     <td className="px-3 py-2.5 text-center font-bold text-slate-700 text-base">
-                      {medal ?? (
+                      {s.isOverridden ? (
+                        <span className="inline-flex items-center gap-1 font-bold text-orange-600 text-sm">
+                          📌{s.displayRank}
+                        </span>
+                      ) : medal ?? (
                         <span className={`font-normal text-sm ${isTied ? 'text-orange-500' : 'text-slate-400'}`}>
-                          {isTied ? `=${s.rank}` : s.rank}
+                          {isTied ? `=${s.displayRank}` : s.displayRank}
                         </span>
                       )}
                     </td>
@@ -1056,6 +1111,20 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, onSaveScor
                               </div>
                             </div>
                           )}
+                          {/* Manual rank override */}
+                          <div className="border-l border-slate-200 pl-4">
+                            <div>
+                              <label className="text-[10px] text-orange-500 font-bold block mb-1">📌 Override Rank</label>
+                              <input type="number" min="1" value={editOverrideRank} onChange={e => setEditOverrideRank(e.target.value)}
+                                className="w-20 border border-orange-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="auto" />
+                            </div>
+                            {s.isOverridden && (
+                              <button onClick={() => { saveOverride(s.key, null); setEditingKey(null); }}
+                                className="mt-1 text-[10px] text-orange-500 hover:text-orange-700 underline">
+                                clear override
+                              </button>
+                            )}
+                          </div>
                           <button onClick={() => commitEdit(s)} disabled={saving}
                             className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-lg transition mb-0">
                             {saving ? 'Saving…' : '✓ Save'}
