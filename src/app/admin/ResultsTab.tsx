@@ -191,6 +191,187 @@ function isUnifiedRanking(catName: string | null | undefined): boolean {
   return /capelli\s*soccer/i.test(catName) || /makex\s*starter/i.test(catName);
 }
 
+// ── MakeX Starter team builder ────────────────────────────────────────────────
+type StarterTeam = { id: string; name: string; s1Key: string; s2Key: string };
+
+function StarterTeamBuilder({ catId, rankings, groupId, onSaveScore }: {
+  catId: string;
+  rankings: CategoryRankings;
+  groupId: string;
+  onSaveScore: (id: string, score: number | null, time: number | null) => Promise<void>;
+}) {
+  const storageKey = `makex2026:starterTeams:${catId}`;
+
+  const [teams, setTeams] = useState<StarterTeam[]>(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch { return []; }
+  });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const allStudents = useMemo(() => [...rankings.schools, ...rankings.clubs], [rankings]);
+  const assignedKeys = useMemo(() => new Set(teams.flatMap(t => [t.s1Key, t.s2Key])), [teams]);
+  const unassigned   = useMemo(() => allStudents.filter(s => !assignedKeys.has(s.key)), [allStudents, assignedKeys]);
+
+  function saveTeams(next: StarterTeam[]) {
+    setTeams(next);
+    localStorage.setItem(storageKey, JSON.stringify(next));
+  }
+
+  function toggleSelect(key: string) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) { next.delete(key); }
+      else if (next.size < 2) { next.add(key); }
+      return next;
+    });
+  }
+
+  function createTeam() {
+    const [k1, k2] = [...selected];
+    const s1 = allStudents.find(s => s.key === k1)!;
+    const s2 = allStudents.find(s => s.key === k2)!;
+    const name = `${s1.teamName.split(' ')[0]} & ${s2.teamName.split(' ')[0]}`;
+    saveTeams([...teams, { id: Math.random().toString(36).slice(2), name, s1Key: k1, s2Key: k2 }]);
+    setSelected(new Set());
+  }
+
+  function deleteTeam(id: string) { saveTeams(teams.filter(t => t.id !== id)); }
+  function renameTeam(id: string, name: string) { saveTeams(teams.map(t => t.id === id ? { ...t, name } : t)); }
+
+  // Build RankedStudent entries for each team (combined scores)
+  const teamRows: RankedStudent[] = useMemo(() => teams.map((team, i) => {
+    const s1 = allStudents.find(s => s.key === team.s1Key);
+    const s2 = allStudents.find(s => s.key === team.s2Key);
+    const none: RoundResult = { score: null, time: null, status: '—' };
+    const combine = (a: RoundResult, b: RoundResult): RoundResult => ({
+      score:  (a.score ?? 0) + (b.score ?? 0) || null,
+      time:   a.time != null && b.time != null ? a.time + b.time : null,
+      status: a.score != null ? a.status : b.status,
+    });
+    const r1 = combine(s1?.r1 ?? none, s2?.r1 ?? none);
+    const r2 = combine(s1?.r2 ?? none, s2?.r2 ?? none);
+    return {
+      key: team.id,
+      teamName: team.name,
+      clubName: [s1?.clubName, s2?.clubName].filter(Boolean).filter((v, j, a) => a.indexOf(v) === j).join(' / '),
+      tableLabel: s1?.tableLabel || s2?.tableLabel || '—',
+      type: 'Club' as const,
+      age: null,
+      r1, r2,
+      best: betterResult(r1, r2),
+      rank: i + 1,
+      r1Id: null,
+      r2Id: null,
+    };
+  }), [teams, allStudents]);
+
+  return (
+    <div className="space-y-4">
+      {/* ── Builder panel ── */}
+      <div className="bg-white border border-violet-200 rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 bg-violet-50 border-b border-violet-100 flex items-center justify-between">
+          <span className="font-bold text-violet-800 text-sm">👥 Team Builder — MakeX Starter</span>
+          <span className="text-xs text-violet-500">
+            {teams.length} team{teams.length !== 1 ? 's' : ''} · {unassigned.length} unassigned student{unassigned.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        <div className="p-4 space-y-5">
+          {/* Unassigned student chips */}
+          {unassigned.length > 0 ? (
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+                Click 2 students to pair them&nbsp;
+                <span className={`font-bold ${selected.size === 2 ? 'text-violet-600' : 'text-slate-400'}`}>
+                  ({selected.size}/2 selected)
+                </span>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {unassigned.map(s => {
+                  const isSel = selected.has(s.key);
+                  return (
+                    <button key={s.key} onClick={() => toggleSelect(s.key)}
+                      className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${
+                        isSel
+                          ? 'bg-violet-600 text-white border-violet-600 shadow-md scale-105'
+                          : 'bg-white text-slate-700 border-slate-300 hover:border-violet-400 hover:text-violet-700'
+                      }`}>
+                      {s.teamName}
+                      {s.clubName && (
+                        <span className={`ml-1.5 font-normal text-[10px] ${isSel ? 'text-violet-200' : 'text-slate-400'}`}>
+                          {s.clubName}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {selected.size === 2 && (
+                <div className="mt-3 flex items-center gap-3">
+                  <button onClick={createTeam}
+                    className="bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold px-5 py-2 rounded-lg transition shadow-sm">
+                    ✓ Create Team
+                  </button>
+                  <button onClick={() => setSelected(new Set())}
+                    className="text-xs text-slate-400 hover:text-slate-600 underline">cancel</button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 italic">All students have been assigned to teams.</p>
+          )}
+
+          {/* Created teams list */}
+          {teams.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Paired Teams</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {teams.map(team => {
+                  const s1 = allStudents.find(s => s.key === team.s1Key);
+                  const s2 = allStudents.find(s => s.key === team.s2Key);
+                  return (
+                    <div key={team.id} className="flex items-start gap-2 bg-violet-50/60 border border-violet-100 rounded-xl px-3 py-2.5">
+                      <div className="flex-1 min-w-0">
+                        <input
+                          value={team.name}
+                          onChange={e => renameTeam(team.id, e.target.value)}
+                          className="font-bold text-sm text-violet-900 bg-transparent w-full border-b border-transparent hover:border-violet-300 focus:border-violet-500 focus:outline-none"
+                        />
+                        <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                          {s1?.teamName ?? '?'} &amp; {s2?.teamName ?? '?'}
+                        </p>
+                      </div>
+                      <button onClick={() => deleteTeam(team.id)}
+                        className="text-slate-300 hover:text-red-500 text-xs mt-0.5 flex-shrink-0 transition">✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Team ranking table ── */}
+      {teamRows.length > 0 && (
+        <RankingTable
+          rows={teamRows}
+          label="🏆 Team Rankings — MakeX Starter"
+          labelClass="text-violet-700 bg-violet-50 border-violet-200"
+          catTitle="MakeX Starter"
+          groupId={groupId}
+          overrideOnly={true}
+          onSaveScore={onSaveScore}
+        />
+      )}
+      {teamRows.length === 0 && (
+        <div className="text-center py-8 text-slate-400 text-sm bg-white border border-slate-200 rounded-2xl">
+          Pair students into teams above to see the ranking table.
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Split a ranking list into age bands. Bands re-rank from 1. */
 type AgeBand = { label: string; ageTag: string; rows: RankedStudent[] };
 function splitCapelliByAge(rows: RankedStudent[]): AgeBand[] {
@@ -785,6 +966,31 @@ export default function ResultsTab() {
 
               // Unified ranking → merge schools+clubs into a single re-ranked list
               if (unified) {
+                const isSoccer  = /capelli\s*soccer/i.test(cat.name);
+                const isStarter = /makex\s*starter/i.test(cat.name);
+
+                // MakeX Starter: special team-builder flow
+                if (isStarter) {
+                  const { schools: sc, clubs: cl } = rankingsByCat.get(cat.id) || { schools: [], clubs: [] };
+                  if (sc.length === 0 && cl.length === 0) return null;
+                  return (
+                    <div key={cat.id} className="space-y-3">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <h3 className="font-bold text-slate-800 text-base">{cat.name}
+                          {cat.age_range_label && <span className="ml-2 text-slate-400 font-normal text-sm">({cat.age_range_label})</span>}
+                        </h3>
+                        <span className="text-xs text-violet-600 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded">👥 Team pairing</span>
+                      </div>
+                      <StarterTeamBuilder
+                        catId={cat.id}
+                        rankings={{ schools: sc, clubs: cl }}
+                        groupId={`${cat.id}-starter`}
+                        onSaveScore={saveScore}
+                      />
+                    </div>
+                  );
+                }
+
                 const combined = reRank([...schools, ...clubs]);
                 if (combined.length === 0) return null;
                 return (
@@ -793,8 +999,11 @@ export default function ResultsTab() {
                       <h3 className="font-bold text-slate-800 text-base">{cat.name}
                         {cat.age_range_label && <span className="ml-2 text-slate-400 font-normal text-sm">({cat.age_range_label})</span>}
                       </h3>
-                      <span className="text-xs text-slate-400">Best of R1 &amp; R2 · points → time</span>
-                      <span className="text-xs text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">Single ranking</span>
+                      {isSoccer
+                        ? <span className="text-xs text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded">📌 Manual ranking only</span>
+                        : <><span className="text-xs text-slate-400">Best of R1 &amp; R2 · points → time</span>
+                           <span className="text-xs text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">Single ranking</span></>
+                      }
                     </div>
                     <RankingTable
                       rows={combined}
@@ -802,6 +1011,7 @@ export default function ResultsTab() {
                       labelClass="text-emerald-700 bg-emerald-50 border-emerald-200"
                       catTitle={catTitle}
                       groupId={`${cat.id}-unified`}
+                      overrideOnly={isSoccer}
                       onSaveScore={saveScore}
                     />
                   </div>
@@ -926,12 +1136,13 @@ export default function ResultsTab() {
 }
 
 // ── Ranking table component ───────────────────────────────────────────────────
-function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, onSaveScore }: {
+function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, overrideOnly = false, onSaveScore }: {
   rows: RankedStudent[];
   label: string;
   labelClass: string;
   catTitle: string;
   groupId: string;
+  overrideOnly?: boolean;
   onSaveScore: (id: string, score: number | null, time: number | null) => Promise<void>;
 }) {
   const storageKey = `makex2026:rankOverrides:${groupId}`;
@@ -952,17 +1163,23 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
 
   // Apply overrides: replace rank for overridden students, then re-sort by effective rank
   const displayRows = useMemo(() => {
-    return rows
-      .map(s => ({
-        ...s,
-        displayRank: overrides[s.key] ?? s.rank,
-        isOverridden: s.key in overrides,
-      }))
-      .sort((a, b) => {
-        if (a.displayRank !== b.displayRank) return a.displayRank - b.displayRank;
-        return compareResults(a.best, b.best);
-      });
-  }, [rows, overrides]);
+    const mapped = rows.map(s => ({
+      ...s,
+      displayRank: overrides[s.key] ?? s.rank,
+      isOverridden: s.key in overrides,
+    }));
+    // In overrideOnly mode: show overridden rows first (sorted by rank), then unoverridden rows dimmed at the bottom
+    if (overrideOnly) {
+      const pinned   = mapped.filter(s =>  s.isOverridden).sort((a, b) => a.displayRank - b.displayRank);
+      const unpinned = mapped.filter(s => !s.isOverridden).sort((a, b) => compareResults(a.best, b.best));
+      return [...pinned, ...unpinned];
+    }
+    const visible = mapped;
+    return visible.sort((a, b) => {
+      if (a.displayRank !== b.displayRank) return a.displayRank - b.displayRank;
+      return compareResults(a.best, b.best);
+    });
+  }, [rows, overrides, overrideOnly]);
 
   const [editingKey,  setEditingKey]  = useState<string | null>(null);
   const [rankEditKey, setRankEditKey] = useState<string | null>(null);
@@ -1015,7 +1232,10 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
               📌 {Object.keys(overrides).length} override{Object.keys(overrides).length !== 1 ? 's' : ''} · clear all
             </button>
           )}
-          <span className="text-xs opacity-70">{rows.length} participant{rows.length !== 1 ? 's' : ''} · {rows.filter(s => s.best.score != null).length} scored</span>
+          {overrideOnly
+            ? <span className="text-xs text-orange-500 opacity-80">{displayRows.length} pinned · click a rank number to add</span>
+            : <span className="text-xs opacity-70">{rows.length} participant{rows.length !== 1 ? 's' : ''} · {rows.filter(s => s.best.score != null).length} scored</span>
+          }
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -1043,11 +1263,12 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
                           : s.displayRank === 2 && !isTied && !s.isOverridden ? '🥈'
                           : s.displayRank === 3 && !isTied && !s.isOverridden ? '🥉'
                           : null;
-              const isTop = s.displayRank <= 3 && s.best.score != null;
+              const isTop = s.displayRank <= 3 && s.best.score != null && (!overrideOnly || s.isOverridden);
+              const isDimmed = overrideOnly && !s.isOverridden;
               const isEditing = editingKey === s.key;
               return (
                 <>
-                  <tr key={s.key} className={isEditing ? 'bg-blue-50' : isTop ? 'bg-amber-50/40' : 'hover:bg-slate-50/60'}>
+                  <tr key={s.key} className={isEditing ? 'bg-blue-50' : isDimmed ? 'opacity-30' : isTop ? 'bg-amber-50/40' : 'hover:bg-slate-50/60'}>
                     <td className="px-2 text-center">
                       <button onClick={() => isEditing ? setEditingKey(null) : openEdit(s)}
                         className="text-slate-400 hover:text-blue-600 transition text-xs px-1"
@@ -1075,6 +1296,8 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
                         >
                           {s.isOverridden
                             ? <span className="inline-flex items-center gap-0.5">📌{s.displayRank}<span onClick={e => { e.stopPropagation(); saveOverride(s.key, null); }} className="ml-1 text-[10px] text-orange-300 hover:text-red-500 cursor-pointer" title="Clear override">✕</span></span>
+                            : isDimmed
+                            ? <span className="text-slate-300 text-xs">—</span>
                             : medal ?? (
                               <span className={`font-normal text-sm ${isTied ? 'text-orange-500' : 'text-slate-400'}`}>
                                 {isTied ? `=${s.displayRank}` : s.displayRank}
