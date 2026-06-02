@@ -31,10 +31,6 @@ function isSoccer (n: string) { return /capelli\s*soccer/i.test(n); }
 function isStarter(n: string) { return /makex\s*starter/i.test(n); }
 function isInspire(n: string) { return /capelli\s*inspire/i.test(n); }
 
-function readOverrides(groupId: string): Record<string, number> {
-  if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(`makex2026:rankOverrides:${groupId}`) || '{}'); } catch { return {}; }
-}
 
 export default function RankCertificatesModal({ academyName, passations, categories, tables, onClose }: {
   academyName: string;
@@ -53,11 +49,10 @@ export default function RankCertificatesModal({ academyName, passations, categor
       const r2all = passations.filter(p => p.category_id === cat.id && p.round_number === 2);
       const { schools, clubs } = buildRankings(r1all, r2all, tables);
 
-      // ── MakeX Starter: team pairing ──────────────────────────────────────
+      // ── MakeX Starter: team pairing — override-only (same rule as Soccer) ──
       if (isStarter(catName)) {
         const teams    = readStarterTeams(cat.id);
         const allStuds = [...schools, ...clubs];
-        const ov       = readOverrides(`${cat.id}-starter`);
         const none: RoundResult = { score: null, time: null, status: '—' };
 
         const teamRows: RankedStudent[] = teams.map((team, i) => {
@@ -73,11 +68,10 @@ export default function RankCertificatesModal({ academyName, passations, categor
           return { key: team.id, teamName: team.name, clubName: s1?.clubName || s2?.clubName || '', tableLabel: '—', type: 'Club' as const, age: null, r1, r2, best: betterResult(r1, r2), rank: i + 1, r1Id: null, r2Id: null };
         });
 
-        const sorted = teamRows
-          .map(s => ({ ...s, displayRank: ov[s.key] ?? s.rank }))
-          .sort((a, b) => a.displayRank !== b.displayRank ? a.displayRank - b.displayRank : compareResults(a.best, b.best));
+        const ranked = applyOverrides(teamRows, `${cat.id}-starter`);
 
-        for (const row of sorted) {
+        for (const row of ranked) {
+          if (!row.isOverridden) continue;   // only teams you manually ranked
           if (row.displayRank > 5) continue;
           const team = teams.find(t => t.id === row.key);
           if (!team) continue;
