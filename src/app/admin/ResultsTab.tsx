@@ -110,14 +110,18 @@ function calcAge(dob: string | null | undefined): number | null {
   return a;
 }
 
-/** Assign competition-style ranks to a sorted array (same score+time → same rank, next rank skips). */
+/** Assign competition-style ranks to a sorted array (same best score+time → same rank, next rank skips). */
 function assignRanks<T extends { best: RoundResult }>(sorted: T[]): (T & { rank: number })[] {
-  return sorted.map((s, i, arr) => {
-    if (i === 0) return { ...s, rank: 1 };
-    const prev = arr[i - 1] as T & { rank: number };
-    const tied = compareResults(s.best, (arr[i - 1] as T).best) === 0;
-    return { ...s, rank: tied ? prev.rank : i + 1 };
-  }) as (T & { rank: number })[];
+  const result: (T & { rank: number })[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (i === 0) {
+      result.push({ ...sorted[i], rank: 1 });
+    } else {
+      const tied = compareResults(sorted[i].best, sorted[i - 1].best) === 0;
+      result.push({ ...sorted[i], rank: tied ? result[i - 1].rank : i + 1 });
+    }
+  }
+  return result;
 }
 
 /** Re-sort + reassign rank=1..N inside a sub-group (used for age-split sub-categories). */
