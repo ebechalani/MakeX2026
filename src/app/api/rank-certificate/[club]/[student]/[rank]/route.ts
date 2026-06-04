@@ -8,11 +8,9 @@ import { SCHOOL_NAMES } from '@/lib/ranking';
 // ── Same layout constants as participation cert ────────────────────────────────
 const PAGE_W = 595.5;
 
-const COMP_TITLE = '2025-2026 MakeX Robotics Competition';
 
 const POS = {
-  compTitle: { y: 338, size: 11 },     // below club/school line
-  rankLine:  { y: 404.5, size: 23 },   // rank label — above student name, in red
+  rankLine:  { y: 245.0, size: 30 },   // replaces "Certificate of Participation" — large red centred
   nameMain:  { y: 386.5, size: 18, maxSize: 18, minSize: 7 },
   category:  { y: 372.0, size: 12 },
   clubLine:  { y: 357.0, size: 11 },   // club / school name + type
@@ -22,7 +20,8 @@ const POS = {
 
 // White cover boxes
 const COVERS_BASE = [
-  { x: 170, y: 375, w: 260, h: 53 },  // name + rank line area
+  { x: 50,  y: 195, w: 495, h: 110 }, // cover "Certificate of Participation" template text
+  { x: 170, y: 375, w: 260, h: 42 },  // name area
   { x: 210, y: 362, w: 180, h: 33 },  // category
   { x: 170, y: 347, w: 260, h: 20 },  // club / school name line
   { x: 195, y: 173, w: 60,  h: 30 },  // member sig
@@ -137,14 +136,7 @@ export async function GET(
     y: POS.clubLine.y, size: clubLineSize, font: fontNormal, color: dark,
   });
 
-  // 5. Competition title — replaces "Certificate of Participation"
-  const compSize = fittingSize(COMP_TITLE, fontBold, POS.compTitle.size, PAGE_W - 80);
-  page.drawText(COMP_TITLE, {
-    x: centerX(COMP_TITLE, fontBold, compSize),
-    y: POS.compTitle.y, size: compSize, font: fontBold, color: dark,
-  });
-
-  // 6. Rank — large, bold, red, above student name
+  // 5. Rank — large red bold, centred where "Certificate of Participation" was
   const rankSize = fittingSize(rankLabel, fontBold, POS.rankLine.size, PAGE_W - 80);
   page.drawText(rankLabel, {
     x: centerX(rankLabel, fontBold, rankSize),
