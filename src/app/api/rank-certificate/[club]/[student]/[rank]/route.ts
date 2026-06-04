@@ -12,7 +12,7 @@ const POS = {
   nameMain:  { y: 386.5, size: 18, maxSize: 18, minSize: 7 },
   category:  { y: 372.0, size: 12 },
   clubLine:  { y: 357.0, size: 11 },   // club / school name + type below category
-  rankLine:  { y: 198.0, size: 23 },   // red rank — between name section and sig line
+  rankLine:  { y: 575.0, size: 23 },   // replaces "Certificate of Participation" in template
   memberSig: { x: 140, y: 181.5, size: 11 },
   mentorSig: { x: 380, y: 181.5, size: 11 },
 };
@@ -22,7 +22,7 @@ const COVERS_BASE = [
   { x: 170, y: 375, w: 260, h: 42 },   // name area (back to participation-cert height)
   { x: 210, y: 362, w: 180, h: 33 },   // category
   { x: 170, y: 347, w: 260, h: 20 },   // club / school name line
-  { x: 100, y: 186, w: 395, h: 34 },   // rank line cover
+  { x: 50,  y: 535, w: 495, h: 105 },  // cover "Certificate of Participation" template text
   { x: 195, y: 173, w: 60,  h: 30 },   // member sig
   { x: 370, y: 173, w: 60,  h: 30 },   // mentor sig
 ];

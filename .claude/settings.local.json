@@ -119,7 +119,11 @@
       "Bash(grep -n \"^  \\);$\\\\|^  }$\" src/app/academy/page.tsx)",
       "Bash(mkdir -p \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\src\\\\app\\\\api\\\\rank-certificate\\\\[club]\\\\[student]\\\\[rank]\")",
       "Bash(node scripts/pdf_to_pngs_mupdf.mjs scripts/cert-template.pdf scripts/cert_preview)",
-      "Bash(python3 -c \"import pdfplumber; print\\('ok'\\)\")"
+      "Bash(python3 -c \"import pdfplumber; print\\('ok'\\)\")",
+      "Bash(node -e \"const sharp = require\\('sharp'\\); console.log\\('sharp ok'\\);\")",
+      "Bash(sort -t= -k2 -rn)",
+      "Bash(sort -k3 -rn)",
+      "Bash(del \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\scripts\\\\cert_grid.pdf\" \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\scripts\\\\cert_embedded.bin\" \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\scripts\\\\cert_xobj.bin\")"
     ]
   }
 }
