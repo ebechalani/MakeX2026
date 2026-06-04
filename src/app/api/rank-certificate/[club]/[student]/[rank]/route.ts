@@ -9,19 +9,20 @@ import { SCHOOL_NAMES } from '@/lib/ranking';
 const PAGE_W = 595.5;
 
 const POS = {
-  rankLine:  { y: 404.5, size: 13 },   // above name
   nameMain:  { y: 386.5, size: 18, maxSize: 18, minSize: 7 },
   category:  { y: 372.0, size: 12 },
   clubLine:  { y: 357.0, size: 11 },   // club / school name + type below category
+  rankLine:  { y: 284.0, size: 32 },   // large red rank — centred between name area and sig line
   memberSig: { x: 140, y: 181.5, size: 11 },
   mentorSig: { x: 380, y: 181.5, size: 11 },
 };
 
-// White cover boxes — same as participation cert + rank line + club line
+// White cover boxes
 const COVERS_BASE = [
-  { x: 170, y: 375, w: 260, h: 53 },   // name + rank line area
+  { x: 170, y: 375, w: 260, h: 42 },   // name area (back to participation-cert height)
   { x: 210, y: 362, w: 180, h: 33 },   // category
   { x: 170, y: 347, w: 260, h: 20 },   // club / school name line
+  { x: 100, y: 268, w: 395, h: 46 },   // rank line (large, centred in mid-cert)
   { x: 195, y: 173, w: 60,  h: 30 },   // member sig
   { x: 370, y: 173, w: 60,  h: 30 },   // mentor sig
 ];
@@ -107,48 +108,49 @@ export async function GET(
   const fontNormal = await doc.embedFont(StandardFonts.Helvetica);
   const dark  = rgb(0.1, 0.1, 0.1);
   const white = rgb(1, 1, 1);
+  const red   = rgb(0.86, 0.08, 0.08);
 
-  // 1. Cover placeholders (enlarged to also hide rank area)
+  // 1. Cover placeholders
   for (const c of COVERS_BASE) {
     page.drawRectangle({ x: c.x, y: c.y, width: c.w, height: c.h, color: white });
   }
 
-  // 2. Rank line (bold, centered, above name)
-  const rankSize = POS.rankLine.size;
-  page.drawText(rankLabel, {
-    x: centerX(rankLabel, fontBold, rankSize),
-    y: POS.rankLine.y, size: rankSize, font: fontBold, color: dark,
-  });
-
-  // 3. Student name (large bold centered)
+  // 2. Student name (large bold centered)
   const nameSize = fittingSize(memberName, fontBold, POS.nameMain.maxSize, PAGE_W - 40);
   page.drawText(memberName, {
     x: centerX(memberName, fontBold, nameSize),
     y: POS.nameMain.y, size: nameSize, font: fontBold, color: dark,
   });
 
-  // 4. Category centered
+  // 3. Category centered
   page.drawText(catName, {
     x: centerX(catName, fontNormal, POS.category.size),
     y: POS.category.y, size: POS.category.size, font: fontNormal, color: dark,
   });
 
-  // 4b. Club / School name + type (e.g. "RoboHolic · Club")
+  // 4. Club / School name + type (e.g. "RoboHolic · Club")
   const clubLineSize = fittingSize(clubLine, fontNormal, POS.clubLine.size, PAGE_W - 40);
   page.drawText(clubLine, {
     x: centerX(clubLine, fontNormal, clubLineSize),
     y: POS.clubLine.y, size: clubLineSize, font: fontNormal, color: dark,
   });
 
-  // 5. Member signature line
+  // 5. Rank — large, bold, red, centred between name section and signature line
+  const rankSize = fittingSize(rankLabel, fontBold, POS.rankLine.size, PAGE_W - 80);
+  page.drawText(rankLabel, {
+    x: centerX(rankLabel, fontBold, rankSize),
+    y: POS.rankLine.y, size: rankSize, font: fontBold, color: red,
+  });
+
+  // 6. Member signature line
   const memSize = fittingSize(memberName, fontNormal, POS.memberSig.size, 160);
   page.drawText(memberName, { x: POS.memberSig.x, y: POS.memberSig.y, size: memSize, font: fontNormal, color: dark });
 
-  // 6. Mentor signature line
+  // 7. Mentor signature line
   const menSize = fittingSize(mentorName, fontNormal, POS.mentorSig.size, 175);
   page.drawText(mentorName, { x: POS.mentorSig.x, y: POS.mentorSig.y, size: menSize, font: fontNormal, color: dark });
 
-  // 7. National Organiser signature image
+  // 8. National Organiser signature image
   if (fs.existsSync(NAT_ORG_SIG_PATH)) {
     const sigBytes = fs.readFileSync(NAT_ORG_SIG_PATH);
     const sigImg   = await doc.embedPng(sigBytes);
