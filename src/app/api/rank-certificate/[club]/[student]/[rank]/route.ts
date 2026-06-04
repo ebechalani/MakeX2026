@@ -12,7 +12,7 @@ const POS = {
   nameMain:  { y: 386.5, size: 18, maxSize: 18, minSize: 7 },
   category:  { y: 372.0, size: 12 },
   clubLine:  { y: 357.0, size: 11 },   // club / school name + type below category
-  rankLine:  { y: 500.0, size: 23 },   // replaces "Certificate of Participation" — centre of cert body
+  rankLine:  { y: 460.0, size: 23 },   // replaces "Certificate of Participation" — centre of cert body
   memberSig: { x: 140, y: 181.5, size: 11 },
   mentorSig: { x: 380, y: 181.5, size: 11 },
 };
