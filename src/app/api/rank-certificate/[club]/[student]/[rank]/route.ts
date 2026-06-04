@@ -8,23 +8,25 @@ import { SCHOOL_NAMES } from '@/lib/ranking';
 // ── Same layout constants as participation cert ────────────────────────────────
 const PAGE_W = 595.5;
 
+const COMP_TITLE = '2025-2026 MakeX Robotics Competition';
+
 const POS = {
+  compTitle: { y: 338, size: 11 },     // below club/school line
+  rankLine:  { y: 404.5, size: 23 },   // rank label — above student name, in red
   nameMain:  { y: 386.5, size: 18, maxSize: 18, minSize: 7 },
   category:  { y: 372.0, size: 12 },
-  clubLine:  { y: 357.0, size: 11 },   // club / school name + type below category
-  rankLine:  { y: 404.5, size: 23 },   // above name
+  clubLine:  { y: 357.0, size: 11 },   // club / school name + type
   memberSig: { x: 140, y: 181.5, size: 11 },
   mentorSig: { x: 380, y: 181.5, size: 11 },
 };
 
 // White cover boxes
 const COVERS_BASE = [
-  { x: 170, y: 375, w: 260, h: 42 },   // name area (back to participation-cert height)
-  { x: 210, y: 362, w: 180, h: 33 },   // category
-  { x: 170, y: 347, w: 260, h: 20 },   // club / school name line
-  { x: 170, y: 375, w: 260, h: 53 },   // name + rank line area
-  { x: 195, y: 173, w: 60,  h: 30 },   // member sig
-  { x: 370, y: 173, w: 60,  h: 30 },   // mentor sig
+  { x: 170, y: 375, w: 260, h: 53 },  // name + rank line area
+  { x: 210, y: 362, w: 180, h: 33 },  // category
+  { x: 170, y: 347, w: 260, h: 20 },  // club / school name line
+  { x: 195, y: 173, w: 60,  h: 30 },  // member sig
+  { x: 370, y: 173, w: 60,  h: 30 },  // mentor sig
 ];
 
 // ── School / Club type helper (mirrors src/lib/ranking.ts) ────────────────────
@@ -135,22 +137,29 @@ export async function GET(
     y: POS.clubLine.y, size: clubLineSize, font: fontNormal, color: dark,
   });
 
-  // 5. Rank — large, bold, red, centred between name section and signature line
+  // 5. Competition title — replaces "Certificate of Participation"
+  const compSize = fittingSize(COMP_TITLE, fontBold, POS.compTitle.size, PAGE_W - 80);
+  page.drawText(COMP_TITLE, {
+    x: centerX(COMP_TITLE, fontBold, compSize),
+    y: POS.compTitle.y, size: compSize, font: fontBold, color: dark,
+  });
+
+  // 6. Rank — large, bold, red, above student name
   const rankSize = fittingSize(rankLabel, fontBold, POS.rankLine.size, PAGE_W - 80);
   page.drawText(rankLabel, {
     x: centerX(rankLabel, fontBold, rankSize),
     y: POS.rankLine.y, size: rankSize, font: fontBold, color: red,
   });
 
-  // 6. Member signature line
+  // 7. Member signature line
   const memSize = fittingSize(memberName, fontNormal, POS.memberSig.size, 160);
   page.drawText(memberName, { x: POS.memberSig.x, y: POS.memberSig.y, size: memSize, font: fontNormal, color: dark });
 
-  // 7. Mentor signature line
+  // 8. Mentor signature line
   const menSize = fittingSize(mentorName, fontNormal, POS.mentorSig.size, 175);
   page.drawText(mentorName, { x: POS.mentorSig.x, y: POS.mentorSig.y, size: menSize, font: fontNormal, color: dark });
 
-  // 8. National Organiser signature image
+  // 9. National Organiser signature image
   if (fs.existsSync(NAT_ORG_SIG_PATH)) {
     const sigBytes = fs.readFileSync(NAT_ORG_SIG_PATH);
     const sigImg   = await doc.embedPng(sigBytes);
