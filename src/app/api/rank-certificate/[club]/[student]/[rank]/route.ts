@@ -10,7 +10,7 @@ const PAGE_W = 595.5;
 
 
 const POS = {
-  rankLine:  { y: 245.0, size: 30 },   // replaces "Certificate of Participation" — large red centred
+  rankLine:  { y: 290.0, size: 30 },   // replaces "Certificate of Participation" — large red centred
   nameMain:  { y: 386.5, size: 18, maxSize: 18, minSize: 7 },
   category:  { y: 372.0, size: 12 },
   clubLine:  { y: 357.0, size: 11 },   // club / school name + type
@@ -20,7 +20,7 @@ const POS = {
 
 // White cover boxes
 const COVERS_BASE = [
-  { x: 50,  y: 195, w: 495, h: 110 }, // cover "Certificate of Participation" template text
+  { x: 50,  y: 255, w: 495, h: 120 }, // cover "Certificate of Participation" template text
   { x: 170, y: 375, w: 260, h: 42 },  // name area
   { x: 210, y: 362, w: 180, h: 33 },  // category
   { x: 170, y: 347, w: 260, h: 20 },  // club / school name line
