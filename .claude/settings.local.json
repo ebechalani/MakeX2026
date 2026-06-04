@@ -117,7 +117,9 @@
       "Bash(git pull *)",
       "Bash(git stash *)",
       "Bash(grep -n \"^  \\);$\\\\|^  }$\" src/app/academy/page.tsx)",
-      "Bash(mkdir -p \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\src\\\\app\\\\api\\\\rank-certificate\\\\[club]\\\\[student]\\\\[rank]\")"
+      "Bash(mkdir -p \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\src\\\\app\\\\api\\\\rank-certificate\\\\[club]\\\\[student]\\\\[rank]\")",
+      "Bash(node scripts/pdf_to_pngs_mupdf.mjs scripts/cert-template.pdf scripts/cert_preview)",
+      "Bash(python3 -c \"import pdfplumber; print\\('ok'\\)\")"
     ]
   }
 }
