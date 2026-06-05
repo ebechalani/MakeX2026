@@ -1,6 +1,5 @@
 'use client';
 import { useMemo, useState } from 'react';
-import JSZip from 'jszip';
 import type { Category, Table, Passation } from '@/lib/types';
 import {
   buildRankings, reRank, applyOverrides, readStarterTeams,
@@ -42,10 +41,27 @@ export default function RankCertificatesModal({ academyName, passations, categor
 }) {
   const certs = useMemo((): CertEntry[] => {
     const result: CertEntry[] = [];
-    // Normalise accents + case for robust club-name matching
-    const norm = (s: string) =>
-      s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+
+    // Same normalisation logic as admin/page.tsx — strips accents, collapses
+    // all non-alphanumeric chars to a single space so "RoboHolic" == "roboholic"
+    // and "Lycée Charlemagne" == "Lycee Charlemagne" etc.
+    const norm = (s: string | null | undefined): string =>
+      (s || '').normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+
     const acNorm = norm(academyName);
+
+    // Collect all unique club_name values from passations that normalise to the
+    // same key as academyName — this handles cases where the academy display name
+    // slightly differs from what's stored in passation.club_name
+    const matchingClubNames = new Set(
+      passations
+        .map(p => p.club_name)
+        .filter((c): c is string => !!c && norm(c) === acNorm)
+    );
 
     for (const cat of categories) {
       const catName = cat.name;
@@ -83,7 +99,7 @@ export default function RankCertificatesModal({ academyName, passations, categor
           const s2 = allStuds.find(s => s.key === team.s2Key);
           // Issue cert to each member whose club matches
           for (const me of [s1, s2]) {
-            if (!me || norm(me.clubName) !== acNorm) continue;
+            if (!me || (!matchingClubNames.has(me.clubName) && norm(me.clubName) !== acNorm)) continue;
             result.push({
               studentName:  me.studentNames || me.teamName,
               clubName:     me.clubName,
@@ -104,7 +120,7 @@ export default function RankCertificatesModal({ academyName, passations, categor
         for (const row of ranked) {
           if (!row.isOverridden) continue;
           if (row.displayRank > 5) continue;
-          if (norm(row.clubName) !== acNorm) continue;
+          if (!matchingClubNames.has(row.clubName) && norm(row.clubName) !== acNorm) continue;
           const name = row.studentNames || row.teamName;
           result.push({ studentName: name, clubName: row.clubName, categoryName: catName, ageGroupLabel: '', rank: row.displayRank, pdfUrl: rankCertUrl(row.clubName, name, row.displayRank) });
         }
@@ -124,7 +140,7 @@ export default function RankCertificatesModal({ academyName, passations, categor
         for (const { rows, groupId, ageLabel } of pairs) {
           for (const row of applyOverrides(rows, groupId)) {
             if (row.displayRank > 5) continue;
-            if (norm(row.clubName) !== acNorm) continue;
+            if (!matchingClubNames.has(row.clubName) && norm(row.clubName) !== acNorm) continue;
             const name = row.studentNames || row.teamName;
             result.push({ studentName: name, clubName: row.clubName, categoryName: catName, ageGroupLabel: ageLabel, rank: row.displayRank, pdfUrl: rankCertUrl(row.clubName, name, row.displayRank) });
           }
@@ -136,7 +152,7 @@ export default function RankCertificatesModal({ academyName, passations, categor
       for (const [group, tag] of [[schools, 'school'], [clubs, 'club']] as [RankedStudent[], string][]) {
         for (const row of applyOverrides(group, `${cat.id}-${tag}-all`)) {
           if (row.displayRank > 5) continue;
-          if (norm(row.clubName) !== acNorm) continue;
+          if (!matchingClubNames.has(row.clubName) && norm(row.clubName) !== acNorm) continue;
           const name = row.studentNames || row.teamName;
           result.push({ studentName: name, clubName: row.clubName, categoryName: catName, ageGroupLabel: '', rank: row.displayRank, pdfUrl: rankCertUrl(row.clubName, name, row.displayRank) });
         }
@@ -154,6 +170,7 @@ export default function RankCertificatesModal({ academyName, passations, categor
     setDownloading(true);
     setDlProgress(0);
     try {
+      const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       for (let i = 0; i < certs.length; i++) {
         const c = certs[i];

@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import JSZip from 'jszip';
 import { createClient } from '@/lib/supabase/client';
 import type { Category, Passation } from '@/lib/types';
 
@@ -79,6 +78,7 @@ export default function CertificatesTab({ academyName, passations, categories }:
     setDownloading(true);
     setDlProgress(0);
     try {
+      const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       for (let i = 0; i < certs.length; i++) {
         const c = certs[i];
