@@ -1,5 +1,6 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import JSZip from 'jszip';
 import type { Category, Table, Passation } from '@/lib/types';
 import {
   buildRankings, reRank, applyOverrides, readStarterTeams,
@@ -137,6 +138,39 @@ export default function RankCertificatesModal({ academyName, passations, categor
     return result;
   }, [academyName, passations, categories, tables]);
 
+  const [downloading, setDownloading] = useState(false);
+  const [dlProgress, setDlProgress] = useState(0);
+
+  async function downloadAll() {
+    if (certs.length === 0) return;
+    setDownloading(true);
+    setDlProgress(0);
+    try {
+      const zip = new JSZip();
+      for (let i = 0; i < certs.length; i++) {
+        const c = certs[i];
+        const res = await fetch(c.pdfUrl);
+        if (res.ok) {
+          const buf = await res.arrayBuffer();
+          const rankLabel = c.rank === 1 ? '1st' : c.rank === 2 ? '2nd' : c.rank === 3 ? '3rd' : `${c.rank}th`;
+          const fileName = `${rankLabel}_${sanitize(c.studentName)}_${sanitize(c.categoryName)}${c.ageGroupLabel ? `_${c.ageGroupLabel.replace(/[^0-9-]/g, '')}` : ''}.pdf`;
+          zip.file(fileName, buf);
+        }
+        setDlProgress(i + 1);
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `RankCertificates_${sanitize(academyName)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+      setDlProgress(0);
+    }
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '24px 16px' }}>
       <div style={{ background: 'white', borderRadius: 20, width: '100%', maxWidth: 860, boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
@@ -151,9 +185,19 @@ export default function RankCertificatesModal({ academyName, passations, categor
                 : `${certs.length} certificate${certs.length !== 1 ? 's' : ''} · ranks 1–5 · click to open PDF`}
             </p>
           </div>
-          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', borderRadius: 10, padding: '9px 16px', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer', color: '#475569' }}>
-            ✕ Close
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {certs.length > 0 && (
+              <button
+                onClick={downloadAll}
+                disabled={downloading}
+                style={{ background: downloading ? '#e2e8f0' : '#0f172a', border: 'none', borderRadius: 10, padding: '9px 16px', fontWeight: 600, fontSize: '0.82rem', cursor: downloading ? 'default' : 'pointer', color: downloading ? '#94a3b8' : 'white', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {downloading ? `⏳ ${dlProgress}/${certs.length}…` : '⬇ Download All'}
+              </button>
+            )}
+            <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', borderRadius: 10, padding: '9px 16px', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer', color: '#475569' }}>
+              ✕ Close
+            </button>
+          </div>
         </div>
 
         {/* Certificate list — same card style as participation certs */}
