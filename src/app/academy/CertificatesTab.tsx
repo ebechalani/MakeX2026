@@ -50,6 +50,10 @@ export default function CertificatesTab({ academyName, passations, categories }:
     [passations, catMap, academyName],
   );
 
+  // ── Download-all state (must be before any early returns) ─────────────────
+  const [downloading, setDownloading] = useState(false);
+  const [dlProgress, setDlProgress]   = useState(0);
+
   if (enabled === null) {
     return (
       <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
@@ -69,9 +73,6 @@ export default function CertificatesTab({ academyName, passations, categories }:
       </div>
     );
   }
-
-  const [downloading, setDownloading] = useState(false);
-  const [dlProgress, setDlProgress] = useState(0);
 
   async function downloadAll() {
     if (certs.length === 0) return;
