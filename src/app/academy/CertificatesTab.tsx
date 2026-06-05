@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import JSZip from 'jszip';
 import { createClient } from '@/lib/supabase/client';
 import type { Category, Passation } from '@/lib/types';
 
@@ -69,6 +70,37 @@ export default function CertificatesTab({ academyName, passations, categories }:
     );
   }
 
+  const [downloading, setDownloading] = useState(false);
+  const [dlProgress, setDlProgress] = useState(0);
+
+  async function downloadAll() {
+    if (certs.length === 0) return;
+    setDownloading(true);
+    setDlProgress(0);
+    try {
+      const zip = new JSZip();
+      for (let i = 0; i < certs.length; i++) {
+        const c = certs[i];
+        const res = await fetch(c.url);
+        if (res.ok) {
+          const buf = await res.arrayBuffer();
+          zip.file(`${sanitize(c.studentName)}_${sanitize(c.categoryName)}.pdf`, buf);
+        }
+        setDlProgress(i + 1);
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Certificates_${sanitize(academyName)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+      setDlProgress(0);
+    }
+  }
+
   if (certs.length === 0) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-slate-400 text-sm">
@@ -79,11 +111,24 @@ export default function CertificatesTab({ academyName, passations, categories }:
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-base font-bold text-slate-800">🎓 E-Certificates</h2>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {certs.length} certificate{certs.length !== 1 ? 's' : ''} available · click to open or right-click → Save
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-base font-bold text-slate-800">🎓 E-Certificates</h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {certs.length} certificate{certs.length !== 1 ? 's' : ''} available · click to open or right-click → Save
+          </p>
+        </div>
+        <button
+          onClick={downloadAll}
+          disabled={downloading}
+          className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${
+            downloading
+              ? 'bg-slate-100 text-slate-400 cursor-default'
+              : 'bg-slate-900 text-white hover:bg-slate-700'
+          }`}
+        >
+          {downloading ? `⏳ ${dlProgress}/${certs.length}…` : '⬇ Download All'}
+        </button>
       </div>
 
       <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-800">

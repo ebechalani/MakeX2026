@@ -42,7 +42,10 @@ export default function RankCertificatesModal({ academyName, passations, categor
 }) {
   const certs = useMemo((): CertEntry[] => {
     const result: CertEntry[] = [];
-    const acLow = academyName.toLowerCase();
+    // Normalise accents + case for robust club-name matching
+    const norm = (s: string) =>
+      s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+    const acNorm = norm(academyName);
 
     for (const cat of categories) {
       const catName = cat.name;
@@ -66,7 +69,7 @@ export default function RankCertificatesModal({ academyName, passations, categor
           });
           const r1 = combine(s1?.r1 ?? none, s2?.r1 ?? none);
           const r2 = combine(s1?.r2 ?? none, s2?.r2 ?? none);
-          return { key: team.id, teamName: team.name, clubName: s1?.clubName || s2?.clubName || '', tableLabel: '—', type: 'Club' as const, age: null, r1, r2, best: betterResult(r1, r2), rank: i + 1, r1Id: null, r2Id: null };
+          return { key: team.id, teamName: team.name, studentNames: team.name, clubName: s1?.clubName || s2?.clubName || '', tableLabel: '—', type: 'Club' as const, age: null, r1, r2, best: betterResult(r1, r2), rank: i + 1, r1Id: null, r2Id: null };
         });
 
         const ranked = applyOverrides(teamRows, `${cat.id}-starter`);
@@ -80,14 +83,14 @@ export default function RankCertificatesModal({ academyName, passations, categor
           const s2 = allStuds.find(s => s.key === team.s2Key);
           // Issue cert to each member whose club matches
           for (const me of [s1, s2]) {
-            if (!me || me.clubName.toLowerCase() !== acLow) continue;
+            if (!me || norm(me.clubName) !== acNorm) continue;
             result.push({
-              studentName:  me.teamName,
+              studentName:  me.studentNames || me.teamName,
               clubName:     me.clubName,
               categoryName: catName,
               ageGroupLabel: '',
               rank:          row.displayRank,
-              pdfUrl:        rankCertUrl(me.clubName, me.teamName, row.displayRank),
+              pdfUrl:        rankCertUrl(me.clubName, me.studentNames || me.teamName, row.displayRank),
             });
           }
         }
@@ -99,27 +102,31 @@ export default function RankCertificatesModal({ academyName, passations, categor
         const combined = reRank([...schools, ...clubs]);
         const ranked   = applyOverrides(combined, `${cat.id}-unified`);
         for (const row of ranked) {
-          if (!row.isOverridden) continue;           // skip anyone not manually ranked
+          if (!row.isOverridden) continue;
           if (row.displayRank > 5) continue;
-          if (row.clubName.toLowerCase() !== acLow) continue;
-          result.push({ studentName: row.teamName, clubName: row.clubName, categoryName: catName, ageGroupLabel: '', rank: row.displayRank, pdfUrl: rankCertUrl(row.clubName, row.teamName, row.displayRank) });
+          if (norm(row.clubName) !== acNorm) continue;
+          const name = row.studentNames || row.teamName;
+          result.push({ studentName: name, clubName: row.clubName, categoryName: catName, ageGroupLabel: '', rank: row.displayRank, pdfUrl: rankCertUrl(row.clubName, name, row.displayRank) });
         }
         continue;
       }
 
-      // ── Capelli Inspire: age-split ────────────────────────────────────────
+      // ── Capelli Inspire: age-split (including "other / unknown DOB" band) ─
       if (isInspire(catName)) {
         const pairs = [
-          { rows: reRank(schools.filter(s => s.age != null && s.age <= 9)),           groupId: `${cat.id}-school-8-9`,   ageLabel: '8–9 years' },
-          { rows: reRank(schools.filter(s => s.age != null && s.age >= 10 && s.age <= 13)), groupId: `${cat.id}-school-10-12`, ageLabel: '10–12 years' },
-          { rows: reRank(clubs.filter(s => s.age != null && s.age <= 9)),             groupId: `${cat.id}-club-8-9`,     ageLabel: '8–9 years' },
-          { rows: reRank(clubs.filter(s => s.age != null && s.age >= 10 && s.age <= 13)),   groupId: `${cat.id}-club-10-12`,   ageLabel: '10–12 years' },
+          { rows: reRank(schools.filter(s => s.age != null && s.age <= 9)),                groupId: `${cat.id}-school-8-9`,    ageLabel: '8–9 years' },
+          { rows: reRank(schools.filter(s => s.age != null && s.age >= 10 && s.age <= 13)),groupId: `${cat.id}-school-10-12`,  ageLabel: '10–12 years' },
+          { rows: reRank(schools.filter(s => s.age == null || s.age > 13)),                groupId: `${cat.id}-school-other`,  ageLabel: '' },
+          { rows: reRank(clubs.filter(s => s.age != null && s.age <= 9)),                  groupId: `${cat.id}-club-8-9`,      ageLabel: '8–9 years' },
+          { rows: reRank(clubs.filter(s => s.age != null && s.age >= 10 && s.age <= 13)), groupId: `${cat.id}-club-10-12`,    ageLabel: '10–12 years' },
+          { rows: reRank(clubs.filter(s => s.age == null || s.age > 13)),                  groupId: `${cat.id}-club-other`,    ageLabel: '' },
         ];
         for (const { rows, groupId, ageLabel } of pairs) {
           for (const row of applyOverrides(rows, groupId)) {
             if (row.displayRank > 5) continue;
-            if (row.clubName.toLowerCase() !== acLow) continue;
-            result.push({ studentName: row.teamName, clubName: row.clubName, categoryName: catName, ageGroupLabel: ageLabel, rank: row.displayRank, pdfUrl: rankCertUrl(row.clubName, row.teamName, row.displayRank) });
+            if (norm(row.clubName) !== acNorm) continue;
+            const name = row.studentNames || row.teamName;
+            result.push({ studentName: name, clubName: row.clubName, categoryName: catName, ageGroupLabel: ageLabel, rank: row.displayRank, pdfUrl: rankCertUrl(row.clubName, name, row.displayRank) });
           }
         }
         continue;
@@ -129,8 +136,9 @@ export default function RankCertificatesModal({ academyName, passations, categor
       for (const [group, tag] of [[schools, 'school'], [clubs, 'club']] as [RankedStudent[], string][]) {
         for (const row of applyOverrides(group, `${cat.id}-${tag}-all`)) {
           if (row.displayRank > 5) continue;
-          if (row.clubName.toLowerCase() !== acLow) continue;
-          result.push({ studentName: row.teamName, clubName: row.clubName, categoryName: catName, ageGroupLabel: '', rank: row.displayRank, pdfUrl: rankCertUrl(row.clubName, row.teamName, row.displayRank) });
+          if (norm(row.clubName) !== acNorm) continue;
+          const name = row.studentNames || row.teamName;
+          result.push({ studentName: name, clubName: row.clubName, categoryName: catName, ageGroupLabel: '', rank: row.displayRank, pdfUrl: rankCertUrl(row.clubName, name, row.displayRank) });
         }
       }
     }

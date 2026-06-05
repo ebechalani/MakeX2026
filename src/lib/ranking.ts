@@ -27,7 +27,8 @@ export type RoundResult = { score: number | null; time: number | null; status: s
 
 export type RankedStudent = {
   key: string;
-  teamName: string;
+  teamName: string;       // raw team_name column
+  studentNames: string;   // student_names ?? team_name — preferred for cert lookup
   clubName: string;
   tableLabel: string;
   type: 'School' | 'Club';
@@ -115,7 +116,7 @@ export function buildRankings(r1rows: Passation[], r2rows: Passation[], tables: 
     const ref = r1p || r2p!;
     const r1res = roundResult(r1p), r2res = roundResult(r2p);
     const best = betterResult(r1res, r2res);
-    const entry = { key: k, teamName: ref.team_name, clubName: ref.club_name || '', tableLabel: getTableLabel(r1p?.table_id || r2p?.table_id), type: orgType(ref.club_name), age: calcAge(ref.date_of_birth), r1: r1res, r2: r2res, best, r1Id: r1p?.id ?? null, r2Id: r2p?.id ?? null };
+    const entry = { key: k, teamName: ref.team_name, studentNames: ref.student_names?.trim() || ref.team_name || '', clubName: ref.club_name || '', tableLabel: getTableLabel(r1p?.table_id || r2p?.table_id), type: orgType(ref.club_name), age: calcAge(ref.date_of_birth), r1: r1res, r2: r2res, best, r1Id: r1p?.id ?? null, r2Id: r2p?.id ?? null };
     if (entry.type === 'School') schools.push(entry); else clubs.push(entry);
   }
   const rank = (arr: Omit<RankedStudent, 'rank'>[]): RankedStudent[] => { arr.sort((a, b) => compareResults(a.best, b.best)); return assignRanks(arr); };

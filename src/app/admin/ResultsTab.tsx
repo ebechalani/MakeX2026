@@ -60,8 +60,8 @@ function StarterTeamBuilder({ catId, rankings, groupId, onSaveScore }: {
   const STARTER_HARDCODED: RankedStudent[] = useMemo(() => {
     const none: RoundResult = { score: null, time: null, status: '—' };
     return [
-      { key: '__hc__carlo kafrouni|roboholic', teamName: 'Carlo Kafrouni', clubName: 'RoboHolic', tableLabel: '—', type: 'Club', age: null, r1: none, r2: none, best: none, rank: 999, r1Id: null, r2Id: null },
-      { key: '__hc__jean paul mrad|roboholic',  teamName: 'Jean Paul Mrad',  clubName: 'RoboHolic', tableLabel: '—', type: 'Club', age: null, r1: none, r2: none, best: none, rank: 999, r1Id: null, r2Id: null },
+      { key: '__hc__carlo kafrouni|roboholic', teamName: 'Carlo Kafrouni', studentNames: 'Carlo Kafrouni', clubName: 'RoboHolic', tableLabel: '—', type: 'Club', age: null, r1: none, r2: none, best: none, rank: 999, r1Id: null, r2Id: null },
+      { key: '__hc__jean paul mrad|roboholic',  teamName: 'Jean Paul Mrad',  studentNames: 'Jean Paul Mrad',  clubName: 'RoboHolic', tableLabel: '—', type: 'Club', age: null, r1: none, r2: none, best: none, rank: 999, r1Id: null, r2Id: null },
     ];
   }, []);
 
@@ -118,6 +118,7 @@ function StarterTeamBuilder({ catId, rankings, groupId, onSaveScore }: {
     return {
       key: team.id,
       teamName: team.name,
+      studentNames: team.name,
       clubName: [s1?.clubName, s2?.clubName].filter(Boolean).filter((v, j, a) => a.indexOf(v) === j).join(' / '),
       tableLabel: s1?.tableLabel || s2?.tableLabel || '—',
       type: 'Club' as const,
