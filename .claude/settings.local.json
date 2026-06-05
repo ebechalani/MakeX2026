@@ -124,7 +124,11 @@
       "Bash(sort -t= -k2 -rn)",
       "Bash(sort -k3 -rn)",
       "Bash(del \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\scripts\\\\cert_grid.pdf\" \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\scripts\\\\cert_embedded.bin\" \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\scripts\\\\cert_xobj.bin\")",
-      "Bash(node -e \"require\\('jszip'\\); console.log\\('jszip ok'\\)\")"
+      "Bash(node -e \"require\\('jszip'\\); console.log\\('jszip ok'\\)\")",
+      "Bash(npx next *)",
+      "Bash(curl -s http://localhost:3001/academy)",
+      "Bash(kill %1)",
+      "Bash(curl -s http://localhost:3002/academy)"
     ]
   }
 }
