@@ -95,7 +95,6 @@ export default function RankCertificatesModal({ academyName, passations, categor
         const ranked = applyOverrides(teamRows, `${cat.id}-starter`);
 
         for (const row of ranked) {
-          if (!row.isOverridden) continue;   // only teams you manually ranked
           if (row.displayRank > 5) continue;
           const team = teams.find(t => t.id === row.key);
           if (!team) continue;
@@ -122,7 +121,6 @@ export default function RankCertificatesModal({ academyName, passations, categor
         const combined = reRank([...schools, ...clubs]);
         const ranked   = applyOverrides(combined, `${cat.id}-unified`);
         for (const row of ranked) {
-          if (!row.isOverridden) continue;
           if (row.displayRank > 5) continue;
           if (!matchingClubNames.has(row.clubName) && norm(row.clubName) !== acNorm) continue;
           const name = row.studentNames || row.teamName;

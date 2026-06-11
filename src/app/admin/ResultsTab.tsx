@@ -412,14 +412,17 @@ export default function ResultsTab() {
 
   /** Create a brand-new round record for a student who has no passation yet for that round. Does NOT call load(). */
   async function createScoreOnly(catId: string, row: RankedStudent, round: 1 | 2, score: number | null, time: number | null) {
-    // Clone base info from whichever round passation already exists in the DB
-    const base = rankedPassations.find(p => p.id === row.r1Id) ?? rankedPassations.find(p => p.id === row.r2Id);
+    // Use the RAW (unremapped) passation as the base so that the original category_id and table_id
+    // are used together. If we used rankedPassations, a remapped student (e.g. Roy Haddad) would get
+    // category_id=CapelliInspire but a table_id that belongs to MakeXInspire, violating the DB FK.
+    // After insert, remapPassations() will still surface the new record under the correct display category.
+    const base = passations.find(p => p.id === row.r1Id) ?? passations.find(p => p.id === row.r2Id);
     const { error } = await supabase.from('passations').insert({
       team_name:           row.teamName,
       student_names:       row.studentNames || row.teamName || null,
       club_name:           row.clubName || null,
-      category_id:         catId,
-      table_id:            base?.table_id     || null,
+      category_id:         base?.category_id || catId,   // ← keep original category so table_id FK is satisfied
+      table_id:            base?.table_id     || '',
       date_of_birth:       base?.date_of_birth || null,
       coach_name:          base?.coach_name    || null,
       round_number:        round,
