@@ -12,23 +12,46 @@ export const STUDENT_CAT_REMAPS: Array<{
   { studentName: 'roy haddad', fromCat: /makex\s*inspire/i, toCat: /capelli\s*inspire/i },
 ];
 
-/** Returns a copy of passations with any misregistered students reassigned to their correct category. */
+// ── Hardcoded club remaps (wrong club / school classification) ─────────────────
+// Add an entry here when a student's club_name in the DB is wrong.
+// studentName: lowercase substring that must appear in student_names or team_name.
+// toClub: the correct club_name to substitute.
+export const STUDENT_CLUB_REMAPS: Array<{
+  studentName: string;
+  toClub: string;
+}> = [
+  { studentName: 'ray yazbeck', toClub: 'RoboHolic' },
+];
+
+/** Returns a copy of passations with any misregistered students reassigned to their correct category / club. */
 export function remapPassations(
   passations: Passation[],
   categories: { id: string; name: string }[],
 ): Passation[] {
-  if (STUDENT_CAT_REMAPS.length === 0) return passations;
   return passations.map(p => {
     const nm = ((p.student_names?.trim()) || p.team_name || '').toLowerCase();
+    let changed = false;
+    let result = { ...p };
+
+    // Category remap
     for (const remap of STUDENT_CAT_REMAPS) {
       if (!nm.includes(remap.studentName)) continue;
       const fromCat = categories.find(c => remap.fromCat.test(c.name));
       const toCat   = categories.find(c => remap.toCat.test(c.name));
       if (fromCat && toCat && p.category_id === fromCat.id) {
-        return { ...p, category_id: toCat.id };
+        result = { ...result, category_id: toCat.id };
+        changed = true;
       }
     }
-    return p;
+
+    // Club remap
+    for (const remap of STUDENT_CLUB_REMAPS) {
+      if (!nm.includes(remap.studentName)) continue;
+      result = { ...result, club_name: remap.toClub };
+      changed = true;
+    }
+
+    return changed ? result : p;
   });
 }
 
