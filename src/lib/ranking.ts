@@ -69,40 +69,46 @@ export function remapPassations(
     return changed ? result : p;
   });
 
-  // Step 2: inject synthetic round records for students whose DB insert keeps failing
-  const extras: Passation[] = [];
+  // Step 2: apply hardcoded score overrides — always wins over whatever is in the DB.
+  // If the round record exists (even with null/wrong score), its score is overwritten.
+  // If the round record is missing entirely, a synthetic passation is injected.
+  const out: Passation[] = [...remapped];
   for (const inj of STUDENT_SCORE_INJECTIONS) {
-    // Skip if the round already exists in the DB (real record wins)
-    const alreadyHas = remapped.some(p => {
-      const nm = ((p.student_names?.trim()) || p.team_name || '').toLowerCase();
-      return nm.includes(inj.studentName) && p.round_number === inj.round;
-    });
-    if (alreadyHas) continue;
+    const nm = (p: Passation) => ((p.student_names?.trim()) || p.team_name || '').toLowerCase();
 
-    // Clone metadata from whatever round does exist
-    const base = remapped.find(p => {
-      const nm = ((p.student_names?.trim()) || p.team_name || '').toLowerCase();
-      return nm.includes(inj.studentName);
-    });
-    if (!base) continue;
+    const existingIdx = out.findIndex(p => nm(p).includes(inj.studentName) && p.round_number === inj.round);
 
-    extras.push({
-      ...base,
-      id:                  `__synthetic__${inj.studentName.replace(/\s+/g, '_')}_r${inj.round}`,
-      round_number:        inj.round,
-      score:               inj.score,
-      time_seconds:        inj.timeSeconds,
-      live_status:         'Finished',
-      final_result_status: 'Finished',
-      scheduled_time:      null,
-      notes:               null,
-      signature_image:     null,
-      judge_name:          null,
-      finalized_at:        null,
-    });
+    if (existingIdx >= 0) {
+      // Override score/time on the existing DB record (handles wrong or null score)
+      out[existingIdx] = {
+        ...out[existingIdx],
+        score:               inj.score,
+        time_seconds:        inj.timeSeconds,
+        live_status:         'Finished',
+        final_result_status: 'Finished',
+      };
+    } else {
+      // No round record at all — inject a synthetic one cloned from the other round
+      const base = out.find(p => nm(p).includes(inj.studentName));
+      if (!base) continue;
+      out.push({
+        ...base,
+        id:                  `__synthetic__${inj.studentName.replace(/\s+/g, '_')}_r${inj.round}`,
+        round_number:        inj.round,
+        score:               inj.score,
+        time_seconds:        inj.timeSeconds,
+        live_status:         'Finished',
+        final_result_status: 'Finished',
+        scheduled_time:      null,
+        notes:               null,
+        signature_image:     null,
+        judge_name:          null,
+        finalized_at:        null,
+      });
+    }
   }
 
-  return extras.length > 0 ? [...remapped, ...extras] : remapped;
+  return out;
 }
 
 // ── School name set ────────────────────────────────────────────────────────────
