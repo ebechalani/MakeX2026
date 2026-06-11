@@ -1133,10 +1133,14 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, c
       const hasR1 = r1Score !== null || r1Time !== null;
       const hasR2 = r2Score !== null || r2Time !== null;
 
+      // IDs starting with __synthetic__ are client-only injections — treat as missing
+      const realR1Id = s.r1Id?.startsWith('__synthetic__') ? null : s.r1Id;
+      const realR2Id = s.r2Id?.startsWith('__synthetic__') ? null : s.r2Id;
+
       // R1: only save/create when the user actually entered values (skip if blank)
       if (hasR1) {
-        if (s.r1Id) {
-          await onSaveScore(s.r1Id, r1Score, r1Time);
+        if (realR1Id) {
+          await onSaveScore(realR1Id, r1Score, r1Time);
         } else if (onCreateScore && catId) {
           await onCreateScore(catId, s, 1, r1Score, r1Time);
         }
@@ -1144,8 +1148,8 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, c
 
       // R2: only save/create when the user actually entered values
       if (hasR2) {
-        if (s.r2Id) {
-          await onSaveScore(s.r2Id, r2Score, r2Time);
+        if (realR2Id) {
+          await onSaveScore(realR2Id, r2Score, r2Time);
         } else if (onCreateScore && catId) {
           await onCreateScore(catId, s, 2, r2Score, r2Time);
         }

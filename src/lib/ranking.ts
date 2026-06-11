@@ -23,12 +23,27 @@ export const STUDENT_CLUB_REMAPS: Array<{
   { studentName: 'ray yazbeck', toClub: 'RoboHolic' },
 ];
 
-/** Returns a copy of passations with any misregistered students reassigned to their correct category / club. */
+// ── Hardcoded score injections (missing round records) ─────────────────────────
+// Add an entry here when a student's round record can't be saved to the DB.
+// A synthetic passation is inserted client-side so the score appears in rankings
+// and certificates without touching the database.
+export const STUDENT_SCORE_INJECTIONS: Array<{
+  studentName: string; // lowercase substring match against student_names or team_name
+  round: 1 | 2;
+  score: number | null;
+  timeSeconds: number | null;
+}> = [
+  { studentName: 'roy haddad', round: 2, score: 70, timeSeconds: 53 },
+];
+
+/** Returns a copy of passations with any misregistered students reassigned to their correct category / club,
+ *  plus synthetic round records for hardcoded score injections. */
 export function remapPassations(
   passations: Passation[],
   categories: { id: string; name: string }[],
 ): Passation[] {
-  return passations.map(p => {
+  // Step 1: remap categories and clubs
+  const remapped = passations.map(p => {
     const nm = ((p.student_names?.trim()) || p.team_name || '').toLowerCase();
     let changed = false;
     let result = { ...p };
@@ -53,6 +68,41 @@ export function remapPassations(
 
     return changed ? result : p;
   });
+
+  // Step 2: inject synthetic round records for students whose DB insert keeps failing
+  const extras: Passation[] = [];
+  for (const inj of STUDENT_SCORE_INJECTIONS) {
+    // Skip if the round already exists in the DB (real record wins)
+    const alreadyHas = remapped.some(p => {
+      const nm = ((p.student_names?.trim()) || p.team_name || '').toLowerCase();
+      return nm.includes(inj.studentName) && p.round_number === inj.round;
+    });
+    if (alreadyHas) continue;
+
+    // Clone metadata from whatever round does exist
+    const base = remapped.find(p => {
+      const nm = ((p.student_names?.trim()) || p.team_name || '').toLowerCase();
+      return nm.includes(inj.studentName);
+    });
+    if (!base) continue;
+
+    extras.push({
+      ...base,
+      id:                  `__synthetic__${inj.studentName.replace(/\s+/g, '_')}_r${inj.round}`,
+      round_number:        inj.round,
+      score:               inj.score,
+      time_seconds:        inj.timeSeconds,
+      live_status:         'Finished',
+      final_result_status: 'Finished',
+      scheduled_time:      null,
+      notes:               null,
+      signature_image:     null,
+      judge_name:          null,
+      finalized_at:        null,
+    });
+  }
+
+  return extras.length > 0 ? [...remapped, ...extras] : remapped;
 }
 
 // ── School name set ────────────────────────────────────────────────────────────
