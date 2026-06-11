@@ -393,29 +393,35 @@ export default function ResultsTab() {
     load();
   }
 
-  async function saveScore(id: string, score: number | null, time: number | null) {
+  /** Update an existing passation's score — does NOT call load() so callers can batch. */
+  async function saveScoreOnly(id: string, score: number | null, time: number | null) {
     const { error } = await supabase.from('passations').update({
       score,
-      time_seconds: time,
+      time_seconds:        time,
       final_result_status: 'Finished',
-      updated_at: new Date().toISOString(),
+      updated_at:          new Date().toISOString(),
     }).eq('id', id);
     if (error) throw new Error(error.message);
+  }
+
+  /** Kept for external callers (StarterTeamBuilder). */
+  async function saveScore(id: string, score: number | null, time: number | null) {
+    await saveScoreOnly(id, score, time);
     load();
   }
 
-  /** Create a brand-new round record for a student who has no passation yet for that round. */
-  async function createScore(catId: string, row: RankedStudent, round: 1 | 2, score: number | null, time: number | null) {
-    // Clone base info from whichever round passation already exists
+  /** Create a brand-new round record for a student who has no passation yet for that round. Does NOT call load(). */
+  async function createScoreOnly(catId: string, row: RankedStudent, round: 1 | 2, score: number | null, time: number | null) {
+    // Clone base info from whichever round passation already exists in the DB
     const base = rankedPassations.find(p => p.id === row.r1Id) ?? rankedPassations.find(p => p.id === row.r2Id);
     const { error } = await supabase.from('passations').insert({
       team_name:           row.teamName,
       student_names:       row.studentNames || row.teamName || null,
       club_name:           row.clubName || null,
       category_id:         catId,
-      table_id:            base?.table_id  || null,
+      table_id:            base?.table_id     || null,
       date_of_birth:       base?.date_of_birth || null,
-      coach_name:          base?.coach_name   || null,
+      coach_name:          base?.coach_name    || null,
       round_number:        round,
       score,
       time_seconds:        time,
@@ -425,6 +431,11 @@ export default function ResultsTab() {
       delay_count:         0,
     });
     if (error) throw new Error(error.message);
+  }
+
+  /** Kept for external callers (RankCertificatesModal). */
+  async function createScore(catId: string, row: RankedStudent, round: 1 | 2, score: number | null, time: number | null) {
+    await createScoreOnly(catId, row, round, score, time);
     load();
   }
 
@@ -912,8 +923,9 @@ export default function ResultsTab() {
                       groupId={`${cat.id}-unified`}
                       catId={cat.id}
                       overrideOnly={isSoccer}
-                      onSaveScore={saveScore}
-                      onCreateScore={createScore}
+                      onSaveScore={saveScoreOnly}
+                      onCreateScore={createScoreOnly}
+                      onReload={load}
                     />
                   </div>
                 );
@@ -945,8 +957,9 @@ export default function ResultsTab() {
                       catTitle={catTitle + (band.label ? ` · ${band.label}` : '')}
                       groupId={`${cat.id}-school-${band.ageTag || 'all'}`}
                       catId={cat.id}
-                      onSaveScore={saveScore}
-                      onCreateScore={createScore}
+                      onSaveScore={saveScoreOnly}
+                      onCreateScore={createScoreOnly}
+                      onReload={load}
                     />
                   ))}
 
@@ -959,8 +972,9 @@ export default function ResultsTab() {
                       catTitle={catTitle + (band.label ? ` · ${band.label}` : '')}
                       groupId={`${cat.id}-club-${band.ageTag || 'all'}`}
                       catId={cat.id}
-                      onSaveScore={saveScore}
-                      onCreateScore={createScore}
+                      onSaveScore={saveScoreOnly}
+                      onCreateScore={createScoreOnly}
+                      onReload={load}
                     />
                   ))}
                 </div>
@@ -1037,7 +1051,7 @@ export default function ResultsTab() {
 }
 
 // ── Ranking table component ───────────────────────────────────────────────────
-function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, catId, overrideOnly = false, onSaveScore, onCreateScore }: {
+function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, catId, overrideOnly = false, onSaveScore, onCreateScore, onReload }: {
   rows: RankedStudent[];
   label: string;
   labelClass: string;
@@ -1047,6 +1061,7 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, c
   overrideOnly?: boolean;
   onSaveScore: (id: string, score: number | null, time: number | null) => Promise<void>;
   onCreateScore?: (catId: string, row: RankedStudent, round: 1 | 2, score: number | null, time: number | null) => Promise<void>;
+  onReload?: () => void;
 }) {
   const storageKey = `makex2026:rankOverrides:${groupId}`;
 
@@ -1112,18 +1127,29 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, c
       const r2Score = editR2Score !== '' ? Number(editR2Score) : null;
       const r2Time  = editR2Time  !== '' ? Number(editR2Time)  : null;
 
-      if (s.r1Id) {
-        await onSaveScore(s.r1Id, r1Score, r1Time);
-      } else if ((r1Score !== null || r1Time !== null) && onCreateScore && catId) {
-        await onCreateScore(catId, s, 1, r1Score, r1Time);
+      const hasR1 = r1Score !== null || r1Time !== null;
+      const hasR2 = r2Score !== null || r2Time !== null;
+
+      // R1: only save/create when the user actually entered values (skip if blank)
+      if (hasR1) {
+        if (s.r1Id) {
+          await onSaveScore(s.r1Id, r1Score, r1Time);
+        } else if (onCreateScore && catId) {
+          await onCreateScore(catId, s, 1, r1Score, r1Time);
+        }
       }
 
-      if (s.r2Id) {
-        await onSaveScore(s.r2Id, r2Score, r2Time);
-      } else if ((r2Score !== null || r2Time !== null) && onCreateScore && catId) {
-        await onCreateScore(catId, s, 2, r2Score, r2Time);
+      // R2: only save/create when the user actually entered values
+      if (hasR2) {
+        if (s.r2Id) {
+          await onSaveScore(s.r2Id, r2Score, r2Time);
+        } else if (onCreateScore && catId) {
+          await onCreateScore(catId, s, 2, r2Score, r2Time);
+        }
       }
 
+      // Reload once after all DB writes are done
+      if (hasR1 || hasR2) onReload?.();
       setEditingKey(null);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
