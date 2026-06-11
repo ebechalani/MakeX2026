@@ -324,8 +324,10 @@ export default function ResultsTab() {
   }, [rankedPassations, categories, tables]);
 
   // ── Filtered raw view ─────────────────────────────────────────────────────
+  // Uses rankedPassations so remapped students (e.g. Roy Haddad → Capelli Inspire)
+  // appear under the correct category here too.
   const filtered = useMemo(() => {
-    return passations.filter(p => {
+    return rankedPassations.filter(p => {
       if (filterCat && p.category_id !== filterCat) return false;
       if (filterRound !== 'all' && String(p.round_number ?? 1) !== filterRound) return false;
       if (filterStatus === 'finalized' && p.final_result_status !== 'Finished') return false;
@@ -334,7 +336,7 @@ export default function ResultsTab() {
       if (filterStatus === 'scheduled' && p.live_status !== 'Scheduled') return false;
       return true;
     });
-  }, [passations, filterCat, filterRound, filterStatus]);
+  }, [rankedPassations, filterCat, filterRound, filterStatus]);
 
   const stats = useMemo(() => {
     const r1 = passations.filter(p => (p.round_number ?? 1) === 1);
@@ -398,7 +400,31 @@ export default function ResultsTab() {
       final_result_status: 'Finished',
       updated_at: new Date().toISOString(),
     }).eq('id', id);
-    if (error) { alert('Save failed: ' + error.message); return; }
+    if (error) throw new Error(error.message);
+    load();
+  }
+
+  /** Create a brand-new round record for a student who has no R2 passation yet. */
+  async function createScore(catId: string, row: RankedStudent, round: 2, score: number | null, time: number | null) {
+    // Clone base info from their R1 passation (table, DOB, coach, etc.)
+    const base = rankedPassations.find(p => p.id === row.r1Id);
+    const { error } = await supabase.from('passations').insert({
+      team_name:           row.teamName,
+      student_names:       row.studentNames || row.teamName || null,
+      club_name:           row.clubName || null,
+      category_id:         catId,
+      table_id:            base?.table_id  || null,
+      date_of_birth:       base?.date_of_birth || null,
+      coach_name:          base?.coach_name   || null,
+      round_number:        round,
+      score,
+      time_seconds:        time,
+      live_status:         'Finished',
+      final_result_status: score != null || time != null ? 'Finished' : 'Scheduled',
+      queue_position:      9999,
+      delay_count:         0,
+    });
+    if (error) throw new Error(error.message);
     load();
   }
 
@@ -885,8 +911,10 @@ export default function ResultsTab() {
                       labelClass="text-emerald-700 bg-emerald-50 border-emerald-200"
                       catTitle={catTitle}
                       groupId={`${cat.id}-unified`}
+                      catId={cat.id}
                       overrideOnly={isSoccer}
                       onSaveScore={saveScore}
+                      onCreateScore={createScore}
                     />
                   </div>
                 );
@@ -920,7 +948,9 @@ export default function ResultsTab() {
                       labelClass="text-blue-700 bg-blue-50 border-blue-200"
                       catTitle={catTitle + (band.label ? ` · ${band.label}` : '')}
                       groupId={`${cat.id}-school-${band.ageTag || 'all'}`}
+                      catId={cat.id}
                       onSaveScore={saveScore}
+                      onCreateScore={createScore}
                     />
                   ))}
 
@@ -933,7 +963,9 @@ export default function ResultsTab() {
                       labelClass="text-purple-700 bg-purple-50 border-purple-200"
                       catTitle={catTitle + (band.label ? ` · ${band.label}` : '')}
                       groupId={`${cat.id}-club-${band.ageTag || 'all'}`}
+                      catId={cat.id}
                       onSaveScore={saveScore}
+                      onCreateScore={createScore}
                     />
                   ))}
                 </div>
@@ -1010,14 +1042,16 @@ export default function ResultsTab() {
 }
 
 // ── Ranking table component ───────────────────────────────────────────────────
-function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, overrideOnly = false, onSaveScore }: {
+function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, catId, overrideOnly = false, onSaveScore, onCreateScore }: {
   rows: RankedStudent[];
   label: string;
   labelClass: string;
   catTitle: string;
   groupId: string;
+  catId?: string;
   overrideOnly?: boolean;
   onSaveScore: (id: string, score: number | null, time: number | null) => Promise<void>;
+  onCreateScore?: (catId: string, row: RankedStudent, round: 2, score: number | null, time: number | null) => Promise<void>;
 }) {
   const storageKey = `makex2026:rankOverrides:${groupId}`;
 
@@ -1062,10 +1096,12 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
   const [editR2Score, setEditR2Score] = useState('');
   const [editR2Time,  setEditR2Time]  = useState('');
   const [saving,      setSaving]      = useState(false);
+  const [saveError,   setSaveError]   = useState<string | null>(null);
 
   function openEdit(s: RankedStudent & { displayRank: number; isOverridden: boolean }) {
     setEditingKey(s.key);
     setRankEditKey(null);
+    setSaveError(null);
     setEditR1Score(s.r1.score != null ? String(s.r1.score) : '');
     setEditR1Time(s.r1.time  != null ? String(s.r1.time)  : '');
     setEditR2Score(s.r2.score != null ? String(s.r2.score) : '');
@@ -1074,18 +1110,30 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
 
   async function commitEdit(s: RankedStudent) {
     setSaving(true);
-    if (s.r1Id) {
-      const score = editR1Score !== '' ? Number(editR1Score) : null;
-      const time  = editR1Time  !== '' ? Number(editR1Time)  : null;
-      await onSaveScore(s.r1Id, score, time);
+    setSaveError(null);
+    try {
+      if (s.r1Id) {
+        const score = editR1Score !== '' ? Number(editR1Score) : null;
+        const time  = editR1Time  !== '' ? Number(editR1Time)  : null;
+        await onSaveScore(s.r1Id, score, time);
+      }
+
+      const r2Score = editR2Score !== '' ? Number(editR2Score) : null;
+      const r2Time  = editR2Time  !== '' ? Number(editR2Time)  : null;
+
+      if (s.r2Id) {
+        await onSaveScore(s.r2Id, r2Score, r2Time);
+      } else if ((r2Score !== null || r2Time !== null) && onCreateScore && catId) {
+        // Round 2 record doesn't exist yet — create it
+        await onCreateScore(catId, s, 2, r2Score, r2Time);
+      }
+
+      setEditingKey(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
     }
-    if (s.r2Id) {
-      const score = editR2Score !== '' ? Number(editR2Score) : null;
-      const time  = editR2Time  !== '' ? Number(editR2Time)  : null;
-      await onSaveScore(s.r2Id, score, time);
-    }
-    setSaving(false);
-    setEditingKey(null);
   }
 
   function commitRankOverride(key: string, rawValue: string) {
@@ -1200,6 +1248,7 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
                     <tr key={`${s.key}-edit`} className="bg-blue-50 border-b border-blue-100">
                       <td colSpan={12} className="px-5 py-3">
                         <div className="flex flex-wrap items-end gap-4">
+                          {/* R1 — only if there's a DB record to update */}
                           {s.r1Id && (
                             <div className="flex items-end gap-2">
                               <p className="text-xs font-bold text-slate-500 uppercase mr-1 mb-1.5">R1</p>
@@ -1215,21 +1264,25 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
                               </div>
                             </div>
                           )}
-                          {s.r2Id && (
-                            <div className="flex items-end gap-2">
-                              <p className="text-xs font-bold text-slate-500 uppercase mr-1 mb-1.5">R2</p>
-                              <div>
-                                <label className="text-[10px] text-slate-400 block mb-1">Score (pts)</label>
-                                <input type="number" value={editR2Score} onChange={e => setEditR2Score(e.target.value)}
-                                  className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="—" />
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-slate-400 block mb-1">Time (s)</label>
-                                <input type="number" value={editR2Time} onChange={e => setEditR2Time(e.target.value)}
-                                  className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="—" />
-                              </div>
+                          {/* R2 — always shown; creates a new DB record if it doesn't exist yet */}
+                          <div className="flex items-end gap-2">
+                            <p className="text-xs font-bold text-slate-500 uppercase mr-1 mb-1.5">
+                              R2
+                              {!s.r2Id && (
+                                <span className="ml-1 text-[9px] font-bold text-violet-500 bg-violet-50 border border-violet-200 px-1 py-0.5 rounded">new</span>
+                              )}
+                            </p>
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-1">Score (pts)</label>
+                              <input type="number" value={editR2Score} onChange={e => setEditR2Score(e.target.value)}
+                                className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="—" />
                             </div>
-                          )}
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-1">Time (s)</label>
+                              <input type="number" value={editR2Time} onChange={e => setEditR2Time(e.target.value)}
+                                className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="—" />
+                            </div>
+                          </div>
                           <button onClick={() => commitEdit(s)} disabled={saving}
                             className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-lg transition mb-0">
                             {saving ? 'Saving…' : '✓ Save'}
@@ -1238,6 +1291,9 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, o
                             className="text-xs text-slate-500 hover:text-slate-700 underline">
                             Cancel
                           </button>
+                          {saveError && (
+                            <p className="w-full text-xs font-semibold text-red-600 mt-1">✗ {saveError}</p>
+                          )}
                         </div>
                       </td>
                     </tr>
