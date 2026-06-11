@@ -404,10 +404,10 @@ export default function ResultsTab() {
     load();
   }
 
-  /** Create a brand-new round record for a student who has no R2 passation yet. */
-  async function createScore(catId: string, row: RankedStudent, round: 2, score: number | null, time: number | null) {
-    // Clone base info from their R1 passation (table, DOB, coach, etc.)
-    const base = rankedPassations.find(p => p.id === row.r1Id);
+  /** Create a brand-new round record for a student who has no passation yet for that round. */
+  async function createScore(catId: string, row: RankedStudent, round: 1 | 2, score: number | null, time: number | null) {
+    // Clone base info from whichever round passation already exists
+    const base = rankedPassations.find(p => p.id === row.r1Id) ?? rankedPassations.find(p => p.id === row.r2Id);
     const { error } = await supabase.from('passations').insert({
       team_name:           row.teamName,
       student_names:       row.studentNames || row.teamName || null,
@@ -1051,7 +1051,7 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, c
   catId?: string;
   overrideOnly?: boolean;
   onSaveScore: (id: string, score: number | null, time: number | null) => Promise<void>;
-  onCreateScore?: (catId: string, row: RankedStudent, round: 2, score: number | null, time: number | null) => Promise<void>;
+  onCreateScore?: (catId: string, row: RankedStudent, round: 1 | 2, score: number | null, time: number | null) => Promise<void>;
 }) {
   const storageKey = `makex2026:rankOverrides:${groupId}`;
 
@@ -1112,19 +1112,20 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, c
     setSaving(true);
     setSaveError(null);
     try {
-      if (s.r1Id) {
-        const score = editR1Score !== '' ? Number(editR1Score) : null;
-        const time  = editR1Time  !== '' ? Number(editR1Time)  : null;
-        await onSaveScore(s.r1Id, score, time);
-      }
-
+      const r1Score = editR1Score !== '' ? Number(editR1Score) : null;
+      const r1Time  = editR1Time  !== '' ? Number(editR1Time)  : null;
       const r2Score = editR2Score !== '' ? Number(editR2Score) : null;
       const r2Time  = editR2Time  !== '' ? Number(editR2Time)  : null;
+
+      if (s.r1Id) {
+        await onSaveScore(s.r1Id, r1Score, r1Time);
+      } else if ((r1Score !== null || r1Time !== null) && onCreateScore && catId) {
+        await onCreateScore(catId, s, 1, r1Score, r1Time);
+      }
 
       if (s.r2Id) {
         await onSaveScore(s.r2Id, r2Score, r2Time);
       } else if ((r2Score !== null || r2Time !== null) && onCreateScore && catId) {
-        // Round 2 record doesn't exist yet — create it
         await onCreateScore(catId, s, 2, r2Score, r2Time);
       }
 
@@ -1248,22 +1249,25 @@ function RankingTable({ rows, label, labelClass, catTitle: _catTitle, groupId, c
                     <tr key={`${s.key}-edit`} className="bg-blue-50 border-b border-blue-100">
                       <td colSpan={12} className="px-5 py-3">
                         <div className="flex flex-wrap items-end gap-4">
-                          {/* R1 — only if there's a DB record to update */}
-                          {s.r1Id && (
-                            <div className="flex items-end gap-2">
-                              <p className="text-xs font-bold text-slate-500 uppercase mr-1 mb-1.5">R1</p>
-                              <div>
-                                <label className="text-[10px] text-slate-400 block mb-1">Score (pts)</label>
-                                <input type="number" value={editR1Score} onChange={e => setEditR1Score(e.target.value)}
-                                  className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="—" />
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-slate-400 block mb-1">Time (s)</label>
-                                <input type="number" value={editR1Time} onChange={e => setEditR1Time(e.target.value)}
-                                  className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="—" />
-                              </div>
+                          {/* R1 — always shown; creates a new DB record if it doesn't exist yet */}
+                          <div className="flex items-end gap-2">
+                            <p className="text-xs font-bold text-slate-500 uppercase mr-1 mb-1.5">
+                              R1
+                              {!s.r1Id && (
+                                <span className="ml-1 text-[9px] font-bold text-violet-500 bg-violet-50 border border-violet-200 px-1 py-0.5 rounded">new</span>
+                              )}
+                            </p>
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-1">Score (pts)</label>
+                              <input type="number" value={editR1Score} onChange={e => setEditR1Score(e.target.value)}
+                                className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="—" />
                             </div>
-                          )}
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-1">Time (s)</label>
+                              <input type="number" value={editR1Time} onChange={e => setEditR1Time(e.target.value)}
+                                className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-mono bg-white" placeholder="—" />
+                            </div>
+                          </div>
                           {/* R2 — always shown; creates a new DB record if it doesn't exist yet */}
                           <div className="flex items-end gap-2">
                             <p className="text-xs font-bold text-slate-500 uppercase mr-1 mb-1.5">
