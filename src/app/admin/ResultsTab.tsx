@@ -7,7 +7,7 @@ import type { Category, Table, Passation } from '@/lib/types';
 
 // ── School / Club classification ─────────────────────────────────────────────
 import {
-  orgType,
+  orgType, remapPassations,
   type RoundResult, type RankedStudent, type CategoryRankings,
   calcAge, roundResult, betterResult, compareResults,
   assignRanks, reRank, buildRankings,
@@ -306,15 +306,22 @@ export default function ResultsTab() {
   }, [load, supabase]);
 
   // ── Rankings per category ─────────────────────────────────────────────────
+  // Apply category remaps (e.g. Roy Haddad: MakeX Inspire → Capelli Inspire)
+  // before computing rankings. The raw results view keeps original passations.
+  const rankedPassations = useMemo(
+    () => remapPassations(passations, categories),
+    [passations, categories],
+  );
+
   const rankingsByCat = useMemo(() => {
     const map = new Map<string, CategoryRankings>();
     for (const cat of categories) {
-      const r1 = passations.filter(p => p.category_id === cat.id && (p.round_number ?? 1) === 1);
-      const r2 = passations.filter(p => p.category_id === cat.id && p.round_number === 2);
+      const r1 = rankedPassations.filter(p => p.category_id === cat.id && (p.round_number ?? 1) === 1);
+      const r2 = rankedPassations.filter(p => p.category_id === cat.id && p.round_number === 2);
       map.set(cat.id, buildRankings(r1, r2, tables));
     }
     return map;
-  }, [passations, categories, tables]);
+  }, [rankedPassations, categories, tables]);
 
   // ── Filtered raw view ─────────────────────────────────────────────────────
   const filtered = useMemo(() => {

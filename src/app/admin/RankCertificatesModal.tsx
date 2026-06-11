@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import type { Category, Table, Passation } from '@/lib/types';
 import {
-  buildRankings, reRank, applyOverrides, readStarterTeams,
+  buildRankings, reRank, applyOverrides, readStarterTeams, remapPassations,
   betterResult, compareResults,
   type RankedStudent, type RoundResult,
 } from '@/lib/ranking';
@@ -42,6 +42,10 @@ export default function RankCertificatesModal({ academyName, passations, categor
   const certs = useMemo((): CertEntry[] => {
     const result: CertEntry[] = [];
 
+    // Apply category remaps (e.g. Roy Haddad: MakeX Inspire → Capelli Inspire)
+    // before building rankings, so certs are generated under the correct category.
+    const remapped = remapPassations(passations, categories);
+
     // Same normalisation logic as admin/page.tsx — strips accents, collapses
     // all non-alphanumeric chars to a single space so "RoboHolic" == "roboholic"
     // and "Lycée Charlemagne" == "Lycee Charlemagne" etc.
@@ -58,15 +62,15 @@ export default function RankCertificatesModal({ academyName, passations, categor
     // same key as academyName — this handles cases where the academy display name
     // slightly differs from what's stored in passation.club_name
     const matchingClubNames = new Set(
-      passations
+      remapped
         .map(p => p.club_name)
         .filter((c): c is string => !!c && norm(c) === acNorm)
     );
 
     for (const cat of categories) {
       const catName = cat.name;
-      const r1all = passations.filter(p => p.category_id === cat.id && (p.round_number ?? 1) === 1);
-      const r2all = passations.filter(p => p.category_id === cat.id && p.round_number === 2);
+      const r1all = remapped.filter(p => p.category_id === cat.id && (p.round_number ?? 1) === 1);
+      const r2all = remapped.filter(p => p.category_id === cat.id && p.round_number === 2);
       const { schools, clubs } = buildRankings(r1all, r2all, tables);
 
       // ── MakeX Starter: team pairing — override-only (same rule as Soccer) ──

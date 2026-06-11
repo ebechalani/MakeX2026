@@ -1,5 +1,37 @@
 import type { Passation, Table } from '@/lib/types';
 
+// ── Hardcoded category remaps (misregistered students) ─────────────────────────
+// Add an entry here when a student was registered under the wrong category.
+// studentName: lowercase substring that must appear in student_names or team_name.
+// fromCat / toCat: regex matched against category.name.
+export const STUDENT_CAT_REMAPS: Array<{
+  studentName: string;
+  fromCat: RegExp;
+  toCat:   RegExp;
+}> = [
+  { studentName: 'roy haddad', fromCat: /makex\s*inspire/i, toCat: /capelli\s*inspire/i },
+];
+
+/** Returns a copy of passations with any misregistered students reassigned to their correct category. */
+export function remapPassations(
+  passations: Passation[],
+  categories: { id: string; name: string }[],
+): Passation[] {
+  if (STUDENT_CAT_REMAPS.length === 0) return passations;
+  return passations.map(p => {
+    const nm = ((p.student_names?.trim()) || p.team_name || '').toLowerCase();
+    for (const remap of STUDENT_CAT_REMAPS) {
+      if (!nm.includes(remap.studentName)) continue;
+      const fromCat = categories.find(c => remap.fromCat.test(c.name));
+      const toCat   = categories.find(c => remap.toCat.test(c.name));
+      if (fromCat && toCat && p.category_id === fromCat.id) {
+        return { ...p, category_id: toCat.id };
+      }
+    }
+    return p;
+  });
+}
+
 // ── School name set ────────────────────────────────────────────────────────────
 export const SCHOOL_NAMES = new Set([
   'Carmelites', 'CCJ', 'CND Steam Club',
