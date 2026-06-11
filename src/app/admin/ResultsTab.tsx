@@ -260,9 +260,11 @@ export default function ResultsTab() {
   const [passations, setPassations] = useState<Passation[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
+  const [view, setView] = useState<'rankings' | 'raw'>('rankings');
   const [filterCat, setFilterCat] = useState<string>('');
   const [filterRound, setFilterRound] = useState<'all' | '1' | '2'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'finalized' | 'void' | 'absent' | 'scheduled'>('all');
+  const [rankType, setRankType] = useState<'all' | 'school' | 'club'>('all');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [clearing, setClearing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -818,8 +820,158 @@ export default function ResultsTab() {
       </div>
 
 
-      {/* ── RAW RESULTS ── */}
-      <div className="space-y-3">
+      {/* View toggle */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        {(['rankings', 'raw'] as const).map(v => (
+          <button key={v} onClick={() => setView(v)}
+            className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition ${
+              view === v ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}>
+            {v === 'rankings' ? '🏆 Rankings' : '📋 Raw Results'}
+          </button>
+        ))}
+      </div>
+
+      {/* ── RANKINGS VIEW ── */}
+      {view === 'rankings' && (
+        <div className="space-y-4">
+          {/* Category filter */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
+              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm">
+              <option value="">All categories</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name} {c.age_range_label && `(${c.age_range_label})`}</option>)}
+            </select>
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+              {(['all', 'school', 'club'] as const).map(t => (
+                <button key={t} onClick={() => setRankType(t)}
+                  className={`px-3 py-1 text-xs font-bold rounded transition ${
+                    rankType === t ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
+                  }`}>
+                  {t === 'all' ? 'All' : t === 'school' ? '🏫 Schools only' : '🏢 Clubs only'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Per-category ranking tables */}
+          {categories
+            .filter(cat => !filterCat || cat.id === filterCat)
+            .map(cat => {
+              const { schools, clubs } = rankingsByCat.get(cat.id) || { schools: [], clubs: [] };
+              if (schools.length === 0 && clubs.length === 0) return null;
+
+              const catTitle = cat.name + (cat.age_range_label ? ` (${cat.age_range_label})` : '');
+              const splitByAge = isCapelliInspire(cat.name);
+              const unified = isUnifiedRanking(cat.name);
+
+              if (unified) {
+                const isSoccer  = /capelli\s*soccer/i.test(cat.name);
+                const isStarter = /makex\s*starter/i.test(cat.name);
+
+                if (isStarter) {
+                  const { schools: sc, clubs: cl } = rankingsByCat.get(cat.id) || { schools: [], clubs: [] };
+                  if (sc.length === 0 && cl.length === 0) return null;
+                  return (
+                    <div key={cat.id} className="space-y-3">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <h3 className="font-bold text-slate-800 text-base">{cat.name}
+                          {cat.age_range_label && <span className="ml-2 text-slate-400 font-normal text-sm">({cat.age_range_label})</span>}
+                        </h3>
+                        <span className="text-xs text-violet-600 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded">👥 Team pairing</span>
+                      </div>
+                      <StarterTeamBuilder
+                        catId={cat.id}
+                        rankings={{ schools: sc, clubs: cl }}
+                        groupId={`${cat.id}-starter`}
+                        onSaveScore={saveScore}
+                      />
+                    </div>
+                  );
+                }
+
+                const combined = reRank([...schools, ...clubs]);
+                if (combined.length === 0) return null;
+                return (
+                  <div key={cat.id} className="space-y-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h3 className="font-bold text-slate-800 text-base">{cat.name}
+                        {cat.age_range_label && <span className="ml-2 text-slate-400 font-normal text-sm">({cat.age_range_label})</span>}
+                      </h3>
+                      {isSoccer
+                        ? <span className="text-xs text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded">📌 Manual ranking only</span>
+                        : <><span className="text-xs text-slate-400">Best of R1 &amp; R2 · points → time</span>
+                           <span className="text-xs text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">Single ranking</span></>
+                      }
+                    </div>
+                    <RankingTable
+                      rows={combined}
+                      label="🏆 Overall Rankings"
+                      labelClass="text-emerald-700 bg-emerald-50 border-emerald-200"
+                      catTitle={catTitle}
+                      groupId={`${cat.id}-unified`}
+                      catId={cat.id}
+                      overrideOnly={isSoccer}
+                      onSaveScore={saveScore}
+                      onCreateScore={createScore}
+                    />
+                  </div>
+                );
+              }
+
+              const schoolBands: AgeBand[] = splitByAge
+                ? splitCapelliByAge(schools)
+                : (schools.length ? [{ label: '', ageTag: '', rows: schools }] : []);
+              const clubBands: AgeBand[] = splitByAge
+                ? splitCapelliByAge(clubs)
+                : (clubs.length ? [{ label: '', ageTag: '', rows: clubs }] : []);
+
+              return (
+                <div key={cat.id} className="space-y-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h3 className="font-bold text-slate-800 text-base">{cat.name}
+                      {cat.age_range_label && <span className="ml-2 text-slate-400 font-normal text-sm">({cat.age_range_label})</span>}
+                    </h3>
+                    <span className="text-xs text-slate-400">Best of R1 &amp; R2 · points → time</span>
+                    {splitByAge && <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">Split by age</span>}
+                  </div>
+
+                  {(rankType === 'all' || rankType === 'school') && schoolBands.map(band => (
+                    <RankingTable
+                      key={`sch-${band.ageTag || 'all'}`}
+                      rows={band.rows}
+                      label={`🏫 School Rankings${band.label ? ` — ${band.label}` : ''}`}
+                      labelClass="text-blue-700 bg-blue-50 border-blue-200"
+                      catTitle={catTitle + (band.label ? ` · ${band.label}` : '')}
+                      groupId={`${cat.id}-school-${band.ageTag || 'all'}`}
+                      catId={cat.id}
+                      onSaveScore={saveScore}
+                      onCreateScore={createScore}
+                    />
+                  ))}
+
+                  {(rankType === 'all' || rankType === 'club') && clubBands.map(band => (
+                    <RankingTable
+                      key={`clb-${band.ageTag || 'all'}`}
+                      rows={band.rows}
+                      label={`🏢 Club Rankings${band.label ? ` — ${band.label}` : ''}`}
+                      labelClass="text-purple-700 bg-purple-50 border-purple-200"
+                      catTitle={catTitle + (band.label ? ` · ${band.label}` : '')}
+                      groupId={`${cat.id}-club-${band.ageTag || 'all'}`}
+                      catId={cat.id}
+                      onSaveScore={saveScore}
+                      onCreateScore={createScore}
+                    />
+                  ))}
+                </div>
+              );
+            })}
+        </div>
+      )}
+
+      {/* ── RAW RESULTS VIEW ── */}
+      {view === 'raw' && (
+        <div className="space-y-3">
           <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap gap-2">
             <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
               className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm">
@@ -879,6 +1031,7 @@ export default function ResultsTab() {
             </table>
           </div>
         </div>
+      )}
     </div>
   );
 }
