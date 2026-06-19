@@ -142,7 +142,23 @@
       "Bash(findstr /i \"ghost\\\\|imagemag\")",
       "Bash(start \"\" \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\scripts\\\\certificates\\\\Referees\\\\Ray Geha.pdf\")",
       "Bash(Remove-Item scripts/bg_image_*.jpg -ErrorAction SilentlyContinue)",
-      "Bash(Write-Host \"Cleaned up\")"
+      "Bash(Write-Host \"Cleaned up\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(curl -sL -o /dev/null -w \"HTTP %{http_code} | type=%{content_type} | size=%{size_download}\\\\n\" \"https://icons.duckduckgo.com/ip3/univ-lyon3.fr.ico\")",
+      "Bash(curl -sL \"https://www.univ-lyon3.fr/\")",
+      "Bash(curl -sL -o lyon3.png \"https://www.univ-lyon3.fr/uas/lyon3/LOGO/logo_lyon3.png\")",
+      "Bash(curl -sL -o /dev/null -w \"downloaded: HTTP %{http_code} type=%{content_type} size=%{size_download} bytes\\\\n\" \"https://www.univ-lyon3.fr/uas/lyon3/LOGO/logo_lyon3.png\")",
+      "Bash(file lyon3.png)",
+      "Bash(node \"C:\\\\Users\\\\EDDY~1.BAC\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-eddy-bachaalany-Documents-GitHub-MakeX2026\\\\557376d5-c232-4546-a6c1-592ba353431e\\\\scratchpad\\\\test_logos.js\")",
+      "Bash(grep -vE '\\\\.\\(html|png|jpg|jpeg|ico|md|txt|json|css|js\\)$')",
+      "Bash(xargs -0 git rm --cached --)",
+      "Bash(xargs -0 -r rm -f --)",
+      "Bash(xargs -0 -I{} echo \"file: {}\")",
+      "Bash(git config *)",
+      "Bash(xargs -0 -r -I{} sh -c 'echo \"IDX: {}\"; git rm -f -- \"{}\"')",
+      "Bash(echo \"exit-grep:$?\")"
     ]
   }
 }
