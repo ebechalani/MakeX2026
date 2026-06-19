@@ -20,8 +20,21 @@ export const STUDENT_CLUB_REMAPS: Array<{
   studentName: string;
   toClub: string;
 }> = [
-  { studentName: 'ray yazbeck', toClub: 'RoboHolic' },
+  { studentName: 'ray yazbeck',         toClub: 'RoboHolic' },
+  { studentName: 'clarita benita',      toClub: 'RoboHolic' },
+  { studentName: 'laeticia bachaalany', toClub: 'RoboHolic' },
 ];
+
+// ── Duplicate category ID remaps ──────────────────────────────────────────────
+// Add an entry here when two DB rows in the `categories` table have the same
+// name but different IDs (registration error). Maps orphan ID → canonical ID.
+// All passations in the orphan category are silently moved to the canonical one
+// so that rankings merge correctly without a DB fix.
+export const CATEGORY_ID_REMAPS: Record<string, string> = {
+  // Second "Sportswonderland" row created by mistake — orphan has 36 students
+  // (incl. Georges Zgheib, Chris Zgheib) who were invisible in rankings.
+  '5a239a3e-afb0-43e9-945b-8a58afa48455': 'b5626537-fc44-46e7-b8c2-6b4f9794bd21',
+};
 
 // ── Hardcoded score injections (missing round records) ─────────────────────────
 // Add an entry here when a student's round record can't be saved to the DB.
@@ -47,6 +60,12 @@ export function remapPassations(
     const nm = ((p.student_names?.trim()) || p.team_name || '').toLowerCase();
     let changed = false;
     let result = { ...p };
+
+    // Duplicate category ID remap (orphan → canonical)
+    if (p.category_id in CATEGORY_ID_REMAPS) {
+      result = { ...result, category_id: CATEGORY_ID_REMAPS[p.category_id] };
+      changed = true;
+    }
 
     // Category remap
     for (const remap of STUDENT_CAT_REMAPS) {

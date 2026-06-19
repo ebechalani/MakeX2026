@@ -27,6 +27,7 @@
     "@types/react-signature-canvas": "^1.0.7",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "pdfjs-dist": "^6.0.227",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

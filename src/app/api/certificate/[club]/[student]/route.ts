@@ -68,11 +68,12 @@ export async function GET(
   );
 
   // Look up the student by sanitized club + name match
-  const [{ data: rows }, { data: cats }] = await Promise.all([
+  const [{ data: rows }, { data: cats }, { data: academies }] = await Promise.all([
     sb.from('passations')
       .select('team_name, student_names, club_name, coach_name, category_id')
       .eq('round_number', 1),
     sb.from('categories').select('id, name'),
+    sb.from('academies').select('name, coach_name'),
   ]);
   if (!rows) return new NextResponse('Database error', { status: 500 });
 
@@ -83,8 +84,12 @@ export async function GET(
   if (!target) return new NextResponse('Certificate not found', { status: 404 });
 
   const memberName = (target.student_names?.trim()) || target.team_name || '—';
-  const mentorName = target.coach_name || '—';
   const catName    = cats?.find(c => c.id === target.category_id)?.name || '—';
+
+  // Prefer the academy's registered coach name over the passation's coach_name field,
+  // which may be truncated or incorrectly entered at registration time.
+  const academy    = academies?.find(a => a.name === target.club_name);
+  const mentorName = academy?.coach_name || target.coach_name || '—';
 
   // Generate PDF
   const templateBytes = fs.readFileSync(TEMPLATE_PATH);

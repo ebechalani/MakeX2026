@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Category, Passation } from '@/lib/types';
+import { CATEGORY_ID_REMAPS } from '@/lib/ranking';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 
@@ -78,7 +79,13 @@ export default function RankingPage() {
     if (!cats || !pas) { setLoading(false); return; }
 
     const allCats = cats as Category[];
-    const allPas = pas as Passation[];
+    // Apply category ID remaps (orphan duplicate IDs → canonical ID) so students
+    // in mis-categorized DB rows appear in the correct unified ranking.
+    const allPas = (pas as Passation[]).map(p =>
+      p.category_id in CATEGORY_ID_REMAPS
+        ? { ...p, category_id: CATEGORY_ID_REMAPS[p.category_id] }
+        : p,
+    );
 
     const result: CatRanking[] = [];
 
@@ -154,7 +161,11 @@ export default function RankingPage() {
     if (!cats || !pas) { alert('Failed to load data for export'); return; }
 
     const allCats = cats as Category[];
-    const allPas = pas as Passation[];
+    const allPas = (pas as Passation[]).map(p =>
+      p.category_id in CATEGORY_ID_REMAPS
+        ? { ...p, category_id: CATEGORY_ID_REMAPS[p.category_id] }
+        : p,
+    );
     const wb = XLSX.utils.book_new();
 
     for (const cat of allCats) {
@@ -275,7 +286,11 @@ export default function RankingPage() {
     if (!cats || !pas) { alert('Failed to load data'); return; }
 
     const allCats = cats as Category[];
-    const allPas = pas as Passation[];
+    const allPas = (pas as Passation[]).map(p =>
+      p.category_id in CATEGORY_ID_REMAPS
+        ? { ...p, category_id: CATEGORY_ID_REMAPS[p.category_id] }
+        : p,
+    );
 
     const wb = XLSX.utils.book_new();
 

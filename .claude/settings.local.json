@@ -128,7 +128,21 @@
       "Bash(npx next *)",
       "Bash(curl -s http://localhost:3001/academy)",
       "Bash(kill %1)",
-      "Bash(curl -s http://localhost:3002/academy)"
+      "Bash(curl -s http://localhost:3002/academy)",
+      "Bash(node scripts/generate_referee_certificates.mjs)",
+      "Bash(ls /mnt/c/Users/eddy.bachaalany/Downloads/ | grep -i \"ref\\\\|judge\\\\|cert\\\\|template\")",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\eddy.bachaalany\\\\Downloads\\\\\" | Where-Object { $_.Name -match \"ref|judge|cert|template|referee\" } | Select-Object Name)",
+      "Bash(dir node_modules)",
+      "Bash(findstr /i \"jimp sharp jpeg png image\")",
+      "Bash(where gswin64c *)",
+      "Bash(where gs *)",
+      "Bash(where magick *)",
+      "Bash(where convert *)",
+      "Bash(dir \"C:\\\\Program Files\")",
+      "Bash(findstr /i \"ghost\\\\|imagemag\")",
+      "Bash(start \"\" \"C:\\\\Users\\\\eddy.bachaalany\\\\Documents\\\\GitHub\\\\MakeX2026\\\\scripts\\\\certificates\\\\Referees\\\\Ray Geha.pdf\")",
+      "Bash(Remove-Item scripts/bg_image_*.jpg -ErrorAction SilentlyContinue)",
+      "Bash(Write-Host \"Cleaned up\")"
     ]
   }
 }
