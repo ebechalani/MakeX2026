@@ -1,0 +1,33 @@
+/* Styles of the mBot2 simulator that Tailwind classes cannot reach: Blockly draws its own SVG. */
+
+/* Blocks that are running right now glow yellow, like in Scratch / mBlock. */
+.mbot2-blockly .blocklyHighlighted > .blocklyPath {
+  stroke: #ffd500;
+  stroke-width: 4px;
+  filter: drop-shadow(0 0 4px rgba(255, 196, 0, 0.95));
+}
+
+/* The workspace fills its panel and never draws outside of it. */
+.mbot2-blockly .injectionDiv {
+  border: 0;
+  outline: none;
+}
+
+/* Category list on the left of the workspace: compact, readable labels. */
+.mbot2-blockly .blocklyToolbox {
+  border-right: 1px solid #e2e8f0;
+  padding: 4px 0;
+}
+
+.mbot2-blockly .blocklyToolboxCategoryLabel {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+/* Keyboard focus inside the palette must stay visible. */
+.mbot2-blockly .blocklyToolboxCategory:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: -2px;
+}
