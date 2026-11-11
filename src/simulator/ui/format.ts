@@ -85,6 +85,23 @@ export function finishText(reason: FinishReason | null): string {
   }
 }
 
+/**
+ * The CyberPi screen is narrow: a printed line that is longer than `columns` characters
+ * continues on the next row, like on the real screen. Returns the rows to draw.
+ */
+export function wrapScreenLines(lines: readonly string[], columns: number): string[] {
+  const width = Math.max(1, Math.floor(columns));
+  const rows: string[] = [];
+  for (const line of lines) {
+    if (line.length <= width) {
+      rows.push(line);
+      continue;
+    }
+    for (let i = 0; i < line.length; i += width) rows.push(line.slice(i, i + width));
+  }
+  return rows;
+}
+
 export type LogLevel = 'info' | 'warn' | 'error' | 'event';
 
 export interface LogLine {

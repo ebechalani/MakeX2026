@@ -714,6 +714,24 @@ describe('samples in the block editor', () => {
       const drawn = workspace.getAllBlocks(false);
       assert.ok(drawn.length >= 5, `${s.id}: ${drawn.length} blocks drawn`);
       for (const block of drawn) assert.ok(supportsBlock(block.type), `${s.id}: ${block.type}`);
+
+      // tidy on the workspace: the start script is the leftmost stack, and no stack lies on top of another
+      const stacks = workspace.getTopBlocks(false).map((block) => ({ type: block.type, box: block.getBoundingRectangle() }));
+      const leftmost = stacks.reduce((a, b) => (b.box.left < a.box.left ? b : a));
+      assert.equal(leftmost.type, 'event_cyberpi_start', `${s.id}: "when CyberPi starts up" comes first`);
+      for (let i = 0; i < stacks.length; i++) {
+        for (let j = i + 1; j < stacks.length; j++) {
+          const a = stacks[i].box;
+          const b = stacks[j].box;
+          const apart = a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+          assert.ok(apart, `${s.id}: ${stacks[i].type} and ${stacks[j].type} overlap`);
+        }
+      }
+      // the explanations ("?" icons) arrive in the editor
+      const notes = drawn.map((block) => block.getCommentText() ?? '').filter((text) => text !== '');
+      assert.ok(notes.length >= 1, `${s.id}: has at least one note`);
+      for (const text of notes) assert.ok(text.length <= 220, `${s.id}: a note is short ("${text}")`);
+
       const saved = Blockly.serialization.workspaces.save(workspace) as ProgramJson;
 
       // the full mission on its own combination; the others on one where the smart program has to

@@ -532,12 +532,14 @@ export const BLOCKS: BlockDef[] = [
     tooltip: 'A random number between the two values. Whole numbers in, whole number out.',
     gapBefore: true,
   },
+  // The three comparisons take text bubbles, as in Scratch: a number or a word can be typed in
+  // (colour = red). Two things that both read as numbers are compared as numbers.
   {
     type: 'operator_gt',
     category: 'operators',
     shape: 'boolean',
     message: '%1 > %2',
-    args: [num('OPERAND1', 0), num('OPERAND2', 50)],
+    args: [txt('OPERAND1', ''), txt('OPERAND2', '50')],
     tooltip: 'True when the first value is greater than the second.',
     gapBefore: true,
   },
@@ -546,7 +548,7 @@ export const BLOCKS: BlockDef[] = [
     category: 'operators',
     shape: 'boolean',
     message: '%1 < %2',
-    args: [num('OPERAND1', 0), num('OPERAND2', 50)],
+    args: [txt('OPERAND1', ''), txt('OPERAND2', '50')],
     tooltip: 'True when the first value is less than the second.',
   },
   {
@@ -554,8 +556,8 @@ export const BLOCKS: BlockDef[] = [
     category: 'operators',
     shape: 'boolean',
     message: '%1 = %2',
-    args: [num('OPERAND1', 0), num('OPERAND2', 50)],
-    tooltip: 'True when both values are the same.',
+    args: [txt('OPERAND1', ''), txt('OPERAND2', '50')],
+    tooltip: 'True when both values are the same. Works for numbers and for words (upper / lower case does not matter).',
   },
   {
     type: 'operator_and',
@@ -660,8 +662,9 @@ export const BLOCKS: BlockDef[] = [
     category: 'variables',
     shape: 'statement',
     message: 'set %1 to %2',
-    args: [variableField(), num('VALUE', 0)],
-    tooltip: 'Stores a value in the variable.',
+    // a text bubble, as in Scratch: a variable can hold a number or a word
+    args: [variableField(), txt('VALUE', '0')],
+    tooltip: 'Stores a value in the variable: a number or a word.',
     hidden: true,
   },
   {

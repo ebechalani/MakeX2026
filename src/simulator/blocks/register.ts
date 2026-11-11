@@ -262,10 +262,80 @@ export function attachToolboxCallbacks(Blockly: BlocklyApi, workspace: BlocklyMo
     Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace(), undefined, '');
   });
   workspace.registerButtonCallback(MAKE_LIST_CALLBACK, (button) => {
-    Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace(), undefined, LIST_VARIABLE_TYPE);
+    // Blockly has one question for this dialog ("New variable name:"); it reads the text at the
+    // moment the dialog opens, so for a list the wording is swapped just for that moment.
+    const msg = Blockly.Msg as Record<string, string>;
+    const question = msg.NEW_VARIABLE_TITLE;
+    msg.NEW_VARIABLE_TITLE = 'New list name:';
+    try {
+      Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace(), undefined, LIST_VARIABLE_TYPE);
+    } finally {
+      msg.NEW_VARIABLE_TITLE = question;
+    }
   });
   // show the new palette straight away
   workspace.getToolbox()?.refreshSelection();
+}
+
+// =============================================================================================
+// White bubbles for "My Blocks"
+// =============================================================================================
+
+/** The value slots of Blockly's my-block blocks that should hold a bubble to type into. */
+function slotsToFill(block: BlocklyModule.Block): BlocklyModule.Input[] {
+  switch (block.type) {
+    case 'procedures_callnoreturn':
+    case 'procedures_callreturn':
+      // one slot per parameter: ARG0, ARG1 ...
+      return block.inputList.filter((input) => input.name.startsWith('ARG'));
+    case 'procedures_defreturn':
+      return block.inputList.filter((input) => input.name === 'RETURN');
+    case 'procedures_ifreturn':
+      return block.inputList.filter((input) => input.name === 'VALUE');
+    default:
+      return [];
+  }
+}
+
+/**
+ * Blockly leaves the value slots of a my-block call (and of "return") as empty holes, and our
+ * palette has no loose number block to plug into them. Scratch and mBlock show a white bubble
+ * there instead: type a number or a word, or drop a round block on it. This gives every such slot
+ * its bubble, when the block is dragged out of the palette and whenever the parameters of a
+ * my-block change. Call once after Blockly.inject().
+ */
+export function addBubblesToMyBlocks(Blockly: BlocklyApi, workspace: BlocklyModule.WorkspaceSvg): void {
+  const fill = (id: string | undefined): void => {
+    const block = id ? workspace.getBlockById(id) : null;
+    if (!block || block.isInFlyout) return;
+    for (const input of slotsToFill(block)) {
+      const connection = input.connection;
+      if (!connection) continue;
+      const known = connection.getShadowState();
+      if (known) {
+        // The slot knows its bubble. It can still be missing: Blockly takes the bubble away when
+        // a parameter is moved or removed in the gear dialog of the my-block. Put it back.
+        if (!connection.targetBlock()) connection.setShadowState(known);
+        continue;
+      }
+      // The bubble always gets the same id for the same slot. Undo / redo count on that: after
+      // "undo" has removed the block and "redo" has put it back, a later step ("typed 25 into the
+      // bubble") must find its bubble again.
+      const bubbleId = `${block.id}_${input.name}`;
+      const state: BlocklyModule.serialization.blocks.State = { type: 'text', fields: { TEXT: '' } };
+      if (!workspace.getBlockById(bubbleId)) state.id = bubbleId;
+      connection.setShadowState(state);
+    }
+  };
+  workspace.addChangeListener((event: BlocklyModule.Events.Abstract) => {
+    if (event.type === Blockly.Events.BLOCK_CREATE) {
+      for (const id of (event as BlocklyModule.Events.BlockCreate).ids ?? []) fill(id);
+    } else if (event.type === Blockly.Events.BLOCK_CHANGE) {
+      // the parameters of a my-block were changed: its calls got new slots
+      const change = event as BlocklyModule.Events.BlockChange;
+      if (change.element === 'mutation') fill(change.blockId);
+    }
+  });
 }
 
 // =============================================================================================
@@ -279,7 +349,8 @@ export interface EditorOptions extends Omit<BlocklyModule.BlocklyOptions, 'toolb
 
 /**
  * Register the blocks, create a Blockly workspace inside `container` with the mBlock toolbox and
- * look, and install the Scratch-like Variables palette. Any Blockly option can be overridden
+ * look, and install the Scratch-like Variables palette and the bubbles of the my-block slots. Any
+ * Blockly option can be overridden
  * (readOnly, media, plugins: CONTINUOUS_TOOLBOX_PLUGINS, zoom ...).
  */
 export function createEditor(Blockly: BlocklyApi, container: Element | string, options: EditorOptions = {}): BlocklyModule.WorkspaceSvg {
@@ -292,5 +363,6 @@ export function createEditor(Blockly: BlocklyApi, container: Element | string, o
     toolbox: toolbox as unknown as BlocklyModule.utils.toolbox.ToolboxDefinition,
   });
   attachToolboxCallbacks(Blockly, workspace);
+  addBubblesToMyBlocks(Blockly, workspace);
   return workspace;
 }

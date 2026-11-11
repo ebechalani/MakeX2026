@@ -317,7 +317,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                     className="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-2"
                     title={`${line.label}: ${percent(line.successRate)} of the runs`}
                   >
-                    <span className="truncate text-sm text-slate-700">{penaltyIds.has(line.id) ? `No penalty: ${line.label.toLowerCase()}` : line.label}</span>
+                    <span className="text-sm leading-tight text-slate-700">{penaltyIds.has(line.id) ? `No penalty: ${line.label.toLowerCase()}` : line.label}</span>
                     <span className="h-2 overflow-hidden rounded-full bg-[#d5e4f7]" aria-hidden="true">
                       <span className="block h-full rounded-full bg-[#2a78d6]" style={{ width: `${line.successRate * 100}%` }} />
                     </span>

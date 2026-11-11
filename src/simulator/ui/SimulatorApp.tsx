@@ -168,6 +168,10 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     setNotice({ text, tone });
     noticeTimer.current = setTimeout(() => setNotice(null), tone === 'error' ? 6000 : 3500);
   }, []);
+  const hush = useCallback(() => {
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    setNotice(null);
+  }, []);
   useEffect(
     () => () => {
       if (noticeTimer.current) clearTimeout(noticeTimer.current);
@@ -322,7 +326,10 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
         <div className="ml-auto flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setBatchOpen(true)}
+            onClick={() => {
+              hush();
+              setBatchOpen(true);
+            }}
             disabled={!editorReady}
             className="flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-sm font-semibold hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:opacity-40"
             title="Run your program on many starting combinations at once"
@@ -416,7 +423,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             finishReason={snapshot.finishReason}
             score={snapshot.score}
             time={snapshot.time}
-            readyHint={`Ready. You can drag the robot inside the ${startZoneName} and scroll on it to turn it.`}
+            readyHint={`Ready. Drag the robot inside the ${startZoneName}; turn it with the buttons below the mat.`}
             placingProblem={placing && ghost ? `Not allowed: ${notAllowed.charAt(0).toLowerCase()}${notAllowed.slice(1)} It stays where it was.` : null}
             onShowSheet={showScoreSheet}
           />
@@ -456,10 +463,10 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
               <span className="font-mono text-xs tabular-nums text-slate-600" title="Direction the robot faces: 0° = up the mat, 90° = to the right">
                 {headingDegrees(shownPose.heading)}°
               </span>
-              <button type="button" onClick={() => onRotate(-rotateStep)} disabled={!placing} className={button.icon} aria-label={`Turn the robot ${rotateStep} degrees to the left`} title="Turn left">
+              <button type="button" onClick={() => onRotate(-rotateStep)} disabled={!placing} className={button.icon} aria-label={`Turn the robot ${rotateStep} degrees to the left`} title="Turn left (the mouse wheel on the robot turns it too)">
                 <RotateLeftIcon className="h-4 w-4" />
               </button>
-              <button type="button" onClick={() => onRotate(rotateStep)} disabled={!placing} className={button.icon} aria-label={`Turn the robot ${rotateStep} degrees to the right`} title="Turn right">
+              <button type="button" onClick={() => onRotate(rotateStep)} disabled={!placing} className={button.icon} aria-label={`Turn the robot ${rotateStep} degrees to the right`} title="Turn right (the mouse wheel on the robot turns it too)">
                 <RotateRightIcon className="h-4 w-4" />
               </button>
               <label className="sr-only" htmlFor="rotate-step">
@@ -548,11 +555,12 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
       </main>
 
       {/* ================================================================ floating message */}
+      {/* (it lets clicks through: a message must never be in the way of a button below it) */}
       {notice && (
         <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex justify-center px-3">
           <p
             role={notice.tone === 'error' ? 'alert' : 'status'}
-            className={`pointer-events-auto max-w-xl rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-xl ${notice.tone === 'error' ? 'bg-rose-700' : 'bg-slate-900'}`}
+            className={`max-w-xl rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-xl ${notice.tone === 'error' ? 'bg-rose-700' : 'bg-slate-900'}`}
           >
             {notice.text}
           </p>

@@ -7,7 +7,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import type { ButtonName, RGB, ScreenLabel } from '../core/types';
-import { rgbCss } from './format';
+import { rgbCss, wrapScreenLines } from './format';
 import { SoundIcon } from './icons';
 import { toggleClass } from './widgets';
 
@@ -16,6 +16,8 @@ const SCREEN_PIXELS = 128;
 const SCREEN_ZOOM = 1.25;
 /** Height of one printed line, in screen pixels. */
 const LINE_HEIGHT = 16;
+/** Characters that fit on one line of the screen; longer lines continue on the next row. */
+const SCREEN_COLUMNS = 18;
 
 interface HoldButtonProps {
   name: ButtonName;
@@ -76,7 +78,8 @@ export interface CyberPiPanelProps {
 }
 
 export function CyberPiPanel({ lines, labels, leds, onButton, soundOn, onSound }: CyberPiPanelProps) {
-  const visibleLines = lines.slice(-Math.floor(SCREEN_PIXELS / LINE_HEIGHT));
+  // like the real screen: long lines wrap, and when the screen is full the oldest rows scroll away
+  const visibleLines = wrapScreenLines(lines, SCREEN_COLUMNS).slice(-Math.floor(SCREEN_PIXELS / LINE_HEIGHT));
   const size = SCREEN_PIXELS * SCREEN_ZOOM;
   const arrow = 'flex h-9 w-9 items-center justify-center rounded-md text-sm';
 
@@ -116,7 +119,7 @@ export function CyberPiPanel({ lines, labels, leds, onButton, soundOn, onSound }
           >
             <div className="absolute inset-x-0 top-0 px-1" style={{ fontSize: 11 * SCREEN_ZOOM, lineHeight: `${LINE_HEIGHT * SCREEN_ZOOM}px` }}>
               {visibleLines.map((line, i) => (
-                <div key={i} className="truncate whitespace-pre">
+                <div key={i} className="overflow-hidden whitespace-pre">
                   {line === '' ? ' ' : line}
                 </div>
               ))}

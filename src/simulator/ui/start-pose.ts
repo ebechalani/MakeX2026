@@ -61,8 +61,9 @@ export function rotatedPose(config: RobotConfig, zone: Rect, from: Pose, heading
 
 /** Heading in whole degrees 0..359 for display (0 = up, 90 = right). */
 export function headingDegrees(heading: number): number {
-  const deg = Math.round(heading / DEG) % 360;
-  return deg < 0 ? deg + 360 : deg;
+  // "+ 360, % 360" brings negative angles into 0..359 and also turns the "-0" that JavaScript
+  // gives for tiny negative angles into a plain 0
+  return ((Math.round(heading / DEG) % 360) + 360) % 360;
 }
 
 export function isPose(value: unknown): value is Pose {

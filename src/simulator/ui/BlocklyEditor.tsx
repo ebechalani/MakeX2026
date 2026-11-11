@@ -65,6 +65,10 @@ const PROGRAM_MARGIN = 28;
 /** Wait this long after the last change before saving (ms). */
 const SAVE_DELAY = 400;
 
+/** CSS class (see simulator.css) that makes a block flash, and how long it stays on the block (ms). */
+const ATTENTION_CLASS = 'mbot2-attention';
+const ATTENTION_MS = 2000;
+
 function BlocklyEditorImpl(props: BlocklyEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const propsRef = useRef(props);
@@ -80,6 +84,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
     let saveTimer: ReturnType<typeof setTimeout> | null = null;
     let observer: ResizeObserver | null = null;
     let saveNow: (() => void) | null = null;
+    let flashTimer: ReturnType<typeof setTimeout> | null = null;
 
     const setUp = async () => {
       const Blockly: BlocklyApi = await import('blockly');
@@ -97,6 +102,12 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
       });
       workspace = ws;
       const serializer = Blockly.serialization.workspaces;
+
+      // Development only: lets an automated browser test reach the editor (window.__sim).
+      // It is never set in the published site.
+      if (process.env.NODE_ENV !== 'production') {
+        (window as unknown as { __sim?: unknown }).__sim = { Blockly, workspace: ws };
+      }
 
       // ---- show the saved program (or the starting one)
       const saved = loadJson(storageKey, isProgramJson);
@@ -173,6 +184,15 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
           if (!block) return false;
           ws.centerOnBlock(id);
           Blockly.common.setSelected(block);
+          // Blockly's own mark for a selected block is a thin yellow line, easy to miss on a
+          // yellow or orange block: let the block flash for a moment as well (see simulator.css)
+          const svg = block.getSvgRoot();
+          svg.classList.remove(ATTENTION_CLASS);
+          // (reading a size makes the browser notice that the class was gone, so the flash restarts)
+          void svg.getBoundingClientRect();
+          svg.classList.add(ATTENTION_CLASS);
+          if (flashTimer) clearTimeout(flashTimer);
+          flashTimer = setTimeout(() => svg.classList.remove(ATTENTION_CLASS), ATTENTION_MS);
           return true;
         },
         blockCount: () => status().blocks,
@@ -194,6 +214,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
       disposed = true;
       window.removeEventListener('pagehide', onLeave);
       if (saveTimer) saveNow?.();
+      if (flashTimer) clearTimeout(flashTimer);
       observer?.disconnect();
       propsRef.current.onReady(null);
       workspace?.dispose();

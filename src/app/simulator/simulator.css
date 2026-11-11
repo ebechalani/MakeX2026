@@ -31,3 +31,116 @@
   outline: 2px solid #0ea5e9;
   outline-offset: -2px;
 }
+
+/*
+ * Blockly hides the scrollbar of a closed block palette with the attribute display="none" on its
+ * <svg>. Tailwind's base styles show every <svg> as a block, which is stronger than that
+ * attribute, so the scrollbar of a palette that was closed would stay on the workspace as a grey
+ * bar. This gives the attribute its meaning back.
+ */
+.mbot2-blockly svg[display='none'] {
+  display: none;
+}
+
+/* A block the student is sent to from the console (a problem in the program) flashes red a few times. */
+@keyframes mbot2-attention {
+  0%,
+  100% {
+    stroke: #e11d48;
+    stroke-width: 7px;
+  }
+  50% {
+    stroke: #e11d48;
+    stroke-width: 1px;
+  }
+}
+
+.mbot2-blockly .mbot2-attention > .blocklyPath {
+  animation: mbot2-attention 0.45s ease-in-out 4;
+  /* (Blockly's yellow glow for the selected block would recolour the red flash) */
+  filter: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mbot2-blockly .mbot2-attention > .blocklyPath {
+    animation: none;
+    stroke: #e11d48 !important;
+    stroke-width: 5px !important;
+  }
+}
+
+/* The open block palette lies on top of the workspace: a soft edge shows where it ends. */
+.mbot2-blockly .blocklyFlyout {
+  filter: drop-shadow(3px 0 5px rgba(15, 23, 42, 0.14));
+}
+
+.mbot2-blockly .blocklyFlyoutBackground {
+  stroke: #cbd5e1;
+  stroke-width: 1px;
+}
+
+/*
+ * Blockly asks for the name of a new variable or list (and shows its warnings) in a small window
+ * of its own, <dialog class="blocklyDialog">. Tailwind's base styles strip such a window bare - no
+ * margins, no padding, no button look - which left it glued into the top-left corner of the page
+ * with "OK Cancel" as plain words. Put it in the middle and dress it like the rest of the simulator.
+ */
+dialog.blocklyDialog {
+  margin: auto;
+  padding: 20px;
+  width: min(340px, calc(100vw - 32px));
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.3);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+dialog.blocklyDialog::backdrop {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+dialog.blocklyDialog .blocklyDialogForm {
+  row-gap: 12px;
+}
+
+dialog.blocklyDialog .blocklyDialogPrompt {
+  font-weight: 700;
+}
+
+dialog.blocklyDialog .blocklyDialogInput {
+  width: 100%;
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 16px;
+}
+
+dialog.blocklyDialog .blocklyDialogInput:focus-visible,
+dialog.blocklyDialog button:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+dialog.blocklyDialog .blocklyDialogButtonRow {
+  justify-content: flex-end;
+}
+
+dialog.blocklyDialog button {
+  min-width: 80px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 16px;
+  background: #ffffff;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+dialog.blocklyDialog .blocklyDialogConfirmButton {
+  border-color: #0284c7;
+  background: #0284c7;
+  color: #ffffff;
+}

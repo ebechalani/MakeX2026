@@ -9,8 +9,10 @@
  *
  * Before the start signal the robot can be placed with the pointer: drag = move, mouse wheel on
  * the robot = turn (hold Shift for 1 degree steps). With the keyboard: arrow keys move, Q / E turn.
+ * On a touch screen a finger on the robot drags it; a finger anywhere else on the stage scrolls
+ * the page as usual.
  */
-import { memo, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import type { Vec2 } from '../core/geometry';
 import type { Pose, Simulation, ZoneOverlay } from '../core/types';
 import { drawStage, fitView, MatPainter, robotHit, viewToMat, type StageOptions, type StageView } from './render';
@@ -128,23 +130,42 @@ function StageCanvasImpl(props: StageCanvasProps) {
   );
 
   // ---- placing the robot
-  const matPoint = (clientX: number, clientY: number): Vec2 | null => {
+  const matPoint = useCallback((clientX: number, clientY: number): Vec2 | null => {
     const canvas = canvasRef.current;
     const view = viewRef.current;
     if (!canvas || !view) return null;
     const rect = canvas.getBoundingClientRect();
     return viewToMat(view, clientX - rect.left, clientY - rect.top);
-  };
+  }, []);
 
   /** The pose under the pointer that can be grabbed: the red outline first, then the robot itself. */
-  const grabbable = (point: Vec2): Pose | null => {
-    const p = propsRef.current;
-    if (!p.placing) return null;
-    const sim = simRef.current;
-    if (p.ghost && robotHit(sim.robotConfig, p.ghost, point, GRAB_TOLERANCE)) return p.ghost;
-    const pose = sim.world.robot.pose;
-    return robotHit(sim.robotConfig, pose, point, GRAB_TOLERANCE) ? pose : null;
-  };
+  const grabbable = useCallback(
+    (point: Vec2): Pose | null => {
+      const p = propsRef.current;
+      if (!p.placing) return null;
+      const sim = simRef.current;
+      if (p.ghost && robotHit(sim.robotConfig, p.ghost, point, GRAB_TOLERANCE)) return p.ghost;
+      const pose = sim.world.robot.pose;
+      return robotHit(sim.robotConfig, pose, point, GRAB_TOLERANCE) ? pose : null;
+    },
+    [simRef],
+  );
+
+  // Touch screens: a finger that lands on the robot is kept for dragging it (the page must not
+  // scroll away under it); a finger anywhere else scrolls the page as usual. Saying "do not
+  // scroll" is only possible in a listener that is registered as not passive, which React's
+  // own onTouchStart is not.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onTouchStart = (event: TouchEvent) => {
+      const touch = event.changedTouches[0];
+      const point = touch ? matPoint(touch.clientX, touch.clientY) : null;
+      if (point && grabbable(point) && event.cancelable) event.preventDefault();
+    };
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    return () => canvas.removeEventListener('touchstart', onTouchStart);
+  }, [grabbable, matPoint]);
 
   const onPointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
     if (event.button !== 0 && event.pointerType === 'mouse') return;
@@ -249,7 +270,6 @@ function StageCanvasImpl(props: StageCanvasProps) {
             : 'Competition mat seen from above, with the robot and the game elements.'
         }
         className="absolute inset-0 h-full w-full rounded-xl outline-none focus-visible:ring-4 focus-visible:ring-sky-400"
-        style={{ touchAction: props.placing ? 'none' : 'auto' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}

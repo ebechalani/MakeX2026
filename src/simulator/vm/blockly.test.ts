@@ -12,7 +12,7 @@ import { before, describe, it } from 'node:test';
 import { BLOCKS, getBlockDef } from '../blocks/catalog';
 import { createEditor, registerBlocks, variablesFlyout } from '../blocks/register';
 import type { BlocklyApi } from '../blocks/register';
-import { TOOLBOX } from '../blocks/toolbox';
+import { TOOLBOX, toolboxBlock } from '../blocks/toolbox';
 import type { ProgramJson } from '../core/types';
 import * as B from './builder';
 import { createFakeIO, runUntilDone } from './fake-io';
@@ -214,5 +214,72 @@ describe('Blockly integration', () => {
     for (const error of result.errors as Array<{ message: string }>) assert.match(error.message, /empty slot \(CONDITION\)/);
     assert.ok(result.calls.includes('print makeblock'));
     assert.ok(result.calls.some((c) => c.startsWith('startMotion')));
+  });
+
+  it('a word can be typed into the bubbles of "=" and "set variable"; move bubbles take numbers only', () => {
+    workspace.clear();
+    const fresh = (type: string) => {
+      const { kind: _kind, ...state } = toolboxBlock(type);
+      return Blockly.serialization.blocks.append(state as never, workspace);
+    };
+    for (const [type, slot] of [['operator_equals', 'OPERAND2'], ['operator_gt', 'OPERAND1'], ['data_setvariableto', 'VALUE']]) {
+      const bubble = fresh(type).getInput(slot)!.connection!.targetBlock()!;
+      assert.ok(bubble.isShadow(), type);
+      bubble.setFieldValue('red', 'TEXT');
+      assert.equal(bubble.getFieldValue('TEXT'), 'red', `${type}: the bubble keeps the word`);
+    }
+    const distance = fresh('mbot2_straight_cm').getInput('DISTANCE')!.connection!.targetBlock()!;
+    distance.setFieldValue('red', 'NUM');
+    assert.equal(distance.getFieldValue('NUM'), 100, 'a distance cannot be a word: the bubble keeps its number');
+    workspace.clear();
+  });
+
+  it('the slots of a my-block call (and of "return") get a white bubble to type into', async () => {
+    workspace.clear();
+    Blockly.serialization.workspaces.load(
+      B.program([B.script(B.whenStart(), []), B.define('go', ['dist'], [B.print(B.join('go ', B.v('dist')))])]) as never,
+      workspace,
+    );
+    // what dragging blocks out of the My Blocks palette creates: holes without a bubble
+    const call = Blockly.serialization.blocks.append({ type: 'procedures_callnoreturn', extraState: { name: 'go', params: ['dist'] } } as never, workspace);
+    const withReturn = Blockly.serialization.blocks.append({ type: 'procedures_defreturn', fields: { NAME: 'my value' } } as never, workspace);
+    const hole = call.getInput('ARG0')!.connection!;
+    // Blockly tells its listeners about new blocks a moment later
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const bubble = hole.targetBlock();
+    assert.ok(bubble && bubble.isShadow(), 'the call slot has a bubble');
+    assert.equal(bubble.type, 'text');
+    assert.ok(withReturn.getInput('RETURN')!.connection!.targetBlock()?.isShadow(), 'the return slot has a bubble');
+
+    // type 25 into it, hang the call under the hat, run the program Blockly saves
+    bubble.setFieldValue('25', 'TEXT');
+    const hat = workspace.getTopBlocks(false).find((block) => block.type === 'event_cyberpi_start')!;
+    hat.nextConnection!.connect(call.previousConnection!);
+    withReturn.dispose(false);
+    const result = run(Blockly.serialization.workspaces.save(workspace) as ProgramJson);
+    assert.deepEqual(result.lines, ['go 25']);
+    assert.deepEqual(result.errors, []);
+
+    // a block dropped on the bubble hides it; taking the block away brings the bubble back with its text
+    const timer = Blockly.serialization.blocks.append({ type: 'cyberpi_timer' } as never, workspace);
+    hole.connect(timer.outputConnection!);
+    assert.equal(hole.targetBlock()!.type, 'cyberpi_timer');
+    timer.dispose(false);
+    assert.equal(hole.targetBlock()!.getFieldValue('TEXT'), '25');
+    workspace.clear();
+  });
+
+  it('notes written with the builder show up as block comments and are saved again', () => {
+    workspace.clear();
+    const program = B.program([B.script(B.whenStart(), [B.note(B.moveCm('forward', 20.4), 'Now below water tower W1.')])]);
+    Blockly.serialization.workspaces.load(program as never, workspace);
+    const move = workspace.getAllBlocks(false).find((block) => block.type === 'mbot2_straight_cm')!;
+    assert.equal(move.getCommentText(), 'Now below water tower W1.');
+    const saved = Blockly.serialization.workspaces.save(workspace) as ProgramJson;
+    const icons = saved.blocks!.blocks![0].next!.block!.icons as { comment: { text: string; pinned: boolean } };
+    assert.equal(icons.comment.text, 'Now below water tower W1.');
+    assert.equal(icons.comment.pinned, false);
+    assert.deepEqual(run(saved), run(program), 'a note changes nothing in what the program does');
+    workspace.clear();
   });
 });

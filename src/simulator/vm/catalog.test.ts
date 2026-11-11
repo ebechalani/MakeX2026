@@ -18,7 +18,7 @@ import {
   valueInputs,
 } from '../blocks/catalog';
 import { MBOT2_THEME, RENDERER } from '../blocks/theme';
-import { buildToolbox, TOOLBOX, toolboxBlockTypes } from '../blocks/toolbox';
+import { buildToolbox, TOOLBOX, toolboxBlock as toolboxEntry, toolboxBlockTypes } from '../blocks/toolbox';
 import * as B from './builder';
 import { blockRole, SUPPORTED_BLOCK_TYPES, supportsBlock } from './index';
 
@@ -60,6 +60,17 @@ describe('block catalog', () => {
         const values = arg.options.map(([, value]) => value);
         assert.equal(new Set(values).size, values.length, `${def.type}.${arg.name}: duplicate option`);
       }
+    }
+  });
+
+  it('comparisons and "set variable" take text bubbles, so a word can be typed in (colour = red)', () => {
+    for (const type of ['operator_gt', 'operator_lt', 'operator_equals', 'data_setvariableto']) {
+      for (const arg of valueInputs(getBlockDef(type)!)) assert.equal(arg.shadow?.kind, 'text', `${type}.${arg.name}`);
+      for (const slot of Object.values(toolboxEntry(type).inputs ?? {})) assert.equal(slot.shadow.type, 'text', type);
+    }
+    // what must be a number stays a number-only bubble
+    for (const type of ['mbot2_straight_cm', 'control_wait', 'operator_add', 'data_changevariableby']) {
+      for (const arg of valueInputs(getBlockDef(type)!)) assert.equal(arg.shadow?.kind, 'number', `${type}.${arg.name}`);
     }
   });
 
@@ -211,8 +222,9 @@ describe('program builder', () => {
     assert.equal(typeof hat.x, 'number');
     const set = hat.next!.block!;
     assert.deepEqual(set.fields, { VARIABLE: { id: 'var1' } });
-    assert.equal(set.inputs!.VALUE.shadow!.type, 'math_number');
-    assert.equal(set.inputs!.VALUE.shadow!.fields!.NUM, 40);
+    // "set ... to" has a text bubble (a word can be typed into it), so the number is written as text
+    assert.equal(set.inputs!.VALUE.shadow!.type, 'text');
+    assert.equal(set.inputs!.VALUE.shadow!.fields!.TEXT, '40');
     const move = set.next!.block!;
     assert.deepEqual(move.fields, { DIRECTION: 'forward' });
     // a dropped-in reporter sits on top of the default shadow, like in the editor
@@ -266,5 +278,81 @@ describe('program builder', () => {
     assert.deepEqual(callBlock.extraState, { name: 'go', params: ['dist'] });
     assert.equal(callBlock.inputs!.ARG0.shadow!.fields!.NUM, 5);
     assert.deepEqual(p.variables, [{ name: 'dist', id: 'var1' }]);
+  });
+
+  it('lays the scripts out side by side: scripts first, my-blocks to their right, each with the room it needs', () => {
+    const wide = B.ifElse(
+      B.and(B.probeDetects('L1', 'line'), B.probeDetects('R1', 'line')),
+      [B.driveRpm(40, -40)],
+      [B.ifThen(B.lt(B.ultrasonic(), 20), [B.print('a rather long text for the screen of the CyberPi')])],
+    );
+    const p = B.program([
+      B.define('deliver', ['other'], [wide, B.moveCm('forward', 5)]),
+      B.script(B.whenStart(), [wide, B.call('deliver', 'left')]),
+      B.script(B.whenButton('a'), [B.wait(1)]),
+      B.defineReturn('twice', ['x'], [], B.mul(B.v('x'), 2)),
+    ]);
+    const tops = p.blocks!.blocks!;
+    assert.deepEqual(tops.map((b) => b.type), ['procedures_defnoreturn', 'procedures_defreturn', 'event_cyberpi_start', 'event_button_pressed'], 'order in the file: definitions first'); // prettier-ignore
+    const onScreen = [...tops].sort((a, b) => a.x! - b.x!);
+    assert.deepEqual(onScreen.map((b) => b.type), ['event_cyberpi_start', 'event_button_pressed', 'procedures_defnoreturn', 'procedures_defreturn'], 'order on the workspace: scripts first'); // prettier-ignore
+    for (const top of tops) assert.equal(top.y, tops[0].y, 'all start at the same height');
+    for (let i = 1; i < onScreen.length; i++) {
+      const before = onScreen[i - 1];
+      const room = onScreen[i].x! - before.x!;
+      assert.ok(room >= B.estimateStackWidth(before, p.variables) + 40, `${before.type} has ${room} px of room`);
+    }
+    // the wide script really is given more room than the old fixed 460 px columns
+    assert.ok(onScreen[1].x! - onScreen[0].x! > 900);
+  });
+
+  it('never guesses a block narrower than Blockly draws it', () => {
+    // widths in workspace pixels measured in Chromium (zelos renderer, 100 % zoom) for the blocks
+    // as the toolbox hands them out
+    const measured: Record<string, number> = {
+      event_cyberpi_start: 195,
+      control_forever: 160,
+      control_if_else: 160,
+      control_wait: 170,
+      cyberpi_show_label: 459,
+      cyberpi_led_color: 218,
+      mbot2_move_direction_with_time: 442,
+      mbot2_straight_cm: 341,
+      mbot2_drive_power: 776,
+      mbot2_motor_rotate_deg: 556,
+      gripper_arm_height: 327,
+      data_replaceitemoflist: 387,
+      event_whenbroadcastreceived: 228,
+    };
+    for (const [type, real] of Object.entries(measured)) {
+      const def = getBlockDef(type)!;
+      const top = def.shape === 'hat' ? B.program([B.script(B.b(type))]).blocks!.blocks![0] : B.program([B.script(B.whenStart(), [B.b(type)])]).blocks!.blocks![0].next!.block!;
+      const guess = B.estimateStackWidth(top, [{ id: 'list1', name: 'my list', type: 'list' }]);
+      assert.ok(guess >= real, `${type}: guessed ${guess.toFixed(0)} px, drawn ${real} px`);
+      assert.ok(guess <= real * 1.5, `${type}: guessed ${guess.toFixed(0)} px, far more than the ${real} px drawn`);
+    }
+    // value blocks nested in a condition (measured: 1076 px for the whole line follower sample)
+    const nested = B.program([
+      B.script(B.whenStart(), [
+        B.forever([B.ifElse(B.lt(B.ultrasonic(), 12), [], [B.ifElse(B.gt(1, 2), [], [B.ifElse(B.or(B.probeDetects('R1', 'line'), B.probeDetects('R2', 'line')), [], [])])])]),
+      ]),
+    ]);
+    assert.ok(B.estimateStackWidth(nested.blocks!.blocks![0]) >= 1076);
+  });
+
+  it('note() attaches an explanation to a block or a definition, as a closed Blockly comment', () => {
+    const p = B.program([
+      B.note(B.define('go', [], [B.wait(1)]), 'What "go" is for.'),
+      B.script(B.whenStart(), [B.note(B.moveCm('forward', 20.4), 'Now below water tower W1.'), B.wait(1)]),
+    ]);
+    const [def, hat] = p.blocks!.blocks!;
+    const move = hat.next!.block!;
+    assert.deepEqual((def.icons as { comment: { text: string; pinned: boolean } }).comment.text, 'What "go" is for.');
+    const comment = (move.icons as { comment: { text: string; pinned: boolean; width: number; height: number } }).comment;
+    assert.equal(comment.text, 'Now below water tower W1.');
+    assert.equal(comment.pinned, false, 'closed until the student clicks the "?" icon');
+    assert.ok(comment.width > 100 && comment.height >= 40);
+    assert.equal(move.next!.block!.icons, undefined, 'blocks without a note have no icon');
+    assert.equal(hat.icons, undefined);
   });
 });

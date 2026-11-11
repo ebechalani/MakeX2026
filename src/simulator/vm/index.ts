@@ -210,6 +210,17 @@ function listIndex(value: Scalar, length: number, allowEnd: boolean): number {
   return n >= 1 && n <= max ? n - 1 : -1;
 }
 
+/**
+ * What "set variable to" stores. Its bubble is a text box (so that a word can be typed in), which
+ * means a typed 12 arrives as the text "12": a text that is simply a number is stored as that
+ * number. Anything else ("007", "red") is kept as it was typed.
+ */
+function asStored(value: Scalar): Scalar {
+  if (typeof value !== 'string' || value === '') return value;
+  const n = Number(value);
+  return Number.isFinite(n) && String(n) === value ? n : value;
+}
+
 const CORE_STATEMENTS: Record<string, (ctx: Context) => Wait | void> = {
   // ------------------------------------------------------------------ control
   control_wait(ctx) {
@@ -248,14 +259,14 @@ const CORE_STATEMENTS: Record<string, (ctx: Context) => Wait | void> = {
 
   // ------------------------------------------------------------------ variables
   data_setvariableto(ctx) {
-    ctx.vm.writeVariable(ctx.thread, variableIdOf(ctx.block, 'VARIABLE'), ctx.value('VALUE'));
+    ctx.vm.writeVariable(ctx.thread, variableIdOf(ctx.block, 'VARIABLE'), asStored(ctx.value('VALUE')));
   },
   data_changevariableby(ctx) {
     const id = variableIdOf(ctx.block, 'VARIABLE');
     ctx.vm.writeVariable(ctx.thread, id, toNumber(ctx.vm.readVariable(ctx.thread, id)) + ctx.num('VALUE'));
   },
   variables_set(ctx) {
-    ctx.vm.writeVariable(ctx.thread, variableIdOf(ctx.block, 'VAR'), ctx.value('VALUE'));
+    ctx.vm.writeVariable(ctx.thread, variableIdOf(ctx.block, 'VAR'), asStored(ctx.value('VALUE')));
   },
   math_change(ctx) {
     const id = variableIdOf(ctx.block, 'VAR');

@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DEG, makeRng } from '../core/geometry';
+import { DEG } from '../core/geometry';
 import { DEFAULT_ROBOT_CONFIG, robotFitsInRect } from '../core/robot';
 import { createSimulation } from '../core/simulation';
 import type { ProgramJson, SimEvent } from '../core/types';
@@ -23,6 +23,7 @@ import {
   luminance,
   parseHex,
   shade,
+  wrapScreenLines,
   type LogLine,
 } from './format';
 import {
@@ -124,6 +125,14 @@ test('the console merges repeated lines and keeps only the newest ones', () => {
   assert.equal(many[9].n, 25);
 });
 
+test('long lines wrap on the narrow CyberPi screen', () => {
+  assert.deepEqual(wrapScreenLines(['Hello', ''], 18), ['Hello', '']);
+  assert.deepEqual(wrapScreenLines(['Ready for the mission'], 18), ['Ready for the miss', 'ion']);
+  assert.deepEqual(wrapScreenLines(['abcdef'], 2), ['ab', 'cd', 'ef']);
+  assert.deepEqual(wrapScreenLines(['abc'], 0), ['a', 'b', 'c'], 'never less than one character per row');
+  assert.deepEqual(wrapScreenLines([], 18), []);
+});
+
 // =============================================================================================
 // Program file
 // =============================================================================================
@@ -181,6 +190,10 @@ test('a program needs a hat block to do anything', () => {
   assert.equal(hasHatBlock({}), false);
   const loose: ProgramJson = { blocks: { blocks: [{ type: 'mbot2_straight_cm', id: 'x' }] } };
   assert.equal(hasHatBlock(loose), false);
+  // "broadcast" is an Events block too, but it does not start a script
+  const looseBroadcast: ProgramJson = { blocks: { blocks: [{ type: 'event_broadcast', id: 'y' }] } };
+  assert.equal(hasHatBlock(looseBroadcast), false);
+  assert.ok(hasHatBlock(program([script(whenButton('b'), [])])), 'a button hat counts');
 });
 
 test('the blank program is a valid program that ends at once', () => {
@@ -237,9 +250,22 @@ test('facing up, the centred pose is the game\'s own start pose', () => {
   assert.equal(mine.heading, 0);
 });
 
-test('the default robot is too long to stand diagonally in the Fire Station', () => {
-  const pose = centredPose(ROBOT, FIRE_STATION, 45 * DEG);
-  assert.equal(poseFits(ROBOT, FIRE_STATION, pose), false);
+test('the default robot also fits diagonally in the Fire Station, but not at every angle', () => {
+  // The robot is 237 mm long, but its gripper end is only 80 mm wide: turned by 45 degrees its
+  // corners are about 242 mm apart in both directions, which is still inside the 250 mm square.
+  const diagonal = centredPose(ROBOT, FIRE_STATION, 45 * DEG);
+  assert.ok(poseFits(ROBOT, FIRE_STATION, diagonal));
+  const box = robotBounds(ROBOT, diagonal);
+  assert.ok(box.maxX - box.minX < FIRE_STATION.w && box.maxY - box.minY < FIRE_STATION.h);
+
+  // In between (about 9..39 degrees away from straight) one of its sides is longer than 250 mm.
+  // The centred pose is the best possible one, so at these angles the robot fits nowhere.
+  for (const degrees of [20, 70, 110, 200, 290, 340]) {
+    const pose = centredPose(ROBOT, FIRE_STATION, degrees * DEG);
+    assert.equal(poseFits(ROBOT, FIRE_STATION, pose), false, `heading ${degrees}`);
+    const b = robotBounds(ROBOT, pose);
+    assert.ok(Math.max(b.maxX - b.minX, b.maxY - b.minY) > FIRE_STATION.w, `heading ${degrees}`);
+  }
 });
 
 test('turning the robot moves it to the middle when it would otherwise stick out', () => {
@@ -259,14 +285,19 @@ test('turning the robot moves it to the middle when it would otherwise stick out
   assert.equal(small.pose.y, centre.y);
 
   // an angle that never fits is reported, with the old position kept
-  const bad = rotatedPose(ROBOT, FIRE_STATION, centre, 45 * DEG);
+  const bad = rotatedPose(ROBOT, FIRE_STATION, centre, 20 * DEG);
   assert.equal(bad.legal, false);
   assert.equal(bad.pose.x, centre.x);
   assert.equal(bad.pose.y, centre.y);
+  assert.ok(Math.abs(bad.pose.heading - 20 * DEG) < 1e-9);
+
+  // from that not-allowed pose, turning on to the diagonal finds a place again (in the middle)
+  const diagonal = rotatedPose(ROBOT, FIRE_STATION, bad.pose, 45 * DEG);
+  assert.ok(diagonal.legal);
+  assert.ok(poseFits(ROBOT, FIRE_STATION, diagonal.pose));
 });
 
 test('poseFits agrees with the engine about what is allowed', () => {
-  const rng = makeRng(7);
   const sim = createSimulation({
     game: fireRescueGame,
     scenario: fireRescueGame.defaultScenario(),
@@ -274,20 +305,33 @@ test('poseFits agrees with the engine about what is allowed', () => {
     program: {},
     startPose: startPoseFor(ROBOT),
   });
+  // A fixed grid of poses around the middle of the Fire Station (no random numbers, so the test
+  // cannot pass or fail by luck): small shifts are allowed, large ones are not, and some
+  // headings are never allowed.
+  const headings = [0, 3, 45, 90, 135, 180, 225, 270, 315, 357, 20, 110];
+  const shifts = [-60, -20, -5, 0, 5, 20, 60];
   let allowed = 0;
-  for (let i = 0; i < 300; i++) {
-    const pose = {
-      x: FIRE_STATION.x + rng() * FIRE_STATION.w,
-      y: FIRE_STATION.y + rng() * FIRE_STATION.h,
-      heading: [0, 90, 180, 270][Math.floor(rng() * 4)] * DEG + (rng() - 0.5) * 12 * DEG,
-    };
-    const mine = poseFits(ROBOT, FIRE_STATION, pose);
-    assert.equal(mine, robotFitsInRect(ROBOT, pose, FIRE_STATION));
-    assert.equal(sim.setStartPose(pose), mine);
-    if (mine) allowed++;
+  let refused = 0;
+  for (const degrees of headings) {
+    const centre = centredPose(ROBOT, FIRE_STATION, degrees * DEG);
+    for (const dx of shifts) {
+      for (const dy of shifts) {
+        const pose = { x: centre.x + dx, y: centre.y + dy, heading: centre.heading };
+        const mine = poseFits(ROBOT, FIRE_STATION, pose);
+        const label = `heading ${degrees}, shifted by ${dx}, ${dy}`;
+        assert.equal(mine, robotFitsInRect(ROBOT, pose, FIRE_STATION), label);
+        assert.equal(sim.setStartPose(pose), mine, label);
+        if (mine) allowed++;
+        else refused++;
+      }
+    }
+    // the middle is allowed exactly at the headings the robot can stand at
+    assert.equal(poseFits(ROBOT, FIRE_STATION, centre), degrees !== 20 && degrees !== 110, `heading ${degrees}, centred`);
   }
-  assert.ok(allowed > 5, 'the test should hit some allowed poses');
+  assert.ok(allowed >= 30, `only ${allowed} allowed poses`);
+  assert.ok(refused >= 30, `only ${refused} refused poses`);
   assert.equal(poseFits(ROBOT, FIRE_STATION, { x: Number.NaN, y: 0, heading: 0 }), false);
+  assert.equal(sim.setStartPose({ x: Number.NaN, y: 0, heading: 0 }), false);
 });
 
 test('headings are shown as 0..359 degrees', () => {
@@ -297,6 +341,12 @@ test('headings are shown as 0..359 degrees', () => {
   assert.equal(headingDegrees(Math.PI), 180);
   assert.equal(headingDegrees(-0.0001), 0);
   assert.equal(headingDegrees(359.6 * DEG), 0);
+  assert.equal(headingDegrees(-359.6 * DEG), 0);
+  assert.equal(headingDegrees(725 * DEG), 5);
+  // never "-0": Object.is tells 0 and -0 apart, which a plain comparison does not
+  for (const heading of [-0.0001, -0, -360 * DEG, 359.6 * DEG, -359.6 * DEG]) {
+    assert.ok(Object.is(headingDegrees(heading), 0), `heading ${heading}`);
+  }
 });
 
 test('isPose only accepts three finite numbers', () => {

@@ -13,6 +13,9 @@
  * block editor would save, and every one of them is run by the tests (integration.test.ts) on the
  * real engine with the real referee.
  *
+ * The blocks that are not obvious carry a note (`note(block, text)`): in the editor such a block
+ * shows a small round "?" icon, and a click on it opens the explanation.
+ *
  * How the numbers were found. The mat is measured in millimetres from its top-left corner
  * (see field.ts). The default robot starts in the Fire Station at x = 625, y = 673.2, facing
  * "up" the mat, and the middle of its claw is 142 mm (14.2 cm) ahead of the middle of its axle:
@@ -50,6 +53,7 @@ import {
   lt,
   move,
   moveCm,
+  note,
   or,
   print,
   probeDetects,
@@ -89,17 +93,21 @@ export interface SampleProgram {
 function fetchBucketFromW1(): BlockNode[] {
   return [
     turn('left', 90),
-    moveCm('forward', 20.4), // now exactly below W1
+    note(moveCm('forward', 20.4), 'Now the robot is exactly below water tower W1.'),
     turn('right', 90),
-    arm('raise'),
-    moveCm('forward', 10.4), // the claw is around the bucket, the robot stops 3 mm before the tower
+    note(arm('raise'), 'Arm up: the fingers pass over the tower, left and right of the bucket.'),
+    note(moveCm('forward', 10.4), 'The claw is around the bucket. The robot stops 3 mm before the tower.'),
     gripper('close'),
   ];
 }
 
 /** Lower the bucket to the mat, let go and move away (a bucket that still touches the robot does not score). */
 function putDownAndLeave(): BlockNode[] {
-  return [arm('lower'), gripper('open'), moveCm('backward', 10)];
+  return [
+    arm('lower'),
+    gripper('open'),
+    note(moveCm('backward', 10), 'Move away: a bucket that still touches the robot does not score.'),
+  ];
 }
 
 // =============================================================================================
@@ -115,7 +123,7 @@ const hello: SampleProgram = {
     '20 cm back, turns a quarter turn to the right and lights its LEDs blue. Works for every combination ' +
     '(it scores no points). Try changing the numbers and the colours.',
   program: program([
-    script(whenStart(), [
+    script(note(whenStart(), 'A first program. Change the numbers, the colours and the texts, then press Start again.'), [
       print('Hello MakeX!'),
       ledColor('all', '#00ff00'),
       moveCm('forward', 20),
@@ -147,34 +155,48 @@ const lineFollow: SampleProgram = {
   program: program([
     script(whenStart(), [
       print('Line follower'),
-      moveCm('forward', 11), // out of the Fire Station: the sensor is now over the black line
+      note(
+        moveCm('forward', 11),
+        'Out of the Fire Station first: the picture inside it has dark spots that are not a line. After this move the sensor is over the black line.',
+      ),
       forever([
-        ifElse(
-          lt(ultrasonic(), 12),
-          // the rescue towers are close ahead: stop the motors and end the program
-          [stopMotors('all'), print('Safe zone reached'), stop('all')],
-          [
-            ifElse(
-              and(probeDetects('L1', 'line'), probeDetects('R1', 'line')),
-              [move('forward', 40)],
-              [
+        note(
+          ifElse(
+            lt(ultrasonic(), 12),
+            // the rescue towers are close ahead: stop the motors and end the program
+            [stopMotors('all'), print('Safe zone reached'), stop('all')],
+            [
+              note(
                 ifElse(
-                  or(probeDetects('L1', 'line'), probeDetects('L2', 'line')),
-                  // the line is to the left: left wheel slower, the robot curves left
-                  [driveRpm(15, -40)],
+                  and(probeDetects('L1', 'line'), probeDetects('R1', 'line')),
+                  [move('forward', 40)],
                   [
                     ifElse(
-                      or(probeDetects('R1', 'line'), probeDetects('R2', 'line')),
-                      // the line is to the right: right wheel slower, the robot curves right
-                      [driveRpm(40, -15)],
-                      // no line under the sensor: straight on until it shows up again
-                      [move('forward', 40)],
+                      or(probeDetects('L1', 'line'), probeDetects('L2', 'line')),
+                      // the line is to the left: left wheel slower, the robot curves left
+                      [
+                        note(
+                          driveRpm(15, -40),
+                          'The line is to the left: the left wheel (EM1) turns slower, so the robot curves left. EM2, the right wheel, is mounted mirrored: a negative speed drives it forward.',
+                        ),
+                      ],
+                      [
+                        ifElse(
+                          or(probeDetects('R1', 'line'), probeDetects('R2', 'line')),
+                          // the line is to the right: right wheel slower, the robot curves right
+                          [note(driveRpm(40, -15), 'The line is to the right: the right wheel (EM2) turns slower, so the robot curves right.')],
+                          // no line under the sensor: straight on until it shows up again
+                          [note(move('forward', 40), 'No line under the sensor (the yellow marker): straight on until the line shows up again.')],
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ],
+                'L1 and R1 are the two middle probes of the sensor. Both on the line: the robot is centred, straight on.',
+              ),
+            ],
+          ),
+          'The rescue towers are closer than 12 cm: stop the motors and end the program. Otherwise: follow the line.',
         ),
       ]),
     ]),
@@ -201,11 +223,11 @@ const gripperDemo: SampleProgram = {
       ...fetchBucketFromW1(),
       moveCm('backward', 12),
       // put the bucket down on the mat ...
-      arm('lower'),
+      note(arm('lower'), 'Put the bucket down on the mat ...'),
       gripper('open'),
       wait(1),
       // ... and pick it up again
-      gripper('close'),
+      note(gripper('close'), '... and pick it up again, from the mat this time.'),
       arm('raise'),
       print('Got it!'),
     ]),
@@ -233,16 +255,16 @@ const oneBucket: SampleProgram = {
       ...fetchBucketFromW1(),
       moveCm('backward', 10),
       // across the field to building A
-      turn('right', 90),
+      note(turn('right', 90), 'Across the field to building A (top right).'),
       moveCm('forward', 62.9),
       turn('left', 90),
-      moveCm('forward', 35.9), // now in front of square A1, where the person stands
+      note(moveCm('forward', 35.9), 'Now in front of square A1, where the person stands.'),
       // one square to the right, driving backwards
-      turn('left', 90),
+      note(turn('left', 90), 'One square to the right, driving backwards: this way the gripper never sticks out over the edge of the mat.'),
       moveCm('backward', 11),
       turn('right', 90),
       // into square A2
-      moveCm('forward', 5.3),
+      note(moveCm('forward', 5.3), 'Into square A2.'),
       ...putDownAndLeave(),
     ]),
   ]),
@@ -268,58 +290,64 @@ const smartBucket: SampleProgram = {
   program: program([
     // "deliver": the robot stands in front of one square of a building, the bucket in its claw.
     // `other` says on which side the building's second square is: left or right.
-    define('deliver', ['other'], [
-      ifThen(lt(ultrasonic(), 20), [
-        // a person is standing in this square: move over to the other one
-        print('Person here - other square'),
-        ifElse(
-          eq(v('other'), 'right'),
-          [turn('left', 90), moveCm('backward', 11), turn('right', 90)],
-          [turn('right', 90), moveCm('backward', 11), turn('left', 90)],
+    note(
+      define('deliver', ['other'], [
+        note(
+          ifThen(lt(ultrasonic(), 20), [
+            // a person is standing in this square: move over to the other one
+            print('Person here - other square'),
+            ifElse(
+              eq(v('other'), 'right'),
+              [turn('left', 90), moveCm('backward', 11), turn('right', 90)],
+              [turn('right', 90), moveCm('backward', 11), turn('left', 90)],
+            ),
+          ]),
+          'Closer than 20 cm: a person is standing in this square. The robot steps sideways to the other square, driving backwards so that the gripper stays over the mat.',
         ),
+        note(moveCm('forward', 5.3), 'Into the square.'),
+        ...putDownAndLeave(),
       ]),
-      moveCm('forward', 5.3),
-      ...putDownAndLeave(),
-    ]),
+      'The robot stands in front of one square of a building, the bucket in its claw. "other" tells on which side the second square of that building is: left or right.',
+    ),
 
     script(whenStart(), [
       ...fetchBucketFromW1(),
-      setVar('colour', clawColor()),
+      note(setVar('colour', clawColor()), 'Remember the colour of the bucket: it decides the building.'),
       print(join('Bucket: ', v('colour'))),
       moveCm('backward', 10),
 
       // red -> building A (top right)
-      ifThen(eq(v('colour'), 'red'), [
+      note(ifThen(eq(v('colour'), 'red'), [
         turn('right', 90),
         moveCm('forward', 62.9),
         turn('left', 90),
         moveCm('forward', 35.9),
         call('deliver', 'right'),
-      ]),
+      ]), 'Red goes to building A (top right).'),
       // blue -> building B (top left)
-      ifThen(eq(v('colour'), 'blue'), [
+      note(ifThen(eq(v('colour'), 'blue'), [
         turn('left', 90),
         moveCm('forward', 22.1),
         turn('right', 90),
         moveCm('forward', 35.9),
         call('deliver', 'left'),
-      ]),
+      ]), 'Blue goes to building B (top left).'),
       // yellow -> building C (bottom left)
-      ifThen(eq(v('colour'), 'yellow'), [
+      note(ifThen(eq(v('colour'), 'yellow'), [
         turn('left', 90),
         moveCm('forward', 22.1),
         turn('left', 90),
         moveCm('forward', 27.1),
         call('deliver', 'right'),
-      ]),
+      ]), 'Yellow goes to building C (bottom left).'),
       // green -> building D (bottom right)
-      ifThen(eq(v('colour'), 'green'), [
+      note(ifThen(eq(v('colour'), 'green'), [
         turn('right', 90),
         moveCm('forward', 62.9),
         turn('right', 90),
         moveCm('forward', 27.1),
         call('deliver', 'left'),
-      ]),
+      ]), 'Green goes to building D (bottom right).'),
     ]),
   ]),
 };
@@ -341,22 +369,22 @@ const onePerson: SampleProgram = {
   program: program([
     script(whenStart(), [
       // to building A, square 1 (arm down, claw open: that is how the robot starts)
-      turn('right', 90),
+      note(turn('right', 90), 'To building A, square 1. The robot starts with its arm down and its claw open.'),
       moveCm('forward', 42.5),
       turn('left', 90),
-      moveCm('forward', 41.6), // the open claw slides around the person
+      note(moveCm('forward', 41.6), 'The open claw slides around the person.'),
       gripper('close'),
-      arm('raise'), // high enough to pass over a tower
+      note(arm('raise'), 'High enough to pass over a tower.'),
       // to rescue tower RR, coming from above
-      turn('right', 180),
+      note(turn('right', 180), 'To rescue tower RR in the lower safe zone, coming from above.'),
       moveCm('forward', 44.3),
       turn('right', 90),
       moveCm('forward', 37),
       turn('left', 90),
-      moveCm('forward', 25.8), // the person hangs exactly over the tower
-      arm('lower'), // the arm stops by itself when the person stands on the tower
+      note(moveCm('forward', 25.8), 'The person hangs exactly over the tower.'),
+      note(arm('lower'), 'The arm stops by itself when the person stands on the tower.'),
       gripper('open'),
-      moveCm('backward', 10),
+      note(moveCm('backward', 10), 'Move away: a person that still touches the robot does not score.'),
     ]),
   ]),
 };
@@ -400,55 +428,66 @@ const fullMission: SampleProgram = {
     'combination needs the ideas of the "smart bucket" program. The my-blocks "pick up" and "put down" ' +
     'keep the script short.',
   program: program([
-    define('pick up', [], [gripper('close'), arm('raise')]),
-    define('put down', [], [arm('lower'), gripper('open'), moveCm('backward', 10)]),
+    note(define('pick up', [], [gripper('close'), arm('raise')]), 'Grip what is in the claw and lift it.'),
+    note(
+      define('put down', [], [arm('lower'), gripper('open'), moveCm('backward', 10)]),
+      'Lower the arm, let go and move away: what still touches the robot does not score.',
+    ),
 
     script(whenStart(), [
       // ---- 1. red bucket: water tower W1 -> square A2
-      ...fetchBucketFromW1(),
+      note(left(), '1. Red bucket: from water tower W1 to square A2.'),
+      ...fetchBucketFromW1().slice(1),
       backward(10), right(), forward(62.9), left(), forward(35.9),
       left(), backward(11), right(), forward(5.3),
       call('put down'),
 
       // ---- 2. red person: square A1 -> rescue tower RR
-      left(), forward(11), right(), forward(10),
+      note(left(), '2. Red person: from square A1 to rescue tower RR.'),
+      forward(11), right(), forward(10),
       call('pick up'),
       turn('right', 180), forward(44.3), right(), forward(37), left(), forward(25.8),
       call('put down'),
 
       // ---- 3. blue bucket: water tower W3 (from its right side) -> square B2
-      backward(3.3), arm('raise'), right(), forward(11.6),
+      note(backward(3.3), '3. Blue bucket: from water tower W3 (taken from its right side) to square B2.'),
+      arm('raise'), right(), forward(11.6),
       gripper('close'),
       backward(6), right(), forward(15.6), left(), forward(42.4), right(), forward(41.2),
       call('put down'),
 
       // ---- 4. blue person: square B1 -> rescue tower RB
-      right(), backward(11), left(), forward(10),
+      note(right(), '4. Blue person: from square B1 to rescue tower RB.'),
+      backward(11), left(), forward(10),
       call('pick up'),
       backward(3), right(), forward(48), right(), forward(67.1),
       call('put down'),
 
       // ---- 5. yellow bucket: water tower W4 (from its left side) -> square C2
-      backward(3.1), arm('raise'), left(), forward(11.4),
+      note(backward(3.1), '5. Yellow bucket: from water tower W4 (taken from its left side) to square C2.'),
+      arm('raise'), left(), forward(11.4),
       gripper('close'),
       backward(6), left(), forward(15.8), left(), forward(42.4), left(), forward(32.4),
       call('put down'),
 
       // ---- 6. yellow person: square C1 -> rescue tower RY
-      left(), backward(11), right(), forward(10),
+      note(left(), '6. Yellow person: from square C1 to rescue tower RY.'),
+      backward(11), right(), forward(10),
       call('pick up'),
       backward(32.4), left(), forward(59), left(), forward(38.3),
       call('put down'),
 
       // ---- 7. green bucket: water tower W2 (from below) -> square D2
-      backward(28.3), right(), forward(14.5), left(), arm('raise'), forward(9.9),
+      note(backward(28.3), '7. Green bucket: from water tower W2 (taken from below) to square D2.'),
+      right(), forward(14.5), left(), arm('raise'), forward(9.9),
       gripper('close'),
       backward(9.9), right(), forward(22.5), right(), forward(27.1),
       right(), backward(11), left(), forward(5.3),
       call('put down'),
 
       // ---- 8. green person: square D1 -> rescue tower RG
-      right(), forward(11), left(), forward(10),
+      note(right(), '8. Green person: from square D1 to rescue tower RG.'),
+      forward(11), left(), forward(10),
       call('pick up'),
       backward(32.4), right(), forward(48), right(), forward(38.4),
       call('put down'),

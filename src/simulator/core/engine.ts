@@ -103,6 +103,8 @@ const RELEASE_MARGIN = 1;
 const GRIP_SLACK = 1;
 /** The claw has "reached" an object when its gap is within this (mm) of the object's width. */
 const GRIP_CONTACT = 0.5;
+/** An object "fits between the fingers" when it leaves at least this much room (mm) on each side. */
+const FINGER_PLAY = 0.5;
 /** Number of rays in the ultrasonic beam. */
 const ULTRASONIC_RAYS = 13;
 /** The front colour sensor looks along three parallel lines this far apart (mm). */
@@ -129,6 +131,12 @@ const HARD = 2;
 const BACKING_COS = 0.2;
 /** A body caught between two parts of the robot is pushed out by at most this much (mm) per pass. */
 const MAX_SQUEEZE_OUT = 5;
+/**
+ * Things that cannot give way push the robot back, but never further than this (mm) in one go:
+ * the robot cannot have driven deeper into them than one small step. If it would take more
+ * (e.g. something is wedged between the fingers and the wall), that is a jam, not a push.
+ */
+const MAX_PUSH_BACK = 2 * MAX_SUBSTEP_MM;
 
 /** Index of each Quad RGB probe in the engine's arrays (left to right). */
 const PROBE_INDEX: Record<ProbeName, number> = { L2: 0, L1: 1, R1: 2, R2: 3 };
@@ -256,6 +264,8 @@ class EngineSimulation<S> implements Simulation<S> {
   private heldLift = 0;
   /** width of the held body between the fingers */
   private heldWidth = 0;
+  /** something was let go or fell off its tower during this tick */
+  private cameDown = false;
 
   // ---- collision
   private readonly shapes: Box[] = [makeBox(), makeBox(), makeBox(), makeBox()];
@@ -272,6 +282,14 @@ class EngineSimulation<S> implements Simulation<S> {
   private readonly dirty: Uint8Array;
   private unsettled = false;
   private bodiesShifted = false;
+  /** counts every time a body is moved, so that a settling pass can tell whether it still moved something */
+  private shiftCount = 0;
+  /**
+   * Some bodies were still nudged by a hair in the last settling pass. That is close enough to
+   * count as settled, but they stay marked in `dirty`: the next round checks them against their
+   * neighbours. (Otherwise many tiny nudges could add up to one body creeping into another.)
+   */
+  private leftover = false;
   private readonly lastBump: Int32Array;
   private lastWallBump = -BUMP_QUIET_TICKS - 1;
   private readonly indexById = new Map<string, number>();
@@ -279,6 +297,8 @@ class EngineSimulation<S> implements Simulation<S> {
   /** saveState(): x, y, angle of every body, and the robot's pose */
   private readonly savedBodies: Float64Array;
   private readonly savedPose: Pose = { x: 0, y: 0, heading: 0 };
+  private readonly savedDirty: Uint8Array;
+  private savedLeftover = false;
   private readonly tableMinX: number;
   private readonly tableMinY: number;
   private readonly tableMaxX: number;
@@ -339,6 +359,7 @@ class EngineSimulation<S> implements Simulation<S> {
     this.dirty = new Uint8Array(n);
     this.lastBump = new Int32Array(n);
     this.savedBodies = new Float64Array(3 * n);
+    this.savedDirty = new Uint8Array(n);
     for (let i = 0; i < n; i++) {
       const b = bodies[i];
       this.indexById.set(b.id, i);
@@ -450,12 +471,15 @@ class EngineSimulation<S> implements Simulation<S> {
     // ... and the carried object goes back to where it started the match
     if (carried >= 0) this.returnHome(carried);
 
-    // nothing may end up inside something else
+    // nothing may end up inside something else (a tower that was pushed into the start zone
+    // is nudged out from under the robot; that can take a few rounds)
     this.dirty.fill(1);
     this.unsettled = this.bodies.length > 0;
     this.robotMoving = false;
-    this.resolveContacts();
-    if (this.bodiesShifted) this.dropUnsupported();
+    for (let k = 0; k < 10 && (this.unsettled || this.leftover); k++) {
+      this.resolveContacts();
+      if (this.bodiesShifted) this.dropUnsupported();
+    }
     this.robot.touching = false;
 
     this.pushEvent({ type: 'restart', time: this.world.time });
@@ -582,7 +606,7 @@ class EngineSimulation<S> implements Simulation<S> {
     this.robot.right.rpm = 0;
     // let anything that was just dropped or nudged come to rest before the referee looks
     this.robotMoving = false;
-    for (let k = 0; k < 10 && this.unsettled; k++) {
+    for (let k = 0; k < 10 && (this.unsettled || this.leftover); k++) {
       this.resolveContacts();
       if (this.bodiesShifted) this.dropUnsupported();
     }
@@ -610,6 +634,7 @@ class EngineSimulation<S> implements Simulation<S> {
   private physicsTick(): void {
     const robot = this.robot;
     this.robotMoving = false;
+    this.cameDown = false;
     robot.touching = false;
     this.moveGripper();
     // (from here on `touching` collects whether anything was pressed against during this tick)
@@ -688,10 +713,22 @@ class EngineSimulation<S> implements Simulation<S> {
       pose.heading = wrapAngle(pose.heading);
       robot.yawDeg += turned * RAD_TO_DEG; // the gyro only feels a turn that really happened
       this.poseVersion++;
-    } else if (this.unsettled) {
+    } else if (this.unsettled || this.leftover) {
       // nobody is driving, but something was dropped or squeezed: let it find its place
       this.resolveContacts();
       if (this.bodiesShifted) this.dropUnsupported();
+      if (touching) robot.touching = true;
+    }
+
+    // Something came down during this tick and has not found its place yet (there was no room
+    // where it landed): sort that out now, so that nothing is left inside something else, or
+    // over the edge of the table, between two ticks.
+    if (this.cameDown && this.unsettled) {
+      touching = robot.touching;
+      for (let k = 0; k < 4 && this.unsettled; k++) {
+        this.resolveContacts();
+        if (this.bodiesShifted) this.dropUnsupported();
+      }
       if (touching) robot.touching = true;
     }
   }
@@ -1009,6 +1046,36 @@ class EngineSimulation<S> implements Simulation<S> {
   }
 
   /**
+   * Body i is being squeezed between the two fingers of the open (or half-closed) claw, e.g.
+   * because the robot turns with a box between its fingers. If the box would fit between the
+   * fingers when it stands straight, they turn it straight and centre it - so it swings round
+   * with the claw instead of being squeezed out. Returns false when the body is not between
+   * the fingers or is too wide for them.
+   */
+  private straightenBetweenFingers(i: number): boolean {
+    if (this.heldIndex >= 0) return false; // the claw is full
+    const b = this.bodies[i];
+    const pose = this.robot.pose;
+    const s = Math.sin(pose.heading);
+    const c = Math.cos(pose.heading);
+    const gap = this.robot.gripper.gap;
+    const across = (b.x - pose.x) * c + (b.y - pose.y) * s;
+    if (Math.abs(across) >= gap / 2) return false; // its middle is not between the fingers
+    const quarterTurns = Math.round(wrapAngle(b.angle - pose.heading) / (Math.PI / 2));
+    const width = quarterTurns % 2 === 0 ? b.w : b.l;
+    if (width + 2 * FINGER_PLAY > gap) return false; // too wide: it has to be pushed out
+    const along = (b.x - pose.x) * s - (b.y - pose.y) * c;
+    b.angle = pose.heading + quarterTurns * (Math.PI / 2);
+    b.x = pose.x + along * s;
+    b.y = pose.y - along * c;
+    this.dirty[i] = 1;
+    this.unsettled = true;
+    this.bodiesShifted = true;
+    this.shiftCount++;
+    return true;
+  }
+
+  /**
    * Would both fingers press into the same body if the claw closed to `gap`? Then the claw is
    * stuck on something it cannot grip (too big, not grippable, or only caught by its end).
    */
@@ -1106,6 +1173,18 @@ class EngineSimulation<S> implements Simulation<S> {
   private release(): void {
     const i = this.letGo();
     if (i < 0) return;
+    const b = this.bodies[i];
+    const support = this.comeDown(i, PLATFORM_SNAP);
+    this.pushEvent({ type: 'release', bodyId: b.id, onto: support ? support.id : null, time: this.world.time });
+  }
+
+  /**
+   * Body i has lost what held it up (the claw let go, or it was pushed off its tower): it comes
+   * to rest on the platform under its centre, or it drops to the mat.
+   * `reach` is how far (mm) the top of that platform may be above the body's base.
+   * Returns the platform it now stands on, or null for the mat.
+   */
+  private comeDown(i: number, reach: number): Body | null {
     const bodies = this.bodies;
     const b = bodies[i];
     let support: Body | null = null;
@@ -1114,7 +1193,7 @@ class EngineSimulation<S> implements Simulation<S> {
       const p = bodies[j];
       if (j === i || !p.platform || p.held) continue;
       const top = p.z + p.h;
-      if (top > b.z + PLATFORM_SNAP || top <= supportTop) continue;
+      if (top > b.z + reach || top <= supportTop) continue;
       if (!pointInBox(b.x, b.y, p.x, p.y, p.w / 2, p.l / 2, Math.sin(p.angle), Math.cos(p.angle))) continue;
       support = p;
       supportTop = top;
@@ -1125,10 +1204,53 @@ class EngineSimulation<S> implements Simulation<S> {
     } else {
       b.z = 0;
       b.restingOn = null;
+      this.slideOffWhatIsUnder(i);
     }
     this.dirty[i] = 1;
     this.unsettled = true;
-    this.pushEvent({ type: 'release', bodyId: b.id, onto: support ? support.id : null, time: this.world.time });
+    this.cameDown = true;
+    return support;
+  }
+
+  /**
+   * A thing that drops to the mat cannot come down INSIDE something: it slides off whatever is
+   * under it (the edge of a tower, another object, a part of the robot) and lands beside it.
+   * Only the falling thing moves; what it falls onto stays where it is.
+   */
+  private slideOffWhatIsUnder(i: number): void {
+    const bodies = this.bodies;
+    const b = bodies[i];
+    const hit = this.contact;
+    const hw = b.w / 2;
+    const hl = b.l / 2;
+    const bs = Math.sin(b.angle);
+    const bc = Math.cos(b.angle);
+    const top = b.z + b.h;
+    // sliding off one thing may land it on the next one: a few rounds sort that out
+    for (let round = 0; round < 4; round++) {
+      let moved = false;
+      for (let j = 0; j < bodies.length; j++) {
+        const o = bodies[j];
+        if (j === i || o.held) continue;
+        if (b.z >= o.z + o.h - Z_EPS || o.z >= top - Z_EPS) continue;
+        if (boxesOverlap(o.x, o.y, o.w / 2, o.l / 2, Math.sin(o.angle), Math.cos(o.angle), b.x, b.y, hw, hl, bs, bc, hit)) {
+          b.x += hit.nx * hit.depth;
+          b.y += hit.ny * hit.depth;
+          moved = true;
+        }
+      }
+      for (let k = 0; k < SHAPE_COUNT; k++) {
+        if (!this.shapeActive[k]) continue;
+        const sh = this.shapes[k];
+        if (b.z >= sh.zmax - Z_EPS || sh.zmin >= top - Z_EPS) continue;
+        if (boxesOverlap(sh.x, sh.y, sh.hw, sh.hl, sh.sin, sh.cos, b.x, b.y, hw, hl, bs, bc, hit)) {
+          b.x += hit.nx * hit.depth;
+          b.y += hit.ny * hit.depth;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
   }
 
   // ===========================================================================================
@@ -1219,6 +1341,7 @@ class EngineSimulation<S> implements Simulation<S> {
     this.dirty[i] = 1;
     this.unsettled = true;
     this.bodiesShifted = true;
+    this.shiftCount++;
     if (!b.platform) return;
     for (let j = 0; j < bodies.length; j++) {
       const rider = bodies[j];
@@ -1226,8 +1349,11 @@ class EngineSimulation<S> implements Simulation<S> {
     }
   }
 
-  /** Keep a body on the table: a body that is pushed through the wall is moved back and is now backed by the wall. */
-  private clampBodyToTable(i: number): void {
+  /**
+   * Keep a body on the table: a body that is pushed through the wall is moved back and is now
+   * backed by the wall. Returns how far (mm) it had to be moved back.
+   */
+  private clampBodyToTable(i: number): number {
     const b = this.bodies[i];
     const s = Math.abs(Math.sin(b.angle));
     const c = Math.abs(Math.cos(b.angle));
@@ -1240,10 +1366,11 @@ class EngineSimulation<S> implements Simulation<S> {
     else if (b.x + ex > this.tableMaxX) dx = this.tableMaxX - (b.x + ex);
     if (b.y - ey < this.tableMinY) dy = this.tableMinY - (b.y - ey);
     else if (b.y + ey > this.tableMaxY) dy = this.tableMaxY - (b.y + ey);
-    if (dx === 0 && dy === 0) return;
+    if (dx === 0 && dy === 0) return 0;
     this.shiftBody(i, dx, dy);
     if (dx !== 0) this.addBacking(i, dx > 0 ? -1 : 1, 0, HARD);
     if (dy !== 0) this.addBacking(i, 0, dy > 0 ? -1 : 1, HARD);
+    return Math.max(Math.abs(dx), Math.abs(dy));
   }
 
   /** Remember that body i cannot give way in direction (ux, uy), and why (SOFT: robot behind it, HARD: wall). */
@@ -1325,12 +1452,18 @@ class EngineSimulation<S> implements Simulation<S> {
     const radius = this.bodyRadius;
     let touching = false;
     let settled = false;
+    // the last pass still moved a body (by less than the tolerance)
+    let nudged = false;
+    // where the robot stood before anything pushed it back
+    const fromX = pose.x;
+    const fromY = pose.y;
     this.backingCount.fill(0);
     this.bodiesShifted = false;
 
     for (let pass = 0; pass < RESOLVE_PASSES; pass++) {
       // the deepest overlap found in this pass
       let deepest = 0;
+      const shiftsBefore = this.shiftCount;
 
       // ---- the robot against every body near it
       for (let i = 0; i < n; i++) {
@@ -1358,8 +1491,13 @@ class EngineSimulation<S> implements Simulation<S> {
           let depth = hit.depth;
           let behind = this.backingAgainst(i, nx, ny);
           if (behind === SOFT) {
-            // Another part of the robot is on the other side (e.g. a box caught between the two
-            // finger tips): instead of squeezing it, push it out, straight away from the robot.
+            // Another part of the robot is on the other side. If the body stands askew between
+            // the two fingers but would fit between them, they simply turn it straight ...
+            if ((k === FINGER_LEFT || k === FINGER_RIGHT) && this.straightenBetweenFingers(i)) {
+              break; // (it is looked at again, where it stands now, in the next pass)
+            }
+            // ... otherwise (e.g. a box caught between the two finger tips): instead of
+            // squeezing it, push it out, straight away from the robot.
             const away = Math.hypot(dx, dy);
             if (away > 1e-6) {
               nx = (b.x - pose.x) / away;
@@ -1385,11 +1523,15 @@ class EngineSimulation<S> implements Simulation<S> {
       }
 
       // ---- bodies that moved against the other bodies
-      if (this.unsettled) {
+      if (this.unsettled || this.leftover) {
         for (let i = 0; i < n; i++) {
           if (!dirty[i]) continue;
           const a = bodies[i];
           if (a.held) continue;
+          // A thing that was moved without being pushed (it rides on a pushed tower, the claw
+          // turned it, it was just put down) may stick out over the edge of the table.
+          const overWall = this.clampBodyToTable(i);
+          if (overWall > deepest) deepest = overWall;
           for (let j = 0; j < n; j++) {
             if (j === i || (dirty[j] && j < i)) continue; // (a pair of moved bodies is looked at once)
             const b = bodies[j];
@@ -1432,10 +1574,16 @@ class EngineSimulation<S> implements Simulation<S> {
         this.noteWallBump();
       }
 
+      // The robot is being pushed back further than it can have driven in: it is jammed.
+      // (Without this, something wedged between the fingers and the wall would throw the
+      // robot back by centimetres in a single tick.)
+      if (Math.hypot(pose.x - fromX, pose.y - fromY) > MAX_PUSH_BACK) break;
+
       // Two things that are both pushed by the robot push each other half-way back, so the
       // overlaps halve from pass to pass; once they are tiny, that is good enough.
       if (deepest <= SETTLE_TOLERANCE) {
         settled = true;
+        nudged = this.shiftCount !== shiftsBefore;
         break;
       }
     }
@@ -1447,10 +1595,15 @@ class EngineSimulation<S> implements Simulation<S> {
       this.unsettled = true;
       return false;
     }
-    if (this.unsettled) {
+    if (nudged) {
+      // Close enough - but what was nudged in this last pass has not been checked against
+      // everything around it yet. It keeps its mark and is looked at first thing next time.
+      this.leftover = true;
+    } else if (this.unsettled || this.leftover) {
       dirty.fill(0);
-      this.unsettled = false;
+      this.leftover = false;
     }
+    this.unsettled = false;
     return true;
   }
 
@@ -1467,6 +1620,9 @@ class EngineSimulation<S> implements Simulation<S> {
     this.savedPose.x = pose.x;
     this.savedPose.y = pose.y;
     this.savedPose.heading = pose.heading;
+    // (only taken while everything is settled: the marks are those of `leftover`)
+    this.savedDirty.set(this.dirty);
+    this.savedLeftover = this.leftover;
   }
 
   /** Put the robot and every body back where saveState() found them. */
@@ -1483,7 +1639,8 @@ class EngineSimulation<S> implements Simulation<S> {
     pose.y = this.savedPose.y;
     pose.heading = this.savedPose.heading;
     this.updateShapes();
-    this.dirty.fill(0);
+    this.dirty.set(this.savedDirty);
+    this.leftover = this.savedLeftover;
     this.unsettled = false;
   }
 
@@ -1516,7 +1673,11 @@ class EngineSimulation<S> implements Simulation<S> {
     this.clampBodyToTable(j);
   }
 
-  /** A body whose centre is no longer over the platform it stood on falls to the mat. */
+  /**
+   * A body whose centre is no longer over the platform it stood on comes down: onto another
+   * platform of the same height that stands right there (it slides across), or onto the mat
+   * beside the platform.
+   */
   private dropUnsupported(): void {
     const bodies = this.bodies;
     for (let i = 0; i < bodies.length; i++) {
@@ -1524,26 +1685,11 @@ class EngineSimulation<S> implements Simulation<S> {
       if (b.held || b.restingOn === null) continue;
       const pi = this.indexById.get(b.restingOn);
       const p = pi === undefined ? null : bodies[pi];
-      if (p) {
-        const ps = Math.sin(p.angle);
-        const pc = Math.cos(p.angle);
-        if (pointInBox(b.x, b.y, p.x, p.y, p.w / 2, p.l / 2, ps, pc)) {
-          b.z = p.z + p.h;
-          continue;
-        }
-        // it tips over the edge and lands beside the platform, not inside it
-        const hit = this.contact;
-        const bs = Math.sin(b.angle);
-        const bc = Math.cos(b.angle);
-        if (boxesOverlap(p.x, p.y, p.w / 2, p.l / 2, ps, pc, b.x, b.y, b.w / 2, b.l / 2, bs, bc, hit)) {
-          b.x += hit.nx * hit.depth;
-          b.y += hit.ny * hit.depth;
-        }
+      if (p && pointInBox(b.x, b.y, p.x, p.y, p.w / 2, p.l / 2, Math.sin(p.angle), Math.cos(p.angle))) {
+        b.z = p.z + p.h;
+        continue;
       }
-      b.z = 0;
-      b.restingOn = null;
-      this.dirty[i] = 1;
-      this.unsettled = true;
+      this.comeDown(i, Z_EPS);
     }
   }
 

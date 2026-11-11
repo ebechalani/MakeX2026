@@ -5,6 +5,7 @@
  * Plain TypeScript (no DOM, no Blockly), so it can be unit-tested under Node.
  */
 import type { BlockJson, ProgramJson } from '../core/types';
+import { blockRole } from '../vm';
 import { isRecord } from './storage';
 
 export const PROGRAM_FILE_FORMAT = 'mbot2-simulator-program';
@@ -80,12 +81,13 @@ export function countBlocks(program: ProgramJson): number {
   return topBlocks(program).reduce((sum, b) => sum + walk(b), 0);
 }
 
-/** Block types that can start a script. */
-const HAT_PREFIX = 'event_';
-
-/** True when at least one script could ever run (the program has a hat block with something below it or not). */
+/**
+ * True when at least one script could ever run: the program has a hat block ("when CyberPi
+ * starts up", "when button A pressed" ...). The interpreter is asked which blocks are hats, so
+ * this always agrees with what really runs.
+ */
 export function hasHatBlock(program: ProgramJson): boolean {
-  return topBlocks(program).some((b) => b.type.startsWith(HAT_PREFIX));
+  return topBlocks(program).some((b) => blockRole(b.type) === 'hat');
 }
 
 /** Name of the "when CyberPi starts up" hat. */
