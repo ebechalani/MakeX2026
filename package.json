@@ -10,7 +10,6 @@
     "test:sim": "tsx --test \"src/simulator/**/*.test.ts\""
   },
   "dependencies": {
-    "@blockly/continuous-toolbox": "^13.4.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.2",
     "blockly": "^13.4.0",
