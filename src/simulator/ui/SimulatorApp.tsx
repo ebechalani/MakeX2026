@@ -15,7 +15,7 @@ import { BlocklyEditor, type BlocklyEditorHandle, type EditorStatus } from './Bl
 import { CombinationPanel } from './CombinationPanel';
 import { ConsolePanel } from './ConsolePanel';
 import { ControlBar } from './ControlBar';
-import { CyberPiPanel } from './CyberPiPanel';
+import { CyberPiPanel, HoldButton } from './CyberPiPanel';
 import { EditorToolbar, type ExampleProgram } from './EditorToolbar';
 import { formatNumber } from './format';
 import { CentreIcon, HomeIcon, RotateLeftIcon, RotateRightIcon, RulesIcon, SensorsIcon, TestIcon, TrailIcon, ZonesIcon } from './icons';
@@ -127,7 +127,14 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     setEditorReady(handle !== null);
   }, []);
   const getProgram = useCallback((): ProgramJson | null => editorRef.current?.getProgram() ?? null, []);
-  const highlightBlocks = useCallback((ids: string[]) => editorRef.current?.highlight(ids), []);
+  /**
+   * True when the workspace was replaced (New, Examples, Open) while a match was on: the robot
+   * still runs the program it was started with, which is no longer the one on screen. Blocks
+   * of the two programs can carry the same ids, so until the next Start nothing lights up -
+   * better than lighting up blocks the robot is not running.
+   */
+  const replacedDuringMatch = useRef(false);
+  const highlightBlocks = useCallback((ids: string[]) => editorRef.current?.highlight(replacedDuringMatch.current ? [] : ids), []);
 
   // ------------------------------------------------------------------ the simulation
   const sim = useSimulation<S>({
@@ -141,6 +148,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   const { snapshot, setSpeed, setSoundOn, setStartPose } = sim;
   const runState = snapshot.runState;
   const placing = runState === 'ready';
+  const matchOn = runState === 'running' || runState === 'paused';
 
   // apply the remembered speed and sound once
   useEffect(() => {
@@ -223,7 +231,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   // ------------------------------------------------------------------ match buttons
   const start = () => {
     setGhost(null);
-    if (!sim.start()) say('The block editor is still loading. Try again in a moment.', 'error');
+    if (sim.start()) replacedDuringMatch.current = false;
+    else say('The block editor is still loading. Try again in a moment.', 'error');
   };
   const reset = () => {
     setGhost(null);
@@ -249,6 +258,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
       say('This program could not be shown. Your blocks were not changed.', 'error');
       return false;
     }
+    if (matchOn) replacedDuringMatch.current = true;
     return true;
   };
 
@@ -319,8 +329,13 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           <span className="hidden sm:inline">Home</span>
         </Link>
         <span className="h-5 w-px bg-white/20" aria-hidden="true" />
+        {/* on a phone there is only room for the name of the category */}
         <h1 className="min-w-0 truncate text-sm font-bold sm:text-base">
-          mBot2 Simulator <span className="font-medium text-sky-300">- {props.title}</span>
+          <span className="max-sm:hidden">mBot2 Simulator </span>
+          <span className="font-medium text-sky-300">
+            <span className="max-sm:hidden">- </span>
+            {props.title}
+          </span>
         </h1>
 
         <div className="ml-auto flex items-center gap-1.5">
@@ -423,6 +438,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             finishReason={snapshot.finishReason}
             score={snapshot.score}
             time={snapshot.time}
+            restarts={snapshot.restarts}
+            restartPenalty={game.restartPenalty}
             readyHint={`Ready. Drag the robot inside the ${startZoneName}; turn it with the buttons below the mat.`}
             placingProblem={placing && ghost ? `Not allowed: ${notAllowed.charAt(0).toLowerCase()}${notAllowed.slice(1)} It stays where it was.` : null}
             onShowSheet={showScoreSheet}
@@ -459,7 +476,23 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
               </button>
             </div>
 
-            <div className="ml-auto flex items-center gap-1.5" role="group" aria-label="Robot start position">
+            {/* during a match the robot cannot be placed any more: its two buttons take that spot, so that
+                "when button A pressed" programs can be started while watching the stage */}
+            {matchOn && (
+              <div className="ml-auto flex items-center gap-1.5" role="group" aria-label="CyberPi buttons">
+                <span className="text-xs font-semibold text-slate-600" title="Hold a button down to press it on the robot. The joystick is in the CyberPi panel below.">
+                  CyberPi
+                </span>
+                <HoldButton name="a" label="Button A" onButton={sim.setButton} className="h-9 w-9 rounded-full text-sm">
+                  A
+                </HoldButton>
+                <HoldButton name="b" label="Button B" onButton={sim.setButton} className="h-9 w-9 rounded-full text-sm">
+                  B
+                </HoldButton>
+              </div>
+            )}
+
+            <div className={matchOn ? 'hidden' : 'ml-auto flex items-center gap-1.5'} role="group" aria-label="Robot start position">
               <span className="font-mono text-xs tabular-nums text-slate-600" title="Direction the robot faces: 0° = up the mat, 90° = to the right">
                 {headingDegrees(shownPose.heading)}°
               </span>
@@ -556,8 +589,9 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
 
       {/* ================================================================ floating message */}
       {/* (it lets clicks through: a message must never be in the way of a button below it) */}
+      {/* (side by side, it sits at the bottom of the block workspace, where it covers no button of the stage) */}
       {notice && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex justify-center px-3">
+        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex justify-center px-3 lg:right-[45%]">
           <p
             role={notice.tone === 'error' ? 'alert' : 'status'}
             className={`max-w-xl rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-xl ${notice.tone === 'error' ? 'bg-rose-700' : 'bg-slate-900'}`}

@@ -28,7 +28,7 @@ interface HoldButtonProps {
 }
 
 /** A button that reports "down" while it is held and "up" when it is let go (mouse, touch or keyboard). */
-function HoldButton({ name, label, onButton, className, children }: HoldButtonProps) {
+export function HoldButton({ name, label, onButton, className, children }: HoldButtonProps) {
   const [down, setDown] = useState(false);
   const press = (next: boolean) => {
     if (next === down) return;

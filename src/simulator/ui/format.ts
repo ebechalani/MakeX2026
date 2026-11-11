@@ -86,6 +86,18 @@ export function finishText(reason: FinishReason | null): string {
 }
 
 /**
+ * What the restarts of this match have cost so far: "1 restart: -5 points", "3 restarts: -15 points".
+ * Empty when there was no restart. (The total score can never go below 0, so with few points on
+ * the board a restart does not change the score - this note is then the only sign of the penalty.)
+ */
+export function restartNote(restarts: number, penaltyEach: number): string {
+  const count = Number.isFinite(restarts) ? Math.max(0, Math.floor(restarts)) : 0;
+  if (count === 0) return '';
+  const lost = count * Math.abs(penaltyEach);
+  return `${count} restart${count === 1 ? '' : 's'}: -${lost} point${lost === 1 ? '' : 's'}`;
+}
+
+/**
  * The CyberPi screen is narrow: a printed line that is longer than `columns` characters
  * continues on the next row, like on the real screen. Returns the rows to draw.
  */

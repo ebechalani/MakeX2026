@@ -22,6 +22,7 @@ import {
   inkOn,
   luminance,
   parseHex,
+  restartNote,
   shade,
   wrapScreenLines,
   type LogLine,
@@ -35,7 +36,7 @@ import {
   programFileName,
   serializeProgramFile,
 } from './program-file';
-import { fitView, robotHit, viewToMat } from './render';
+import { fitView, placeZoneLabels, robotHit, viewToMat } from './render';
 import { centredPose, headingDegrees, isPose, poseFits, robotBounds, rotatedPose } from './start-pose';
 import { isRecord, storageKey } from './storage';
 import { Trail } from './trail';
@@ -105,6 +106,16 @@ test('engine events become console lines; sounds do not', () => {
   assert.equal(describeEvent({ type: 'tone', frequency: 440, seconds: 1, time: 0 }), null);
   assert.equal(describeEvent({ type: 'restart', time: 12 })?.level, 'warn');
   assert.match(describeEvent({ type: 'finish', reason: 'time', time: 180 })?.text ?? '', /Time is up/);
+});
+
+test('restarts are spelled out, because a restart at 0 points does not change the score', () => {
+  assert.equal(restartNote(0, 5), '');
+  assert.equal(restartNote(1, 5), '1 restart: -5 points');
+  assert.equal(restartNote(3, 5), '3 restarts: -15 points');
+  assert.equal(restartNote(2, -5), '2 restarts: -10 points', 'the sign of the penalty does not matter');
+  assert.equal(restartNote(1, 1), '1 restart: -1 point');
+  assert.equal(restartNote(Number.NaN, 5), '');
+  assert.equal(restartNote(-2, 5), '');
 });
 
 test('the console merges repeated lines and keeps only the newest ones', () => {
@@ -434,4 +445,50 @@ test('the pointer grabs the robot anywhere on its body or gripper, not beside it
   const right = { x: 625, y: 625, heading: 90 * DEG };
   assert.ok(robotHit(ROBOT, right, { x: 625 + 160, y: 625 }));
   assert.equal(robotHit(ROBOT, right, { x: 625, y: 625 - 160 }), false);
+});
+
+test('zone names never run into each other, however small the stage is', () => {
+  const zones = fireRescueGame.overlays(fireRescueGame.defaultScenario());
+  // from a phone (about 0.25 screen pixels per mm) to a large monitor (about 0.75)
+  for (const pixelsPerMm of [0.25, 0.36, 0.46, 0.6, 0.75]) {
+    const fontSize = 10 / pixelsPerMm;
+    const gap = 5 / pixelsPerMm;
+    // bold letters are roughly 0.62 of the font size wide
+    const textWidth = (label: string): number => label.length * fontSize * 0.62;
+    const places = placeZoneLabels(zones, textWidth, fontSize, gap);
+    assert.equal(places.length, zones.length);
+    const boxes = places.map((place, i) => {
+      const half = textWidth(zones[i].label) / 2;
+      const top = place.below ? zones[i].rect.y + zones[i].rect.h + gap : zones[i].rect.y - gap - fontSize;
+      return { left: place.x - half, right: place.x + half, top, bottom: top + fontSize };
+    });
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i];
+        const b = boxes[j];
+        const apart = a.right + fontSize <= b.left || b.right + fontSize <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+        assert.ok(apart, `"${zones[i].label}" and "${zones[j].label}" overlap at ${pixelsPerMm} px/mm`);
+      }
+    }
+    // the two squares of a building are 110 mm apart: on a small stage their names are wider
+    // than that, so one goes above its square and the other below; on a large stage both fit above
+    for (const building of ['A', 'B', 'C', 'D']) {
+      const pickup = zones.findIndex((z) => z.id === `pickup:${building}`);
+      const delivery = zones.findIndex((z) => z.id === `delivery:${building}`);
+      // (side by side they need a clear space of one letter height between them)
+      const sideBySide = (textWidth(zones[pickup].label) + textWidth(zones[delivery].label)) / 2 + fontSize <= 110;
+      assert.equal(places[pickup].below !== places[delivery].below, !sideBySide, `building ${building} at ${pixelsPerMm} px/mm`);
+    }
+  }
+});
+
+test('a zone name stays above its area when nothing is in the way', () => {
+  const zones = [
+    { label: 'W1', rect: { x: 100, y: 100, w: 70, h: 70 } },
+    { label: 'W2', rect: { x: 500, y: 100, w: 70, h: 70 } },
+  ];
+  const places = placeZoneLabels(zones, (label) => label.length * 12, 20, 10);
+  assert.deepEqual(places.map((p) => p.below), [false, false]);
+  assert.equal(places[0].x, 135);
+  assert.equal(places[0].y, 90, 'the text baseline sits `gap` above the area');
 });

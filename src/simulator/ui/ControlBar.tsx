@@ -37,7 +37,7 @@ export interface ControlBarProps {
  */
 
 const BIG =
-  'inline-flex h-11 select-none items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold text-white shadow-sm transition ' +
+  'inline-flex h-11 select-none items-center justify-center gap-2 rounded-xl px-2.5 text-sm font-bold text-white shadow-sm transition ' +
   `@[34rem]:h-12 @[34rem]:px-5 @[34rem]:text-base ` +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40';
 
@@ -122,7 +122,7 @@ export function ControlBar(props: ControlBarProps) {
           {runState === 'paused' ? <PlayIcon className="h-5 w-5" /> : <PauseIcon className="h-5 w-5" />}
         </button>
 
-        <div className={`ml-auto flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-2.5 py-1 shadow-sm @[34rem]:gap-4 @[34rem]:px-3 @[34rem]:py-1.5`}>
+        <div className={`ml-auto flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-2 py-1 shadow-sm @[34rem]:gap-4 @[34rem]:px-3 @[34rem]:py-1.5`}>
           <div
             className={`flex flex-col leading-none @[34rem]:flex-row @[34rem]:items-baseline @[34rem]:gap-1.5`}
             role="timer"

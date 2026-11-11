@@ -580,6 +580,57 @@ function drawProbes(ctx: CanvasRenderingContext2D, sim: StageSim, sensors: Senso
 // Zones, path, placing the robot
 // =============================================================================================
 
+/** Where the name of one zone is written: centre x and text baseline y, in mat millimetres. */
+export interface ZoneLabelPlace {
+  x: number;
+  y: number;
+  /** true when the name had to go below its area */
+  below: boolean;
+}
+
+/**
+ * Decide where the name of every zone is written.
+ *
+ * A name normally sits just above its area, so that whatever stands in the area does not hide
+ * it. Names are often wider than their areas, though: the two squares of a building are 110 mm
+ * apart and "A1 person" / "A2 water" would run into each other. A name that would touch one
+ * already placed is therefore written below its area instead.
+ *
+ * `textWidth` measures a name, `fontSize` is the height of the letters and `gap` the distance
+ * between an area and its name - all in the same unit as the zone rectangles (mm).
+ */
+export function placeZoneLabels(
+  zones: ReadonlyArray<Pick<ZoneOverlay, 'label' | 'rect'>>,
+  textWidth: (label: string) => number,
+  fontSize: number,
+  gap: number,
+): ZoneLabelPlace[] {
+  interface Box {
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+  }
+  const taken: Box[] = [];
+  // two names side by side need a clear space between them (one letter height), or they read as one
+  const air = fontSize;
+  const free = (box: Box): boolean =>
+    taken.every((t) => box.right + air <= t.left || t.right + air <= box.left || box.bottom <= t.top || t.bottom <= box.top);
+
+  return zones.map((zone) => {
+    const { x, y, w, h } = zone.rect;
+    const centre = x + w / 2;
+    const half = textWidth(zone.label) / 2;
+    const above: Box = { left: centre - half, right: centre + half, top: y - gap - fontSize, bottom: y - gap };
+    const under: Box = { left: centre - half, right: centre + half, top: y + h + gap, bottom: y + h + gap + fontSize };
+    const below = !free(above) && free(under);
+    const box = below ? under : above;
+    taken.push(box);
+    // the letters stand on the baseline; capital letters are about 0.72 of the font size tall
+    return { x: centre, y: below ? box.top + fontSize * 0.72 : box.bottom, below };
+  });
+}
+
 function drawOverlays(ctx: CanvasRenderingContext2D, overlays: ZoneOverlay[], view: StageView): void {
   const fontSize = 10 / view.scale;
   ctx.save();
@@ -597,9 +648,12 @@ function drawOverlays(ctx: CanvasRenderingContext2D, overlays: ZoneOverlay[], vi
     ctx.setLineDash(zone.kind === 'delivery' ? [6 / view.scale, 4 / view.scale] : []);
     ctx.strokeRect(x, y, w, h);
     ctx.setLineDash([]);
-    // the label sits just above its area so that whatever stands in the area does not hide it
-    haloText(ctx, zone.label, x + w / 2, y - 5 / view.scale, '#0f172a', 'rgba(255, 255, 255, 0.92)', 3 / view.scale);
   }
+  // the names go on top of all the areas, each where it does not run into another name
+  const places = placeZoneLabels(overlays, (label) => ctx.measureText(label).width, fontSize, 5 / view.scale);
+  overlays.forEach((zone, i) => {
+    haloText(ctx, zone.label, places[i].x, places[i].y, '#0f172a', 'rgba(255, 255, 255, 0.92)', 3 / view.scale);
+  });
   ctx.restore();
 }
 

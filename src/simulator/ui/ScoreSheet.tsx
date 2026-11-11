@@ -6,7 +6,7 @@
  */
 import type { ReactNode } from 'react';
 import type { FinishReason, ScoreLine, ScoreReport } from '../core/types';
-import { finishText, formatStamp } from './format';
+import { finishText, formatStamp, restartNote } from './format';
 import { CheckIcon, CrossIcon } from './icons';
 import type { RunState } from './useSimulation';
 
@@ -77,6 +77,9 @@ export interface StatusLineProps {
   score: ScoreReport;
   /** simulated seconds on the match clock */
   time: number;
+  /** restarts used in this match, and what each one costs (shown because a restart at 0 points does not change the score) */
+  restarts?: number;
+  restartPenalty?: number;
   /** what to tell the student before the start (how to place the robot) */
   readyHint: string;
   /** set when the robot is being put somewhere it may not start: shown in red instead of the hint */
@@ -89,9 +92,10 @@ export interface StatusLineProps {
  * is running, and - when it is over - the result. It keeps the same height in every state, so
  * the stage below it never jumps.
  */
-export function StatusLine({ runState, finishReason, score, time, readyHint, placingProblem, onShowSheet }: StatusLineProps) {
+export function StatusLine({ runState, finishReason, score, time, restarts = 0, restartPenalty = 0, readyHint, placingProblem, onShowSheet }: StatusLineProps) {
   const missions = score.lines.filter((line) => line.max > 0 && line.id !== 'bonus');
   const done = missions.filter((line) => line.ok).length;
+  const penaltyNote = restartNote(restarts, restartPenalty);
   const points = (
     <span className="font-mono font-bold tabular-nums">
       {score.total} / {score.max}
@@ -113,6 +117,7 @@ export function StatusLine({ runState, finishReason, score, time, readyHint, pla
     content = (
       <>
         <span className="font-bold">Match running.</span> {done} of {missions.length} missions complete.
+        {penaltyNote && <span className="font-semibold text-amber-800"> {penaltyNote}.</span>}
       </>
     );
   } else if (runState === 'paused') {
@@ -138,6 +143,7 @@ export function StatusLine({ runState, finishReason, score, time, readyHint, pla
       <>
         <span className="font-bold">Match over.</span> {finishText(finishReason)} at {formatStamp(time)}. Final score: {points}
         {perfect ? ' - a perfect run!' : score.complete ? ' - every mission complete.' : ''}
+        {penaltyNote && ` (${penaltyNote})`}
       </>
     );
   }

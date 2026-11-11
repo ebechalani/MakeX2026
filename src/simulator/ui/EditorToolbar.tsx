@@ -39,6 +39,9 @@ export interface EditorToolbarProps {
   onRedo: () => void;
 }
 
+/** Toolbar button; a little tighter on a phone, so that all six fit on one row there. */
+const TOOL = `${button.ghost} max-sm:gap-1 max-sm:px-1.5`;
+
 export function EditorToolbar(props: EditorToolbarProps) {
   const { ready, examples } = props;
   const [examplesOpen, setExamplesOpen] = useState(false);
@@ -54,15 +57,15 @@ export function EditorToolbar(props: EditorToolbarProps) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-white px-2 py-1.5" role="toolbar" aria-label="Program">
-      <button type="button" className={button.ghost} onClick={props.onNew} disabled={!ready} title="Start a new, empty program">
+    <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-200 bg-white px-2 py-1.5 sm:gap-1" role="toolbar" aria-label="Program">
+      <button type="button" className={TOOL} onClick={props.onNew} disabled={!ready} title="Start a new, empty program">
         <NewFileIcon className="h-4 w-4" />
         New
       </button>
 
       <button
         type="button"
-        className={button.ghost}
+        className={TOOL}
         aria-haspopup="dialog"
         onClick={() => setExamplesOpen(true)}
         disabled={!ready}
@@ -111,7 +114,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
         </Modal>
       )}
 
-      <button type="button" className={button.ghost} onClick={() => fileRef.current?.click()} disabled={!ready} title="Open a program file from this computer">
+      <button type="button" className={TOOL} onClick={() => fileRef.current?.click()} disabled={!ready} title="Open a program file from this computer">
         <OpenIcon className="h-4 w-4" />
         Open
       </button>
@@ -128,18 +131,18 @@ export function EditorToolbar(props: EditorToolbarProps) {
           event.target.value = '';
         }}
       />
-      <button type="button" className={button.ghost} onClick={props.onSave} disabled={!ready} title="Save the program as a file on this computer">
+      <button type="button" className={TOOL} onClick={props.onSave} disabled={!ready} title="Save the program as a file on this computer">
         <SaveIcon className="h-4 w-4" />
         Save
       </button>
 
-      <span className="mx-1 h-6 w-px bg-slate-200" aria-hidden="true" />
+      <span className="mx-1 h-6 w-px bg-slate-200 max-sm:hidden" aria-hidden="true" />
 
-      <button type="button" className={button.ghost} onClick={props.onUndo} disabled={!ready || !props.canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">
+      <button type="button" className={TOOL} onClick={props.onUndo} disabled={!ready || !props.canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">
         <UndoIcon className="h-4 w-4" />
         <span className="hidden xl:inline">Undo</span>
       </button>
-      <button type="button" className={button.ghost} onClick={props.onRedo} disabled={!ready || !props.canRedo} aria-label="Redo" title="Redo (Ctrl+Shift+Z)">
+      <button type="button" className={TOOL} onClick={props.onRedo} disabled={!ready || !props.canRedo} aria-label="Redo" title="Redo (Ctrl+Shift+Z)">
         <RedoIcon className="h-4 w-4" />
         <span className="hidden xl:inline">Redo</span>
       </button>
