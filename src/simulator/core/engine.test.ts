@@ -765,13 +765,15 @@ test('line sensor: sees the black centre line of the Fire Rescue mat', () => {
   assert.ok(io.probe('R2').light > 90);
   assert.equal(io.lineOffset(), 0);
 
-  // robot 10 mm left of the line -> the line is to the right
+  // robot 10 mm left of the line -> the line is under its right probes -> NEGATIVE deviation,
+  // like on the real mBot2 ("-100 = the sensor is on the left of the line")
   const left = at(615).harness.io();
   assert.equal(left.lineStatus(), 0b0011);
-  assert.ok(left.lineOffset() > 30, `offset ${left.lineOffset()}`);
-  // robot 10 mm right of the line -> the line is to the left
+  assert.ok(left.lineOffset() < -30, `offset ${left.lineOffset()}`);
+  // robot 10 mm right of the line -> the line is under its left probes -> positive deviation
   const right = at(635).harness.io();
   assert.equal(right.lineStatus(), 0b1100);
+  assert.ok(right.lineOffset() > 30, `offset ${right.lineOffset()}`);
   near(right.lineOffset(), -left.lineOffset(), 1e-6, 'mirror image');
 
   // no line at all
@@ -805,14 +807,66 @@ test('line sensor: yellow marker, and stopping at a line while driving', () => {
   assert.ok(probeY < 500 && probeY > 490, `stopped with the probes just on the line: ${probeY}`);
 });
 
-test('lineOffsetOf: weighted position of the dark probes', () => {
+test('lineOffsetOf: weighted position of the dark probes, signed like the real Quad RGB sensor', () => {
   const dark = makeProbeReading({ r: 0, g: 0, b: 0 }, 35);
   const bright = makeProbeReading({ r: 255, g: 255, b: 255 }, 35);
   const offsets = CFG.quadRgb.probeOffsets;
-  assert.equal(lineOffsetOf([dark, bright, bright, bright], offsets, 35), -100);
-  assert.equal(lineOffsetOf([bright, bright, bright, dark], offsets, 35), 100);
+  // the readings are in the order L2, L1, R1, R2 (the robot's left to its right)
+  assert.equal(lineOffsetOf([dark, bright, bright, bright], offsets, 35), 100, 'line under L2: the sensor is far to the RIGHT of the line');
+  assert.equal(lineOffsetOf([bright, bright, bright, dark], offsets, 35), -100, 'line under R2: the sensor is far to the LEFT of the line');
+  assert.ok(lineOffsetOf([bright, dark, bright, bright], offsets, 35) > 0, 'line under L1: a little to the right of the line');
+  assert.ok(lineOffsetOf([bright, bright, dark, bright], offsets, 35) < 0, 'line under R1: a little to the left of the line');
   assert.equal(lineOffsetOf([dark, dark, dark, dark], offsets, 35), 0);
   assert.equal(lineOffsetOf([bright, bright, bright, bright], offsets, 35), 0);
+  // a centred line reads plain 0, not "-0" (which would print as "-0" on the screen)
+  assert.ok(Object.is(lineOffsetOf([bright, dark, dark, bright], offsets, 35), 0), 'centred: 0, not -0');
+});
+
+test("line deviation: Makeblock's proportional line follower steers TOWARDS the line", () => {
+  // The follower from Makeblock's mBot2 examples, word for word:
+  //     left_power  =       base_power - kp * deviation        -> motor EM1 (left wheel)
+  //     right_power = -1 * (base_power + kp * deviation)       -> motor EM2 (right wheel, mirrored)
+  // EM2 is mounted mirrored: a NEGATIVE power drives the right wheel forward. RobotIO speaks
+  // "wheel, + = robot forward", so the EM2 power changes sign on its way to the right wheel.
+  const BASE_POWER = 20;
+  const KP = 0.3;
+  const LINE_X = 625; // the black centre line of the Fire Rescue mat: x = 625, from y = 500 up to y = 150
+  const follower: Script = function* (io) {
+    for (;;) {
+      const deviation = io.lineOffset();
+      const em1Power = BASE_POWER - KP * deviation;
+      const em2Power = -1 * (BASE_POWER + KP * deviation);
+      io.setWheelPower('left', em1Power);
+      io.setWheelPower('right', -em2Power);
+      yield;
+    }
+  };
+
+  for (const startOffset of [-12, 12]) {
+    const side = startOffset < 0 ? 'left' : 'right';
+    // start beside the line, with the probes on its plain upper part (just past the loop that
+    // crosses it at y = 395)
+    const startY = 365 + CFG.quadRgb.forward;
+    const s = setup(follower, { startPose: { x: LINE_X + startOffset, y: startY, heading: 0 } });
+    const startDeviation = s.harness.io().lineOffset();
+    assert.equal(Math.sign(startDeviation), Math.sign(startOffset), `robot ${side} of the line: sign of the deviation`);
+
+    s.sim.start();
+    // the first thing the robot does is turn towards the line ...
+    s.sim.step(Math.round(0.3 / SIM_DT));
+    assert.equal(
+      Math.sign(s.robot.pose.heading),
+      -Math.sign(startOffset),
+      `robot ${side} of the line: turns towards it (heading ${(s.robot.pose.heading / DEG).toFixed(1)} deg)`,
+    );
+    // ... and one second later it has driven on, the line in the middle of the sensor
+    s.sim.step(Math.round(1.0 / SIM_DT));
+    const io = s.harness.io();
+    assert.ok(startY - s.robot.pose.y > 100, `robot ${side} of the line: it kept driving forward (${(startY - s.robot.pose.y).toFixed(0)} mm)`);
+    assert.ok(Math.abs(s.robot.pose.x - LINE_X) < Math.abs(startOffset), `robot ${side} of the line: closer to the line (x = ${s.robot.pose.x.toFixed(1)})`);
+    assert.notEqual(io.lineStatus() & 0b0110, 0, `robot ${side} of the line: a middle probe is on the line`);
+    assert.ok(Math.abs(io.lineOffset()) <= 50, `robot ${side} of the line: small deviation at the end (${io.lineOffset().toFixed(0)})`);
+  }
 });
 
 test('ultrasonic: sees a tower, not a low object under the beam, nothing outside the beam', () => {
@@ -1190,9 +1244,10 @@ test('a program that throws is stopped and reported, the match goes on to a clea
 test('noise: the same seed gives the same match, and reading the dashboard changes nothing', () => {
   const noisy: RobotConfig = { ...CFG, noise: { wheelSlip: 0.04, sensor: 12, ultrasonicCm: 0.5 } };
   // follow the centre line with the line offset: sensor noise feeds back into the driving
+  // (a negative offset = the robot is left of the line = steer to the right)
   const follow: Script = function* (io) {
     for (let i = 0; i < 300; i++) {
-      const steer = io.lineOffset() * 0.3 + (io.ultrasonicCm() < 10 ? 5 : 0);
+      const steer = -io.lineOffset() * 0.3 + (io.ultrasonicCm() < 10 ? 5 : 0);
       io.setWheelRpm('left', 60 + steer);
       io.setWheelRpm('right', 60 - steer);
       yield;

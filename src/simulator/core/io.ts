@@ -62,7 +62,13 @@ export interface RobotIO {
   probe(name: ProbeName): ProbeReading;
   /** 4-bit line status: bit 3 = L2, bit 2 = L1, bit 1 = R1, bit 0 = R2; a bit is 1 when on the line */
   lineStatus(): number;
-  /** line deviation -100 (line far to the left) .. 100 (far to the right); 0 when centred or lost */
+  /**
+   * line deviation, signed like the real mBot2 Quad RGB sensor (Python `get_offset_track`):
+   * -100 = the robot is far to the LEFT of the line (the line is under the right probes) ..
+   * +100 = the robot is far to the RIGHT of the line (the line is under the left probes);
+   * 0 when centred or lost. Makeblock's follower `EM1 = base - kp * deviation`,
+   * `EM2 = -(base + kp * deviation)` steers back to the line with this sign.
+   */
   lineOffset(): number;
   /** distance to the nearest obstacle in cm; config.ultrasonic.maxRangeCm when nothing is seen */
   ultrasonicCm(): number;

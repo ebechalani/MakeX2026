@@ -16,6 +16,7 @@ import type * as BlocklyModule from 'blockly';
 import { createEditor, type BlocklyApi } from '../blocks';
 import type { ProgramJson } from '../core/types';
 import { isProgramJson } from './program-file';
+import { programFitScale } from './program-view';
 import { loadJson, saveJson } from './storage';
 
 export interface BlocklyEditorHandle {
@@ -52,15 +53,41 @@ export interface BlocklyEditorProps {
   onStatus?: (status: EditorStatus) => void;
 }
 
-/** Scroll so that the top-left corner of the program sits near the top-left corner of the view. */
-function showTopLeft(ws: BlocklyModule.WorkspaceSvg): void {
-  const content = ws.getMetricsManager().getContentMetrics(false);
+/** Space kept free above and to the left of the program after loading (pixels). */
+const PROGRAM_MARGIN = 28;
+
+/** Space kept free to the right of and below the program when it is fitted: the scroll bars live there (pixels). */
+const SCROLLBAR_ROOM = 20;
+
+/** The smallest zoom a program is shown at after loading: the text on the blocks is still easy to read. */
+const MIN_READABLE_SCALE = 0.6;
+
+/**
+ * Show a program that was just loaded (an example, a file, the saved blocks): its top-left
+ * corner near the top-left corner of the view, and - when it is too large for the editor at the
+ * normal zoom - zoomed out so that all of it can be seen, as far as it stays readable
+ * (the exact rule is in ./program-view.ts). It never zooms in beyond the normal zoom.
+ */
+function showProgram(ws: BlocklyModule.WorkspaceSvg): void {
+  const metrics = ws.getMetricsManager();
+  const whole = metrics.getContentMetrics(true); // the program at zoom 1
+  const view = metrics.getViewMetrics(false); // the visible part of the workspace, in pixels
+  const scale = programFitScale({
+    contentWidth: whole.width,
+    contentHeight: whole.height,
+    viewWidth: view.width,
+    viewHeight: view.height,
+    marginX: PROGRAM_MARGIN + SCROLLBAR_ROOM,
+    marginY: PROGRAM_MARGIN + SCROLLBAR_ROOM,
+    defaultScale: ws.options.zoomOptions.startScale,
+    minScale: MIN_READABLE_SCALE,
+  });
+  if (Math.abs(scale - ws.scale) > 1e-3) ws.setScale(scale);
+
+  const content = metrics.getContentMetrics(false);
   if (content.width === 0 && content.height === 0) return;
   ws.scroll(PROGRAM_MARGIN - content.left, PROGRAM_MARGIN - content.top);
 }
-
-/** Space kept free above and to the left of the program after loading (pixels). */
-const PROGRAM_MARGIN = 28;
 
 /** Wait this long after the last change before saving (ms). */
 const SAVE_DELAY = 400;
@@ -124,7 +151,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
         }
       }
       ws.clearUndo();
-      showTopLeft(ws);
+      showProgram(ws);
 
       // ---- save and report after every change
       const status = (): EditorStatus => ({
@@ -169,7 +196,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
             Blockly.Events.setGroup(false);
           }
           highlighted = [];
-          showTopLeft(ws);
+          showProgram(ws);
           return true;
         },
         undo: () => ws.undo(false),

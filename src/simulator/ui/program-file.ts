@@ -90,6 +90,14 @@ export function hasHatBlock(program: ProgramJson): boolean {
   return topBlocks(program).some((b) => blockRole(b.type) === 'hat');
 }
 
+/**
+ * True when pressing Start can make something happen: at least one hat block has a block
+ * snapped under it. (A hat alone - the blank program - starts and ends in the same moment.)
+ */
+export function hasRunnableScript(program: ProgramJson): boolean {
+  return topBlocks(program).some((b) => blockRole(b.type) === 'hat' && b.next?.block !== undefined);
+}
+
 /** Name of the "when CyberPi starts up" hat. */
 export const START_HAT_TYPE = 'event_cyberpi_start';
 

@@ -42,7 +42,7 @@ import type {
 } from '../core/types';
 import { PROBE_NAMES, SERVO_PORTS } from '../core/types';
 import { appendLog, describeEvent, type LogLine } from './format';
-import { hasHatBlock } from './program-file';
+import { hasHatBlock, hasRunnableScript } from './program-file';
 import { Trail } from './trail';
 
 // =============================================================================================
@@ -398,6 +398,12 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
         time: 0,
         level: 'warn',
         text: 'Nothing will happen: the program has no yellow "when CyberPi starts up" block to begin with.',
+      });
+    } else if (!hasRunnableScript(program)) {
+      addLog({
+        time: 0,
+        level: 'warn',
+        text: 'Nothing will happen: no block is snapped under a yellow "when ..." block yet.',
       });
     }
     handleEvents(sim.drainEvents());

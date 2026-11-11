@@ -1,5 +1,26 @@
 /* Styles of the mBot2 simulator that Tailwind classes cannot reach: Blockly draws its own SVG. */
 
+/*
+ * Wide screens: blocks on the left, stage on the right.
+ * The stage column takes 45 % of the width, but not more than the stage can use: the stage is a
+ * square that must fit under the match controls without scrolling (its size is
+ * "100dvh - 17.75rem", see SimulatorApp.tsx), so on a screen that is wide but not tall - most
+ * laptops - a 45 % column would have empty space left and right of the mat. That space goes to
+ * the block workspace instead, which always needs more room. The column never gets narrower than
+ * 33rem: the match controls and the panels under the stage need that much.
+ * (15.25rem = 17.75rem minus 2.5rem for the padding of the column and its scroll bar.)
+ */
+@media (min-width: 64rem) {
+  .mbot2-stage-column {
+    width: min(45%, max(33rem, calc(100dvh - 15.25rem)));
+  }
+
+  /* messages float over the block workspace, where they cover no button of the stage */
+  .mbot2-toast {
+    right: min(45%, max(33rem, calc(100dvh - 15.25rem)));
+  }
+}
+
 /* Blocks that are running right now glow yellow, like in Scratch / mBlock. */
 .mbot2-blockly .blocklyHighlighted > .blocklyPath {
   stroke: #ffd500;

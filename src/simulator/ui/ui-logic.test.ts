@@ -31,11 +31,13 @@ import {
   blankProgram,
   countBlocks,
   hasHatBlock,
+  hasRunnableScript,
   isProgramJson,
   parseProgramFile,
   programFileName,
   serializeProgramFile,
 } from './program-file';
+import { programFitScale } from './program-view';
 import { fitView, placeZoneLabels, robotHit, viewToMat } from './render';
 import { centredPose, headingDegrees, isPose, poseFits, robotBounds, rotatedPose } from './start-pose';
 import { isRecord, storageKey } from './storage';
@@ -205,6 +207,18 @@ test('a program needs a hat block to do anything', () => {
   const looseBroadcast: ProgramJson = { blocks: { blocks: [{ type: 'event_broadcast', id: 'y' }] } };
   assert.equal(hasHatBlock(looseBroadcast), false);
   assert.ok(hasHatBlock(program([script(whenButton('b'), [])])), 'a button hat counts');
+});
+
+test('a program has something to run once a block is snapped under a hat block', () => {
+  assert.equal(hasRunnableScript(blankProgram()), false, 'the yellow block alone does nothing');
+  assert.equal(hasRunnableScript({}), false);
+  assert.ok(hasRunnableScript(SAMPLE));
+  assert.ok(hasRunnableScript(program([script(whenButton('a'), [moveCm('forward', 5)])])), 'a button script counts');
+  // blocks that hang under nothing never run
+  const loose: ProgramJson = { blocks: { blocks: [{ type: 'mbot2_straight_cm', id: 'x', next: { block: { type: 'mbot2_straight_cm', id: 'y' } } }] } };
+  assert.equal(hasRunnableScript(loose), false);
+  // one empty hat next to a full one
+  assert.ok(hasRunnableScript(program([script(whenStart(), []), script(whenButton('b'), [moveCm('backward', 5)])])));
 });
 
 test('the blank program is a valid program that ends at once', () => {
@@ -491,4 +505,52 @@ test('a zone name stays above its area when nothing is in the way', () => {
   assert.deepEqual(places.map((p) => p.below), [false, false]);
   assert.equal(places[0].x, 135);
   assert.equal(places[0].y, 90, 'the text baseline sits `gap` above the area');
+});
+
+// =============================================================================================
+// How large a freshly loaded program is shown in the block workspace
+// =============================================================================================
+
+/** The editor of the tests: normal zoom 0.75, never smaller than 0.6, 48 px kept free each way. */
+function fitScale(contentWidth: number, contentHeight: number, viewWidth: number, viewHeight: number): number {
+  return programFitScale({ contentWidth, contentHeight, viewWidth, viewHeight, marginX: 48, marginY: 48, defaultScale: 0.75, minScale: 0.6 });
+}
+
+test('a loaded program that fits the editor is shown at the normal size, never larger', () => {
+  // "Hello, mBot2" (427 x 413 units) in the editor of a 1366 x 768 laptop (607 x 675 px)
+  assert.equal(fitScale(427, 413, 607, 675), 0.75);
+  // a single block in a huge editor is not blown up
+  assert.equal(fitScale(100, 50, 3000, 2000), 0.75);
+  // an empty workspace, or an editor that has no size yet
+  assert.equal(fitScale(0, 0, 607, 675), 0.75);
+  assert.equal(fitScale(427, 413, 0, 0), 0.75);
+  assert.equal(fitScale(427, 413, 40, 675), 0.75);
+});
+
+test('a loaded program that is a little too large is made smaller until all of it shows', () => {
+  // "Deliver one bucket" (375 x 955 units) is 69 px too tall for that laptop at the normal size
+  const scale = fitScale(375, 955, 607, 675);
+  assert.ok(scale < 0.75 && scale >= 0.6, `scale ${scale}`);
+  assert.ok(955 * scale <= 675 - 48 + 1e-9, 'the whole height shows');
+  assert.ok(375 * scale <= 607 - 48 + 1e-9, 'the whole width shows');
+  // too wide instead of too tall
+  const wide = fitScale(800, 300, 607, 675);
+  assert.ok(Math.abs(800 * wide - (607 - 48)) < 1e-9, 'exactly as wide as the room allows');
+});
+
+test('a long program keeps a readable size: only its width is fitted, the student scrolls down', () => {
+  // 30 blocks under each other: showing all of it would need a zoom of 0.4
+  assert.equal(fitScale(375, 1600, 607, 675), 0.75);
+  // long and a little too wide: small enough for the full width, not smaller
+  const scale = fitScale(800, 3000, 607, 675);
+  assert.ok(Math.abs(800 * scale - (607 - 48)) < 1e-9);
+  assert.ok(scale >= 0.6 && scale < 0.75);
+});
+
+test('a loaded program is never shown smaller than the smallest readable size', () => {
+  // "Follow the black line" (1076 x 1064 units) on an iPad (505 x 727 px) would need 0.42
+  assert.equal(fitScale(1076, 1064, 505, 727), 0.6);
+  assert.equal(fitScale(5000, 5000, 300, 300), 0.6);
+  // a "smallest size" above the normal size makes no sense: the normal size wins
+  assert.equal(programFitScale({ contentWidth: 5000, contentHeight: 50, viewWidth: 300, viewHeight: 300, marginX: 0, marginY: 0, defaultScale: 0.75, minScale: 0.9 }), 0.75);
 });

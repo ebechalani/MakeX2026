@@ -19,7 +19,7 @@ import { CyberPiPanel, HoldButton } from './CyberPiPanel';
 import { EditorToolbar, type ExampleProgram } from './EditorToolbar';
 import { formatNumber } from './format';
 import { CentreIcon, HomeIcon, RotateLeftIcon, RotateRightIcon, RulesIcon, SensorsIcon, TestIcon, TrailIcon, ZonesIcon } from './icons';
-import { blankProgram, parseProgramFile, programFileName, serializeProgramFile } from './program-file';
+import { blankProgram, hasRunnableScript, parseProgramFile, programFileName, serializeProgramFile } from './program-file';
 import type { StageOptions } from './render';
 import { ScoreSheet, StatusLine } from './ScoreSheet';
 import { SensorDashboard } from './SensorDashboard';
@@ -231,8 +231,16 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   // ------------------------------------------------------------------ match buttons
   const start = () => {
     setGhost(null);
-    if (sim.start()) replacedDuringMatch.current = false;
-    else say('The block editor is still loading. Try again in a moment.', 'error');
+    if (!sim.start()) {
+      say('The block editor is still loading. Try again in a moment.', 'error');
+      return;
+    }
+    replacedDuringMatch.current = false;
+    // a program with nothing under its yellow block ends in the same moment: say why
+    const program = getProgram();
+    if (program && !hasRunnableScript(program)) {
+      say('Nothing to run yet: snap blocks under the yellow "when CyberPi starts up" block, or open one of the Examples.');
+    }
   };
   const reset = () => {
     setGhost(null);
@@ -389,7 +397,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
 
       <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {/* ============================================================== blocks */}
-        <section aria-label="Your program" className="relative flex h-[72dvh] min-h-[26rem] flex-col border-b border-slate-300 bg-white lg:h-auto lg:min-h-0 lg:w-[55%] lg:border-b-0 lg:border-r">
+        {/* (side by side, the blocks get all the width the stage column does not need: see .mbot2-stage-column in simulator.css) */}
+        <section aria-label="Your program" className="relative flex h-[72dvh] min-h-[26rem] flex-col border-b border-slate-300 bg-white lg:h-auto lg:min-h-0 lg:min-w-0 lg:flex-1 lg:border-b-0 lg:border-r">
           <EditorToolbar
             ready={editorReady}
             canUndo={editorStatus.canUndo}
@@ -411,11 +420,22 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
               onReady={onEditorReady}
               onStatus={setEditorStatus}
             />
+            {/* An empty workspace says how to begin. The note lies under the open block palette
+                (which has z-index 20) and lets clicks and drags through; it goes away with the
+                first block that is added. Its left edge clears the list of block groups. */}
+            {editorReady && editorStatus.blocks <= 1 && (
+              <p className="pointer-events-none absolute left-[10.75rem] right-10 top-28 z-10 max-w-sm text-sm leading-relaxed text-slate-500">
+                <span className="font-bold text-slate-700">Build your program here.</span> Click a group on the left (try{' '}
+                <span className="font-semibold text-slate-700">mBot2 Chassis</span>), drag a block out and snap it under the yellow block. Then press{' '}
+                <span className="font-semibold text-slate-700">Start</span>. Or open one of the <span className="font-semibold text-slate-700">Examples</span> to see how
+                it is done.
+              </p>
+            )}
           </div>
         </section>
 
         {/* ============================================================== stage */}
-        <section aria-label="Stage" className="relative flex min-h-0 flex-col gap-2 p-3 lg:w-[45%] lg:overflow-y-auto">
+        <section aria-label="Stage" className="mbot2-stage-column relative flex min-h-0 flex-col gap-2 p-3 lg:shrink-0 lg:overflow-y-auto">
           <ControlBar
             runState={runState}
             canStart={editorReady}
@@ -445,6 +465,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             onShowSheet={showScoreSheet}
           />
 
+          {/* as large as fits under the controls without scrolling (the width of the column follows this size: .mbot2-stage-column) */}
           <div className="mx-auto aspect-square w-full" style={{ maxWidth: 'max(17rem, min(100%, calc(100dvh - 17.75rem)))' }}>
             <StageCanvas
               simRef={sim.simRef as RefObject<Simulation<unknown>>}
@@ -591,7 +612,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
       {/* (it lets clicks through: a message must never be in the way of a button below it) */}
       {/* (side by side, it sits at the bottom of the block workspace, where it covers no button of the stage) */}
       {notice && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex justify-center px-3 lg:right-[45%]">
+        <div className="mbot2-toast pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex justify-center px-3">
           <p
             role={notice.tone === 'error' ? 'alert' : 'status'}
             className={`max-w-xl rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-xl ${notice.tone === 'error' ? 'bg-rose-700' : 'bg-slate-900'}`}

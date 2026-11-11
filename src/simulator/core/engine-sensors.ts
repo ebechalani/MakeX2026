@@ -67,8 +67,25 @@ export function lineStatusOf(readings: readonly ProbeReading[]): number {
 }
 
 /**
- * Where the line is under the sensor: -100 (far left) .. 0 (centred, or no line) .. 100 (far right).
- * It is the average position of the probes that see the line, each weighted by how dark it reads.
+ * The line deviation, with the same sign as on the real mBot2 (the mBlock block "quad rgb sensor
+ * deviation (-100~100)", in Python `mbuild.quad_rgb_sensor.get_offset_track(1)`). It tells where
+ * the SENSOR is, seen from the line - not where the line is, seen from the sensor:
+ *
+ *   -100  the sensor (the robot) is far to the LEFT of the line: the line is under the right probes
+ *      0  the line is in the middle, or no probe sees a line
+ *   +100  the sensor (the robot) is far to the RIGHT of the line: the line is under the left probes
+ *
+ * That is the sign Makeblock's own line follower is written for, so it works here unchanged:
+ *
+ *   EM1 (left motor)  power =       base_power - kp * deviation
+ *   EM2 (right motor) power = -1 * (base_power + kp * deviation)     (EM2 is mounted mirrored)
+ *
+ * Robot left of the line -> negative deviation -> the left wheel speeds up, the right wheel slows
+ * down -> the robot turns right, back towards the line.
+ *
+ * The size of the value comes from the average position of the probes that see the line, each
+ * weighted by how dark it reads. `probeOffsets` are the positions of L2, L1, R1, R2 across the
+ * robot (negative = left of the middle).
  */
 export function lineOffsetOf(
   readings: readonly ProbeReading[],
@@ -80,15 +97,18 @@ export function lineOffsetOf(
   if (reach <= 0 || lineThreshold <= 0) return 0;
 
   let weightSum = 0;
-  let positionSum = 0;
+  /** where the line is under the sensor: -1 = under the far-left probe .. +1 = under the far-right probe */
+  let linePositionSum = 0;
   for (let i = 0; i < 4; i++) {
     // weight 0 at the line threshold, growing to 1 when the probe reads half the threshold or less
     const weight = Math.min(1, Math.max(0, (lineThreshold - readings[i].light) / (lineThreshold / 2)));
     weightSum += weight;
-    positionSum += weight * (probeOffsets[i] / reach);
+    linePositionSum += weight * (probeOffsets[i] / reach);
   }
   if (weightSum < 1e-9) return 0;
-  return (100 * positionSum) / weightSum;
+  // A line under the RIGHT probes means the sensor sits to the LEFT of the line: the sign turns round.
+  const deviation = (-100 * linePositionSum) / weightSum;
+  return deviation === 0 ? 0 : deviation; // (so a centred line reads 0, never "-0")
 }
 
 /**

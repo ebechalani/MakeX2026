@@ -89,8 +89,9 @@ export interface StatusLineProps {
 
 /**
  * One line above the stage that always says where the match stands: how to get ready, that it
- * is running, and - when it is over - the result. It keeps the same height in every state, so
- * the stage below it never jumps.
+ * is running, and - when it is over - the result and what to press next. It keeps the same
+ * height in every state as long as the text fits on two lines, so the stage below it does not
+ * jump; a longer text makes it taller (it is never squeezed: "shrink-0").
  */
 export function StatusLine({ runState, finishReason, score, time, restarts = 0, restartPenalty = 0, readyHint, placingProblem, onShowSheet }: StatusLineProps) {
   const missions = score.lines.filter((line) => line.max > 0 && line.id !== 'bonus');
@@ -132,7 +133,8 @@ export function StatusLine({ runState, finishReason, score, time, restarts = 0, 
     showSheet = true;
     content = (
       <>
-        <span className="font-bold">Stopped</span> at {formatStamp(time)} - this run does not count. Score so far: {points}
+        <span className="font-bold">Stopped by you</span> at {formatStamp(time)} - no final score (so far {points}). Start tries again, Reset puts the
+        field back.
       </>
     );
   } else {
@@ -149,7 +151,7 @@ export function StatusLine({ runState, finishReason, score, time, restarts = 0, 
   }
 
   return (
-    <div className={`flex min-h-12 items-center gap-2 rounded-xl border px-3 py-1.5 text-[13px] leading-snug ${tone}`}>
+    <div className={`flex min-h-12 shrink-0 items-center gap-2 rounded-xl border px-3 py-1.5 text-[13px] leading-snug ${tone}`}>
       <p role="status" aria-live="polite" className="min-w-0 flex-1">
         {content}
       </p>

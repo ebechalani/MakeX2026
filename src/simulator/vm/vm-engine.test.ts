@@ -453,17 +453,71 @@ describe('blocks on the real robot: sensors', () => {
     assert.equal(variable(lineOnLeft, 'inner'), 2, 'inner pair: only L1');
     assert.deepEqual(['L2', 'L1', 'R1', 'R2'].map((p) => variable(lineOnLeft, p)), [true, true, false, false]);
     assert.equal(variable(lineOnLeft, 'is 12'), true);
-    assert.ok(Number(variable(lineOnLeft, 'deviation')) < -50, 'line to the left = negative deviation');
+    // the deviation says where the ROBOT is, seen from the line - as on the real mBot2
+    assert.ok(Number(variable(lineOnLeft, 'deviation')) > 50, 'robot to the right of the line = positive deviation');
 
     // robot 15 mm too far to the LEFT: the line is under its two RIGHT probes
     const lineOnRight = readLine(-15);
     assert.equal(variable(lineOnRight, 'status'), 3, 'R1 + R2 = 2 + 1');
     assert.equal(variable(lineOnRight, 'inner'), 1, 'inner pair: only R1');
     assert.deepEqual(['L2', 'L1', 'R1', 'R2'].map((p) => variable(lineOnRight, p)), [false, false, true, true]);
-    assert.ok(Number(variable(lineOnRight, 'deviation')) > 50, 'line to the right = positive deviation');
+    assert.ok(Number(variable(lineOnRight, 'deviation')) < -50, 'robot to the left of the line = negative deviation');
 
     // far off the line: nothing
     assert.equal(variable(readLine(200), 'status'), 0);
+  });
+
+  it("line deviation: Makeblock's proportional line follower steers towards the line, as on the real robot", () => {
+    // The line follower from Makeblock's mBot2 examples, block for block:
+    //   forever
+    //     set left_power  to  base_power - kp * (quad rgb sensor deviation)
+    //     set right_power to  -1 * (base_power + kp * (quad rgb sensor deviation))
+    //     encoder motor EM1 rotates at power left_power %, EM2 rotates at power right_power %
+    // EM2 (the right wheel) is mounted mirrored, so its negative power drives it forward.
+    // On the real robot the deviation is NEGATIVE when the robot is to the LEFT of the line: then
+    // EM1 gets more power, the right wheel less, and the robot turns right, back to the line.
+    const officialFollower: B.BlockNode[] = [
+      B.setVar('base_power', 30),
+      B.setVar('kp', 0.4),
+      B.forever([
+        B.setVar('left_power', B.sub(B.v('base_power'), B.mul(B.v('kp'), B.lineDeviation()))),
+        B.setVar('right_power', B.mul(-1, B.add(B.v('base_power'), B.mul(B.v('kp'), B.lineDeviation())))),
+        B.drivePower(B.v('left_power'), B.v('right_power')),
+      ]),
+    ];
+    // the black line of the practice mat runs up the middle, at x = 1500
+    const offLine = (sim: Sim): number => sim.world.robot.pose.x - 1500;
+
+    for (const shift of [-15, 15]) {
+      const side = shift < 0 ? 'left' : 'right';
+      const setup: Setup = { startPose: { x: 1500 + shift, y: 1500, heading: 0 } };
+
+      // 0.4 s: the robot has turned towards the line (left of the line = turn right = clockwise)
+      const early = playFor(0.4, officialFollower, setup);
+      assert.deepEqual(early.vm.errors(), []);
+      assert.equal(
+        Math.sign(headingDeg(early)),
+        -Math.sign(shift),
+        `robot ${side} of the line: it turns towards the line (heading ${headingDeg(early).toFixed(1)} deg)`,
+      );
+      assert.ok(Math.abs(offLine(early)) < Math.abs(shift), `robot ${side} of the line: it is already closer to it`);
+
+      // 4 s: it has driven well over half a metre and is still following the line
+      const late = playFor(4, officialFollower, setup);
+      assert.ok(moved(late).up > 500, `robot ${side} of the line: drove on along the line (${moved(late).up.toFixed(0)} mm)`);
+      near(offLine(late), 0, 6, `robot ${side} of the line: mm off the line after 4 s`);
+      near(headingDeg(late), 0, 10, `robot ${side} of the line: heading after 4 s`);
+    }
+
+    // The same program with the sign of the correction turned round (what a student would have
+    // to write if the deviation had the opposite sign) runs away from the line.
+    const wrongWay: B.BlockNode[] = [
+      B.forever([
+        B.drivePower(B.add(30, B.mul(0.4, B.lineDeviation())), B.mul(-1, B.sub(30, B.mul(0.4, B.lineDeviation())))),
+      ]),
+    ];
+    const lost = playFor(4, wrongWay, { startPose: { x: 1485, y: 1500, heading: 0 } });
+    assert.ok(Math.abs(offLine(lost)) > 60, `the reversed formula leaves the line (${offLine(lost).toFixed(0)} mm off)`);
   });
 
   it('ultrasonic sensor: centimetres from the front of the robot to the object', () => {

@@ -958,7 +958,8 @@ export const BLOCKS: BlockDef[] = [
     shape: 'reporter',
     message: 'quad rgb sensor deviation (-100~100)',
     args: [],
-    tooltip: 'Where the line is under the sensor: -100 = far to the left, 0 = in the middle, 100 = far to the right.',
+    tooltip:
+      'How far the robot has drifted off the line, as on the real mBot2: -100 = the robot is far to the left of the line (the line is under the right probes), 0 = the line is in the middle, 100 = the robot is far to the right of the line (the line is under the left probes). To follow a line: EM1 power = base - kp x deviation, EM2 power = -1 x (base + kp x deviation).',
   },
   {
     type: 'sensing_quadrgb_probe_detects',

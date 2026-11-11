@@ -19,6 +19,8 @@ const BUTTON_BASE =
 export const button = {
   /** white button with a thin border: the everyday button */
   plain: `${BUTTON_BASE} border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 active:bg-slate-100`,
+  /** the everyday button when it is the natural next step: tinted, so that it stands out */
+  accent: `${BUTTON_BASE} border border-sky-500 bg-sky-50 px-3 py-2 text-sm text-sky-900 hover:bg-sky-100 active:bg-sky-200`,
   /** small square button that only shows an icon */
   icon: `${BUTTON_BASE} h-9 w-9 border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 active:bg-slate-100`,
   /** the main action of a dialog */

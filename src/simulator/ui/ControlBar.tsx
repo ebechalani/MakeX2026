@@ -43,6 +43,8 @@ const BIG =
 
 /** Smaller buttons of the second row; their icons are dropped when the column is narrow. */
 const SMALL = `${button.plain} px-2`;
+/** The same button when it is the natural next step (Reset field once the match is over). */
+const SMALL_NEXT = `${button.accent} px-2`;
 const SMALL_ICON = `hidden h-4 w-4 @[34rem]:block`;
 
 function speedLabel(speed: Speed): string {
@@ -52,6 +54,8 @@ function speedLabel(speed: Speed): string {
 export function ControlBar(props: ControlBarProps) {
   const { runState, timeLeft, score, speed } = props;
   const active = runState === 'running' || runState === 'paused';
+  /** the match was stopped or is over: the field shows the end of that run until it is reset */
+  const over = runState === 'stopped' || runState === 'finished';
   const lowTime = active && timeLeft <= 30;
 
   const speedPicker = (
@@ -96,7 +100,11 @@ export function ControlBar(props: ControlBarProps) {
           onClick={props.onStart}
           disabled={active || !props.canStart}
           className={`${BIG} bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-emerald-500 active:bg-emerald-800`}
-          title="The referee's start signal: the field is set up fresh and your program starts from the top"
+          title={
+            over
+              ? 'Try again: the field is set up fresh, the clock starts at the top and your program runs from its first block'
+              : "The referee's start signal: the field is set up fresh and your program starts from the top"
+          }
         >
           <FlagIcon className="h-6 w-6" />
           Start
@@ -106,7 +114,7 @@ export function ControlBar(props: ControlBarProps) {
           onClick={props.onStop}
           disabled={!active}
           className={`${BIG} bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-500 active:bg-rose-800 @[34rem]:px-4`}
-          title="Stop the program and the robot where they are"
+          title="Stop the program and the robot where they are. The match is not scored; Reset field puts everything back."
         >
           <StopIcon className="h-5 w-5" />
           Stop
@@ -173,11 +181,11 @@ export function ControlBar(props: ControlBarProps) {
           type="button"
           onClick={props.onReset}
           disabled={runState === 'ready'}
-          className={SMALL}
+          className={over ? SMALL_NEXT : SMALL}
           aria-label="Reset field"
-          title="Put every tower, bucket and person back and the robot into the start zone"
+          title="Put every tower, bucket and person back and the robot into the start zone, ready for a new start. Works at any moment, also during a match."
         >
-          <ResetIcon className={`${SMALL_ICON} text-slate-500`} />
+          <ResetIcon className={`${SMALL_ICON} ${over ? 'text-sky-700' : 'text-slate-500'}`} />
           Reset<span className={`hidden @[34rem]:inline`}>field</span>
         </button>
         <div className="ml-auto">{speedPicker}</div>

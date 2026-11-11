@@ -101,7 +101,7 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
             unit={`(${bits})`}
             hint="One digit per probe, L2 L1 R1 R2: 1 = on the line. Example: 0110 = 6 means the two middle probes see the line."
           />
-          <Value label="Deviation" value={formatNumber(s.lineOffset)} hint="-100 = the line is far to the left, 0 = centred, 100 = far to the right" />
+          <Value label="Deviation" value={formatNumber(s.lineOffset)} hint="-100 = the robot is far to the left of the line, 0 = centred, 100 = far to the right of the line (as on the real mBot2)" />
         </dl>
       </div>
 
